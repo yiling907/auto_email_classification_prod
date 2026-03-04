@@ -1,0 +1,178 @@
+{
+  "Comment": "InsureMail AI - Email Processing Workflow",
+  "StartAt": "ParseEmail",
+  "States": {
+    "ParseEmail": {
+      "Type": "Task",
+      "Resource": "${email_parser_lambda_arn}",
+      "Comment": "Parse raw email and extract fields",
+      "ResultPath": "$.parsed_email",
+      "Next": "ParallelAnalysis",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "HandleError",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "ParallelAnalysis": {
+      "Type": "Parallel",
+      "Comment": "Run intent classification and entity extraction in parallel",
+      "Branches": [
+        {
+          "StartAt": "ClassifyIntent",
+          "States": {
+            "ClassifyIntent": {
+              "Type": "Task",
+              "Resource": "${multi_llm_inference_lambda_arn}",
+              "Comment": "Classify email intent using multiple LLMs",
+              "Parameters": {
+                "prompt.$": "States.Format('Classify the intent of this email into one of: claim_inquiry, policy_question, complaint, general_inquiry. Email: {}', $.parsed_email.parsed_data.body)",
+                "task_type": "intent_classification"
+              },
+              "ResultPath": "$.intent",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "ExtractEntities",
+          "States": {
+            "ExtractEntities": {
+              "Type": "Pass",
+              "Comment": "Extract entities (simplified for demo)",
+              "Parameters": {
+                "policy_number": "DEMO-12345",
+                "member_name": "Demo User",
+                "claim_amount": 5000
+              },
+              "ResultPath": "$.entities",
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.analysis",
+      "Next": "RetrieveKnowledge"
+    },
+    "RetrieveKnowledge": {
+      "Type": "Task",
+      "Resource": "${rag_retrieval_lambda_arn}",
+      "Comment": "Retrieve relevant knowledge base documents",
+      "Parameters": {
+        "email_text.$": "$.parsed_email.parsed_data.body",
+        "top_k": 3
+      },
+      "ResultPath": "$.rag_results",
+      "Next": "ValidateCRM",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "ValidateCRM",
+          "ResultPath": "$.rag_error"
+        }
+      ]
+    },
+    "ValidateCRM": {
+      "Type": "Pass",
+      "Comment": "Mock CRM validation (check if policy exists)",
+      "Parameters": {
+        "policy_exists": true,
+        "customer_id": "CUST-001",
+        "validation_status": "success"
+      },
+      "ResultPath": "$.crm_validation",
+      "Next": "AssessFraudRisk"
+    },
+    "AssessFraudRisk": {
+      "Type": "Pass",
+      "Comment": "Rule-based fraud risk assessment",
+      "Parameters": {
+        "risk_level": "low",
+        "risk_score": 0.15,
+        "flags": []
+      },
+      "ResultPath": "$.fraud_score",
+      "Next": "GenerateResponse"
+    },
+    "GenerateResponse": {
+      "Type": "Task",
+      "Resource": "${claude_response_lambda_arn}",
+      "Comment": "Generate response using Claude 3",
+      "Parameters": {
+        "email_id.$": "$.parsed_email.email_id",
+        "email_body.$": "$.parsed_email.parsed_data.body",
+        "subject.$": "$.parsed_email.parsed_data.subject",
+        "entities.$": "$.analysis[1].entities",
+        "intent.$": "$.analysis[0].intent.results[0].output_text",
+        "rag_documents.$": "$.rag_results.retrieved_documents",
+        "crm_validation.$": "$.crm_validation",
+        "fraud_score.$": "$.fraud_score"
+      },
+      "ResultPath": "$.response",
+      "Next": "DetermineAction"
+    },
+    "DetermineAction": {
+      "Type": "Choice",
+      "Comment": "Route based on confidence score",
+      "Choices": [
+        {
+          "Variable": "$.response.action",
+          "StringEquals": "auto_response",
+          "Next": "AutoRespond"
+        },
+        {
+          "Variable": "$.response.action",
+          "StringEquals": "human_review",
+          "Next": "QueueForReview"
+        }
+      ],
+      "Default": "Escalate"
+    },
+    "AutoRespond": {
+      "Type": "Pass",
+      "Comment": "Automatically send response",
+      "Parameters": {
+        "action": "auto_response",
+        "message": "Response sent automatically"
+      },
+      "ResultPath": "$.final_action",
+      "Next": "Success"
+    },
+    "QueueForReview": {
+      "Type": "Pass",
+      "Comment": "Queue for human review",
+      "Parameters": {
+        "action": "queued_for_review",
+        "message": "Queued for human review"
+      },
+      "ResultPath": "$.final_action",
+      "Next": "Success"
+    },
+    "Escalate": {
+      "Type": "Pass",
+      "Comment": "Escalate to agent",
+      "Parameters": {
+        "action": "escalated",
+        "message": "Escalated to human agent"
+      },
+      "ResultPath": "$.final_action",
+      "Next": "Success"
+    },
+    "HandleError": {
+      "Type": "Pass",
+      "Comment": "Handle errors and escalate",
+      "Parameters": {
+        "action": "error_escalation",
+        "message": "Error occurred, escalating to human agent"
+      },
+      "ResultPath": "$.final_action",
+      "Next": "Success"
+    },
+    "Success": {
+      "Type": "Succeed",
+      "Comment": "Workflow completed successfully"
+    }
+  }
+}
