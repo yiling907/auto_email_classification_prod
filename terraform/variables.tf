@@ -17,14 +17,20 @@ variable "aws_region" {
 }
 
 variable "bedrock_models" {
-  description = "List of Bedrock model IDs to enable"
+  description = "List of Bedrock model IDs to enable (using most cost-effective options)"
   type        = list(string)
   default = [
-    "anthropic.claude-3-sonnet-20240229-v1:0",
+    # Claude 3 Haiku - Most cost-effective Claude model
+    # ~$0.25 per 1M input tokens, $1.25 per 1M output tokens (10x cheaper than Sonnet)
     "anthropic.claude-3-haiku-20240307-v1:0",
+
+    # Amazon Titan Embeddings - For RAG (most cost-effective embedding model)
+    # ~$0.10 per 1M tokens
     "amazon.titan-embed-text-v1"
-    # Note: Removed deprecated models (titan-text-lite-v1, llama3, mistral)
-    # Add newer models as needed
+
+    # Note: Removed expensive models for cost optimization:
+    # - Claude 3 Sonnet (~$3/$15 per 1M tokens) - 10x more expensive
+    # - Deprecated models (titan-text-lite-v1, llama3, mistral)
   ]
 }
 

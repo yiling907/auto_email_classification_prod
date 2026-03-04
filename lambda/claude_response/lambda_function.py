@@ -15,7 +15,10 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
-CLAUDE_MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0"
+# Using Claude 3 Haiku for cost optimization (10x cheaper than Sonnet)
+# Haiku: ~$0.25 per million input tokens, $1.25 per million output tokens
+# Sonnet: ~$3 per million input tokens, $15 per million output tokens
+CLAUDE_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
 
 email_table = dynamodb.Table(EMAIL_TABLE_NAME)
 
