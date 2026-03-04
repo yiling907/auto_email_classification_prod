@@ -23,6 +23,11 @@ variable "email_parser_function_name" {
   type        = string
 }
 
+variable "evaluation_metrics_lambda_arn" {
+  description = "ARN of the evaluation metrics Lambda function"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

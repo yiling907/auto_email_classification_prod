@@ -92,12 +92,13 @@ module "bedrock" {
 module "monitoring" {
   source = "./modules/monitoring"
 
-  project_name              = var.project_name
-  environment               = var.environment
-  log_retention_days        = var.log_retention_days
-  state_machine_arn         = module.step_functions.state_machine_arn
-  email_parser_function_name = module.lambda.email_parser_name
-  tags                      = local.common_tags
+  project_name                  = var.project_name
+  environment                   = var.environment
+  log_retention_days            = var.log_retention_days
+  state_machine_arn             = module.step_functions.state_machine_arn
+  email_parser_function_name    = module.lambda.email_parser_name
+  evaluation_metrics_lambda_arn = module.lambda.evaluation_metrics_arn
+  tags                          = local.common_tags
 }
 
 # API Gateway module - REST API for dashboard

@@ -218,9 +218,10 @@ resource "aws_lambda_function" "api_handlers" {
 
   environment {
     variables = {
-      EMAIL_TABLE_NAME         = var.email_table_name
-      MODEL_METRICS_TABLE_NAME = var.model_metrics_table_name
-      EMBEDDINGS_TABLE_NAME    = var.embeddings_table_name
+      EMAIL_TABLE_NAME                  = var.email_table_name
+      MODEL_METRICS_TABLE_NAME          = var.model_metrics_table_name
+      EMBEDDINGS_TABLE_NAME             = var.embeddings_table_name
+      EVALUATION_METRICS_FUNCTION_NAME  = aws_lambda_function.evaluation_metrics.function_name
     }
   }
 

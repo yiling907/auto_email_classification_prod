@@ -160,6 +160,25 @@ resource "aws_iam_role_policy" "lambda_step_functions" {
   })
 }
 
+# Lambda policy for Lambda-to-Lambda invocations (API handlers can call evaluation_metrics)
+resource "aws_iam_role_policy" "lambda_invoke" {
+  name = "${local.resource_prefix}-lambda-invoke"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # Step Functions execution role
 resource "aws_iam_role" "step_functions" {
   name = "${local.resource_prefix}-step-functions"

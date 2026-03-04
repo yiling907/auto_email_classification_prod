@@ -12,11 +12,13 @@ from boto3.dynamodb.conditions import Key
 
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
+lambda_client = boto3.client('lambda')
 
 # Environment variables
 EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
 MODEL_METRICS_TABLE_NAME = os.environ['MODEL_METRICS_TABLE_NAME']
 EMBEDDINGS_TABLE_NAME = os.environ['EMBEDDINGS_TABLE_NAME']
+EVALUATION_METRICS_FUNCTION_NAME = os.environ.get('EVALUATION_METRICS_FUNCTION_NAME', '')
 
 email_table = dynamodb.Table(EMAIL_TABLE_NAME)
 model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME)
@@ -209,9 +211,39 @@ def get_email_detail(email_id: str) -> Dict[str, Any]:
 
 
 def get_model_metrics(event: Dict[str, Any]) -> Dict[str, Any]:
-    """Get model performance metrics"""
+    """Get model performance metrics - delegates to evaluation_metrics Lambda"""
     try:
-        # Scan all metrics
+        # Get query parameters
+        params = event.get('queryStringParameters') or {}
+        task_type = params.get('task_type', 'all')
+        days = int(params.get('days', 7))
+
+        # Call evaluation_metrics Lambda if configured
+        if EVALUATION_METRICS_FUNCTION_NAME:
+            try:
+                response = lambda_client.invoke(
+                    FunctionName=EVALUATION_METRICS_FUNCTION_NAME,
+                    InvocationType='RequestResponse',
+                    Payload=json.dumps({
+                        'task_type': task_type,
+                        'days': days
+                    })
+                )
+
+                payload = json.loads(response['Payload'].read())
+
+                if payload.get('statusCode') == 200:
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Content-Type': 'application/json'},
+                        'body': json.dumps(payload, cls=DecimalEncoder)
+                    }
+
+            except Exception as e:
+                print(f"Error calling evaluation_metrics Lambda: {str(e)}")
+                # Fall back to direct calculation below
+
+        # Fallback: Direct calculation (for backward compatibility)
         response = model_metrics_table.scan()
         metrics = response.get('Items', [])
 
