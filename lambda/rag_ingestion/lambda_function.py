@@ -6,6 +6,7 @@ import json
 import os
 import uuid
 from typing import Dict, Any, List
+from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
 
@@ -208,21 +209,26 @@ def store_embedding(
         chunk_index: Index of chunk in document
     """
     try:
+        # Convert embedding list to JSON string for DynamoDB storage
+        # DynamoDB doesn't support lists of floats natively
+        embedding_json = json.dumps(embedding)
+
         item = {
             'doc_id': doc_id,
             'doc_type': doc_type,
             'content': content[:1000],  # Store first 1000 chars
-            'embedding': embedding,
+            'embedding': embedding_json,  # Store as JSON string
             'metadata': {
                 'source_key': source_key,
                 'chunk_index': chunk_index,
                 'content_length': len(content),
                 'embedding_dim': len(embedding)
             },
-            'timestamp': boto3.dynamodb.types.DYNAMODB_CONTEXT.create_type_serializer().serialize({}).get('NULL')
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
 
         embeddings_table.put_item(Item=item)
+        print(f"✓ Stored embedding for {doc_id}")
 
     except Exception as e:
         print(f"Error storing embedding: {str(e)}")

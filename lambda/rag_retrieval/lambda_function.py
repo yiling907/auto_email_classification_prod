@@ -131,14 +131,26 @@ def retrieve_similar_documents(query_embedding: List[float], top_k: int = 3) -> 
         scored_docs = []
         for doc in documents:
             if 'embedding' in doc:
-                similarity = cosine_similarity(query_embedding, doc['embedding'])
-                scored_docs.append({
-                    'doc_id': doc.get('doc_id'),
-                    'doc_type': doc.get('doc_type', 'unknown'),
-                    'content': doc.get('content', ''),
-                    'similarity_score': similarity,
-                    'metadata': doc.get('metadata', {})
-                })
+                try:
+                    # Parse embedding from JSON string back to list of floats
+                    doc_embedding_str = doc['embedding']
+                    if isinstance(doc_embedding_str, str):
+                        doc_embedding = json.loads(doc_embedding_str)
+                    else:
+                        # Already a list (shouldn't happen with new code, but handle for backwards compat)
+                        doc_embedding = doc_embedding_str
+
+                    similarity = cosine_similarity(query_embedding, doc_embedding)
+                    scored_docs.append({
+                        'doc_id': doc.get('doc_id'),
+                        'doc_type': doc.get('doc_type', 'unknown'),
+                        'content': doc.get('content', ''),
+                        'similarity_score': similarity,
+                        'metadata': doc.get('metadata', {})
+                    })
+                except Exception as e:
+                    print(f"Error processing document {doc.get('doc_id')}: {str(e)}")
+                    continue
 
         # Sort by similarity and return top-K
         scored_docs.sort(key=lambda x: x['similarity_score'], reverse=True)

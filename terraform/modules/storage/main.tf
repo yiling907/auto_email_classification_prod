@@ -45,8 +45,6 @@ resource "aws_s3_bucket_notification" "emails" {
   lambda_function {
     lambda_function_arn = var.email_parser_lambda_arn
     events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "test/"  # Only trigger for test emails in test/ prefix
-    filter_suffix       = ".eml"
   }
 
   depends_on = [var.email_parser_lambda_permission_id]
@@ -92,8 +90,6 @@ resource "aws_s3_bucket_notification" "knowledge_base" {
   lambda_function {
     lambda_function_arn = var.rag_ingestion_lambda_arn
     events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "documents/"
-    filter_suffix       = ""
   }
 
   depends_on = [var.rag_ingestion_lambda_permission_id]
