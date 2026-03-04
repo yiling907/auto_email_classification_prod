@@ -233,10 +233,16 @@ def get_model_metrics(event: Dict[str, Any]) -> Dict[str, Any]:
                 payload = json.loads(response['Payload'].read())
 
                 if payload.get('statusCode') == 200:
+                    # Extract statistics from evaluation_metrics response
+                    # and return in the format expected by frontend
+                    stats = payload.get('statistics', {})
                     return {
                         'statusCode': 200,
                         'headers': {'Content-Type': 'application/json'},
-                        'body': json.dumps(payload, cls=DecimalEncoder)
+                        'body': json.dumps({
+                            'by_model': stats.get('by_model', {}),
+                            'total_metrics': stats.get('total_requests', 0)
+                        }, cls=DecimalEncoder)
                     }
 
             except Exception as e:
