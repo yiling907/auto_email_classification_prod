@@ -17,6 +17,13 @@ locals {
   )
 }
 
+# CloudWatch Log Group for Step Functions (must be created first)
+resource "aws_cloudwatch_log_group" "step_functions" {
+  name              = "/aws/vendedlogs/states/${local.resource_prefix}-email-processing"
+  retention_in_days = 7
+  tags              = var.tags
+}
+
 # Step Functions state machine
 resource "aws_sfn_state_machine" "email_processing" {
   name     = "${local.resource_prefix}-email-processing"
@@ -34,12 +41,7 @@ resource "aws_sfn_state_machine" "email_processing" {
     enabled = true
   }
 
-  tags = merge(var.tags, { Name = "${local.resource_prefix}-email-processing" })
-}
+  depends_on = [aws_cloudwatch_log_group.step_functions]
 
-# CloudWatch Log Group for Step Functions
-resource "aws_cloudwatch_log_group" "step_functions" {
-  name              = "/aws/vendedlogs/states/${local.resource_prefix}-email-processing"
-  retention_in_days = 7
-  tags              = var.tags
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-email-processing" })
 }
