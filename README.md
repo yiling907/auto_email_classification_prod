@@ -69,19 +69,29 @@ terraform apply
 
 ## Documentation
 
-### Setup Guides
-- [SES_SETUP.md](docs/SES_SETUP.md) - Email integration setup
-- [EMAIL_INTEGRATION.md](docs/EMAIL_INTEGRATION.md) - Email configuration guide
-- [DEPLOY_TO_AWS.md](docs/DEPLOY_TO_AWS.md) - Dashboard deployment
+📚 **Complete documentation index**: [docs/README.md](docs/README.md)
 
-### Technical Docs
-- [CLAUDE.md](CLAUDE.md) - Development guidance for Claude Code
-- [COST_OPTIMIZATION.md](docs/COST_OPTIMIZATION.md) - Cost optimization strategies
-- [DASHBOARD_GUIDE.md](docs/DASHBOARD_GUIDE.md) - Dashboard features
-- [ROADMAP.md](docs/ROADMAP.md) - Future enhancements
+### Quick Links
 
-### Project Specs
-- [claude.md](claude.md) - Full project specification
+#### Getting Started
+- **[Deployment Guide](docs/guides/DEPLOYMENT.md)** - Complete setup (infrastructure + dashboard)
+- **[Testing Guide](tests/README.md)** - Running tests and validation
+- **[Troubleshooting](docs/troubleshooting/TROUBLESHOOTING.md)** - Common issues and solutions
+
+#### Configuration
+- **[SES Setup](docs/guides/SES_SETUP.md)** - Email integration
+- **[RAG Setup](docs/guides/RAG_SETUP.md)** - Knowledge base configuration
+- **[Dashboard Guide](docs/guides/DASHBOARD_GUIDE.md)** - Dashboard features
+
+#### Reference
+- **[Cost Optimization](docs/reference/COST_OPTIMIZATION.md)** - Cost analysis and strategies
+- **[Open Source Models](docs/reference/OPEN_SOURCE_MODELS.md)** - Model comparison
+- **[Architecture](docs/reference/MODEL_METRICS_DATA_FLOW.md)** - System architecture
+
+#### Developer Resources
+- **[CLAUDE.md](CLAUDE.md)** - Development guidance for Claude Code
+- **[ROADMAP.md](docs/ROADMAP.md)** - Future enhancements
+- **[CHANGELOG.md](docs/CHANGELOG.md)** - Release history
 
 ## License
 

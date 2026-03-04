@@ -79,3 +79,4 @@ htmlcov/
 # Temporary files
 tmp/
 temp/
+coverage.xml
