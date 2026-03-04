@@ -46,6 +46,24 @@ variable "enable_bedrock_logging" {
   default     = true
 }
 
+variable "sender_email" {
+  description = "Email address to send responses from (must be verified in SES)"
+  type        = string
+  default     = "support@example.com"
+}
+
+variable "sender_name" {
+  description = "Name to display as sender"
+  type        = string
+  default     = "InsureMail AI Support"
+}
+
+variable "ses_receipt_recipients" {
+  description = "List of email addresses to receive emails. Use empty list for all emails."
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "Common tags for all resources"
   type        = map(string)

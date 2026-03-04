@@ -33,6 +33,11 @@ variable "multi_llm_inference_lambda_arn" {
   type        = string
 }
 
+variable "email_sender_lambda_arn" {
+  description = "ARN of the email sender Lambda function"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

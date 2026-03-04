@@ -67,3 +67,23 @@ output "api_handlers_name" {
   description = "Name of the API handlers Lambda function"
   value       = aws_lambda_function.api_handlers.function_name
 }
+
+output "email_receiver_arn" {
+  description = "ARN of the email receiver Lambda function"
+  value       = aws_lambda_function.email_receiver.arn
+}
+
+output "email_receiver_name" {
+  description = "Name of the email receiver Lambda function"
+  value       = aws_lambda_function.email_receiver.function_name
+}
+
+output "email_sender_arn" {
+  description = "ARN of the email sender Lambda function"
+  value       = aws_lambda_function.email_sender.arn
+}
+
+output "email_sender_name" {
+  description = "Name of the email sender Lambda function"
+  value       = aws_lambda_function.email_sender.function_name
+}

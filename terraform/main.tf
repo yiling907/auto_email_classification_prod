@@ -50,6 +50,9 @@ module "lambda" {
   model_metrics_table_name  = module.storage.model_metrics_table_name
   embeddings_table_name     = module.storage.embeddings_table_name
   log_retention_days        = var.log_retention_days
+  state_machine_arn         = module.step_functions.state_machine_arn
+  sender_email              = var.sender_email
+  sender_name               = var.sender_name
   tags                      = local.common_tags
 }
 
@@ -64,6 +67,7 @@ module "step_functions" {
   rag_retrieval_lambda_arn        = module.lambda.rag_retrieval_arn
   claude_response_lambda_arn      = module.lambda.claude_response_arn
   multi_llm_inference_lambda_arn  = module.lambda.multi_llm_inference_arn
+  email_sender_lambda_arn         = module.lambda.email_sender_arn
   tags                            = local.common_tags
 }
 
@@ -98,4 +102,20 @@ module "api_gateway" {
   api_handler_lambda_arn  = module.lambda.api_handlers_arn
   api_handler_lambda_name = module.lambda.api_handlers_name
   tags                    = local.common_tags
+}
+
+# SES module - Email receiving and sending
+module "ses" {
+  source = "./modules/ses"
+
+  project_name               = var.project_name
+  environment                = var.environment
+  support_email              = var.sender_email
+  ses_receipt_recipients     = var.ses_receipt_recipients
+  email_bucket_name          = module.storage.email_bucket_name
+  email_bucket_arn           = module.storage.email_bucket_arn
+  email_receiver_lambda_arn  = module.lambda.email_receiver_arn
+  email_receiver_lambda_name = module.lambda.email_receiver_name
+  log_retention_days         = var.log_retention_days
+  tags                       = local.common_tags
 }

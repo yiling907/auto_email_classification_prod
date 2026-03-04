@@ -119,6 +119,47 @@ resource "aws_iam_role_policy" "lambda_bedrock" {
   })
 }
 
+# Lambda policy for SES access (sending emails)
+resource "aws_iam_role_policy" "lambda_ses" {
+  name = "${local.resource_prefix}-lambda-ses"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail",
+          "ses:GetSendQuota"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Lambda policy for Step Functions access (starting executions)
+resource "aws_iam_role_policy" "lambda_step_functions" {
+  name = "${local.resource_prefix}-lambda-step-functions"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "states:StartExecution",
+          "states:DescribeExecution"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # Step Functions execution role
 resource "aws_iam_role" "step_functions" {
   name = "${local.resource_prefix}-step-functions"

@@ -48,6 +48,24 @@ variable "log_retention_days" {
   type        = number
 }
 
+variable "state_machine_arn" {
+  description = "ARN of the Step Functions state machine (for email receiver)"
+  type        = string
+  default     = ""
+}
+
+variable "sender_email" {
+  description = "Email address to send responses from (must be verified in SES)"
+  type        = string
+  default     = "support@example.com"
+}
+
+variable "sender_name" {
+  description = "Name to display as sender"
+  type        = string
+  default     = "InsureMail AI Support"
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

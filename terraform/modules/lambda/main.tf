@@ -250,3 +250,72 @@ resource "aws_lambda_permission" "allow_s3_email_parser" {
   principal     = "s3.amazonaws.com"
   source_arn    = "arn:aws:s3:::${var.email_bucket_name}"
 }
+
+# Data source to package Email Receiver Lambda
+data "archive_file" "email_receiver" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_path}/email_receiver"
+  output_path = "${path.module}/builds/email_receiver.zip"
+}
+
+# Email Receiver Lambda (SES → SNS → Lambda)
+resource "aws_lambda_function" "email_receiver" {
+  filename         = data.archive_file.email_receiver.output_path
+  function_name    = "${local.resource_prefix}-email-receiver"
+  role            = var.lambda_execution_role_arn
+  handler         = "lambda_function.lambda_handler"
+  runtime         = var.lambda_runtime
+  timeout         = 60
+  memory_size     = 512
+  source_code_hash = data.archive_file.email_receiver.output_base64sha256
+
+  environment {
+    variables = {
+      STATE_MACHINE_ARN = var.state_machine_arn
+      EMAIL_BUCKET_NAME = var.email_bucket_name
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-email-receiver" })
+}
+
+resource "aws_cloudwatch_log_group" "email_receiver" {
+  name              = "/aws/lambda/${aws_lambda_function.email_receiver.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
+# Data source to package Email Sender Lambda
+data "archive_file" "email_sender" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_path}/email_sender"
+  output_path = "${path.module}/builds/email_sender.zip"
+}
+
+# Email Sender Lambda (sends responses via SES)
+resource "aws_lambda_function" "email_sender" {
+  filename         = data.archive_file.email_sender.output_path
+  function_name    = "${local.resource_prefix}-email-sender"
+  role            = var.lambda_execution_role_arn
+  handler         = "lambda_function.lambda_handler"
+  runtime         = var.lambda_runtime
+  timeout         = 30
+  memory_size     = 256
+  source_code_hash = data.archive_file.email_sender.output_base64sha256
+
+  environment {
+    variables = {
+      EMAIL_TABLE_NAME = var.email_table_name
+      SENDER_EMAIL     = var.sender_email
+      SENDER_NAME      = var.sender_name
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-email-sender" })
+}
+
+resource "aws_cloudwatch_log_group" "email_sender" {
+  name              = "/aws/lambda/${aws_lambda_function.email_sender.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}

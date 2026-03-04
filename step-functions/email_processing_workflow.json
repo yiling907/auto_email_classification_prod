@@ -131,14 +131,25 @@
       "Default": "Escalate"
     },
     "AutoRespond": {
-      "Type": "Pass",
-      "Comment": "Automatically send response",
+      "Type": "Task",
+      "Resource": "${email_sender_lambda_arn}",
+      "Comment": "Send auto-response via SES",
       "Parameters": {
-        "action": "auto_response",
-        "message": "Response sent automatically"
+        "email_id.$": "$.parsed_email.email_id",
+        "recipient_email.$": "$.parsed_email.parsed_data.from_address",
+        "subject.$": "$.parsed_email.parsed_data.subject",
+        "response_text.$": "$.response.response_text",
+        "confidence_score.$": "$.response.confidence_score"
       },
-      "ResultPath": "$.final_action",
-      "Next": "Success"
+      "ResultPath": "$.email_result",
+      "Next": "Success",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.email_error",
+          "Next": "Success"
+        }
+      ]
     },
     "QueueForReview": {
       "Type": "Pass",
