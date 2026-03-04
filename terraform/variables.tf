@@ -17,31 +17,29 @@ variable "aws_region" {
 }
 
 variable "bedrock_models" {
-  description = "List of Bedrock model IDs - Using open-source models for cost optimization"
+  description = "List of Bedrock model IDs - Using available open-source models"
   type        = list(string)
   default = [
-    # Open Source Models (Free/Low Cost)
+    # Open Source Models (Verified Working)
 
-    # Meta Llama 3.1 8B Instruct - Open source, cost-effective
-    # ~$0.30 per 1M input tokens, $0.60 per 1M output tokens
-    "meta.llama3-1-8b-instruct-v1:0",
-
-    # Mistral 7B Instruct - Open source, very cost-effective
+    # Mistral 7B Instruct - Open source, most cost-effective
     # ~$0.15 per 1M input tokens, $0.20 per 1M output tokens
+    # STATUS: ✅ WORKING
     "mistral.mistral-7b-instruct-v0:2",
 
-    # Amazon Titan Text Express - AWS native, cost-effective
-    # ~$0.20 per 1M input tokens, $0.60 per 1M output tokens
-    "amazon.titan-text-express-v1",
+    # Meta Llama 3.1 8B Instruct - Open source (via cross-region inference profile)
+    # ~$0.30 per 1M input tokens, $0.60 per 1M output tokens
+    # STATUS: ✅ WORKING (using inference profile)
+    "us.meta.llama3-1-8b-instruct-v1:0",
 
-    # Amazon Titan Embeddings - For RAG (cheapest embedding model)
+    # Amazon Titan Embeddings - For RAG
     # ~$0.10 per 1M tokens
+    # STATUS: ✅ WORKING
     "amazon.titan-embed-text-v1"
 
-    # Note: Removed proprietary models:
-    # - Claude 3 Haiku ($0.25/$1.25 per 1M) - proprietary
-    # - Claude 3 Sonnet ($3/$15 per 1M) - expensive & proprietary
-    # Using only open-source alternatives for multi-LLM comparison
+    # REMOVED DEPRECATED MODELS:
+    # - amazon.titan-text-express-v1 (EOL - reached end of life)
+    # - Direct model IDs require provisioned throughput (use inference profiles instead)
   ]
 }
 

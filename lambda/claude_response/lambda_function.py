@@ -18,13 +18,13 @@ EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
 
 # Using open-source models for cost optimization
 # Primary model for production responses (can be overridden via env var)
-PRIMARY_MODEL_ID = os.environ.get('PRIMARY_MODEL_ID', 'meta.llama3-1-8b-instruct-v1:0')
+PRIMARY_MODEL_ID = os.environ.get('PRIMARY_MODEL_ID', 'mistral.mistral-7b-instruct-v0:2')
 
-# Available open-source models for fallback
+# Available open-source models for fallback (in priority order)
 FALLBACK_MODELS = [
-    'meta.llama3-1-8b-instruct-v1:0',    # Llama 3.1 8B: $0.30/$0.60 per 1M tokens
-    'mistral.mistral-7b-instruct-v0:2',  # Mistral 7B: $0.15/$0.20 per 1M tokens
-    'amazon.titan-text-express-v1'       # Titan Express: $0.20/$0.60 per 1M tokens
+    'mistral.mistral-7b-instruct-v0:2',       # Mistral 7B: $0.15/$0.20 per 1M tokens (cheapest & reliable)
+    'us.meta.llama3-1-8b-instruct-v1:0',      # Llama 3.1 8B: $0.30/$0.60 per 1M (inference profile)
+    # Removed: amazon.titan-text-express-v1 (EOL - end of life)
 ]
 
 email_table = dynamodb.Table(EMAIL_TABLE_NAME)

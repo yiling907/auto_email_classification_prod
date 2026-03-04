@@ -18,26 +18,21 @@ dynamodb = boto3.resource('dynamodb')
 MODEL_METRICS_TABLE_NAME = os.environ['MODEL_METRICS_TABLE_NAME']
 model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME)
 
-# Model configurations - Open source models only
+# Model configurations - Working open source models only
 MODELS = {
-    'llama-3.1-8b': {
-        'id': 'meta.llama3-1-8b-instruct-v1:0',
-        'type': 'meta',
-        'cost_per_1k_input': 0.00030,
-        'cost_per_1k_output': 0.00060
-    },
     'mistral-7b': {
         'id': 'mistral.mistral-7b-instruct-v0:2',
         'type': 'mistral',
         'cost_per_1k_input': 0.00015,
         'cost_per_1k_output': 0.00020
     },
-    'titan-express': {
-        'id': 'amazon.titan-text-express-v1',
-        'type': 'amazon',
-        'cost_per_1k_input': 0.00020,
+    'llama-3.1-8b': {
+        'id': 'us.meta.llama3-1-8b-instruct-v1:0',  # Using cross-region inference profile
+        'type': 'meta',
+        'cost_per_1k_input': 0.00030,
         'cost_per_1k_output': 0.00060
     }
+    # Removed: titan-express (amazon.titan-text-express-v1 reached EOL)
 }
 
 
