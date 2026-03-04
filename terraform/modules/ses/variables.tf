@@ -1,4 +1,4 @@
-# SES Module Variables
+# SES Module Variables (IMAP version - sending only)
 
 variable "project_name" {
   description = "Project name for resource naming"
@@ -16,32 +16,6 @@ variable "support_email" {
   default     = ""
 }
 
-variable "ses_receipt_recipients" {
-  description = "List of email addresses to receive emails. Use empty list for all emails to this domain."
-  type        = list(string)
-  default     = []
-}
-
-variable "email_bucket_name" {
-  description = "S3 bucket name for storing emails"
-  type        = string
-}
-
-variable "email_bucket_arn" {
-  description = "S3 bucket ARN for storing emails"
-  type        = string
-}
-
-variable "email_receiver_lambda_arn" {
-  description = "ARN of the email receiver Lambda function"
-  type        = string
-}
-
-variable "email_receiver_lambda_name" {
-  description = "Name of the email receiver Lambda function"
-  type        = string
-}
-
 variable "log_retention_days" {
   description = "CloudWatch log retention period in days"
   type        = number
@@ -53,3 +27,10 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# REMOVED (no longer needed with IMAP receiving):
+# - ses_receipt_recipients (no SES receipt rules)
+# - email_bucket_name (not used by SES module)
+# - email_bucket_arn (not used by SES module)
+# - email_receiver_lambda_arn (Lambda removed)
+# - email_receiver_lambda_name (Lambda removed)
