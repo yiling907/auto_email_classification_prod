@@ -1,0 +1,43 @@
+# InsureMail AI Terraform Variables
+# Copy this file to terraform.tfvars and customize for your environment
+
+# Project Configuration
+project_name = "insuremail-ai"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+# Lambda Configuration
+lambda_runtime = "python3.11"
+log_retention_days = 7
+
+# Amazon Bedrock Models
+# Only include models you have access to in your AWS account
+bedrock_models = [
+  "anthropic.claude-3-sonnet-20240229-v1:0",  # Production model
+  "anthropic.claude-3-haiku-20240307-v1:0",   # Cost-effective evaluation
+  "amazon.titan-embed-text-v1"                # For RAG embeddings
+]
+
+# SES Configuration (Real Email Integration)
+# IMPORTANT: You must verify this email address in SES before deploying
+# Run: ./scripts/setup_ses.sh to automate verification
+sender_email = "support@yourdomain.com"
+sender_name  = "InsureMail AI Support"
+
+# Optional: Filter which emails to receive
+# Empty list = receive all emails to this domain
+# Specific list = only receive emails to these addresses
+ses_receipt_recipients = []
+# Example with filtering:
+# ses_receipt_recipients = ["support@yourdomain.com", "claims@yourdomain.com"]
+
+# Monitoring Configuration
+enable_bedrock_logging = true
+
+# Resource Tags
+tags = {
+  Project    = "InsureMail AI"
+  ManagedBy  = "Terraform"
+  Repository = "auto_email_classification_prod"
+  Environment = "dev"
+}
