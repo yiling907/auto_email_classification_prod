@@ -1,0 +1,43 @@
+POLICY COVERAGE INFORMATION - InsureMail AI Insurance
+
+MEDICAL COVERAGE:
+
+Diagnostic Services:
+- X-rays, MRI, CT scans: Covered at 80% after deductible
+- Lab tests: Covered at 90%
+- Annual physical exam: Covered at 100% (no deductible)
+
+Specialist Care:
+- Specialist consultations: Covered at 70% after deductible
+- Follow-up visits: Same as initial consultation
+- Referral required for coverage (except emergencies)
+
+DENTAL COVERAGE:
+
+Basic Dental Services:
+- Cleanings (2 per year): Covered at 100%
+- Fillings: Covered at 80%
+- X-rays: Covered at 90%
+
+Major Dental Services:
+- Root canals: Covered at 60% after $500 dental deductible
+- Crowns: Covered at 50%
+- Bridges: Covered at 50%
+- Dentures: Covered at 50%
+
+DEDUCTIBLES:
+- Individual medical deductible: $1,500 per year
+- Family medical deductible: $3,000 per year
+- Individual dental deductible: $500 per year
+
+OUT-OF-POCKET MAXIMUM:
+- Individual: $6,000 per year
+- Family: $12,000 per year
+
+COVERAGE EXCLUSIONS:
+- Cosmetic procedures
+- Experimental treatments
+- Services not medically necessary
+- Treatment from non-network providers (unless emergency)
+
+For detailed coverage questions, refer to your policy documents or contact customer service.

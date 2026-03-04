@@ -1,0 +1,37 @@
+CLAIMS PROCESSING GUIDELINES - InsureMail AI Insurance
+
+Standard Claims Processing Timeline:
+- Claims are typically processed within 14 business days of receipt
+- Complex claims may require up to 30 business days
+- Missing documentation will delay processing
+
+Required Documentation for Medical Claims:
+1. Completed claim form
+2. Itemized bill from healthcare provider
+3. Medical records or procedure notes
+4. Proof of payment (if already paid)
+5. Policy number and member ID
+
+Claims Status Updates:
+- Members can check claim status online at insuremailai.com/claims
+- Email notifications sent at key processing stages:
+  * Receipt confirmation
+  * Under review
+  * Additional information needed
+  * Processed (approved or denied)
+
+Pre-Authorization Requirements:
+- Required for procedures over $5,000
+- Must be obtained at least 5 business days before procedure
+- Emergency procedures are exempt
+- Pre-auth requests: preauth@insuremailai.com
+
+Claims Appeals:
+- Members have 60 days to appeal a denied claim
+- Appeals must include:
+  * Original claim number
+  * Reason for appeal
+  * Supporting medical documentation
+- Appeal processing: 30 business days
+
+For urgent claim inquiries, contact: 1-800-CLAIMS-1

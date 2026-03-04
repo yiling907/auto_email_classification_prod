@@ -1,0 +1,18 @@
+From: john.doe@example.com
+To: claims@insuremailai.com
+Subject: Question about my claim status
+Date: Mon, 4 Mar 2026 10:30:00 +0000
+
+Hello,
+
+I submitted a claim two weeks ago for my recent medical procedure (Policy #INS-2024-12345). The claim number is CLM-789456. I had an MRI scan at City Hospital on February 15, 2026, which cost $2,500.
+
+Could you please provide an update on the status of my claim? I haven't received any communication since I submitted the paperwork.
+
+Also, I wanted to confirm whether my policy covers follow-up consultations with the specialist.
+
+Thank you for your assistance.
+
+Best regards,
+John Doe
+Policy #INS-2024-12345

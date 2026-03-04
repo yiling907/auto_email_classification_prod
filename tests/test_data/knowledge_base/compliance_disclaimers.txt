@@ -1,0 +1,36 @@
+COMPLIANCE DISCLAIMERS - InsureMail AI Insurance
+
+Standard Email Response Disclaimers:
+
+General Disclaimer:
+"This communication is for informational purposes only and does not constitute a guarantee of coverage or payment. Actual coverage is determined by the terms and conditions of your policy. Please refer to your policy documents for complete details."
+
+Claims-Related Disclaimer:
+"Claim determinations are made based on a comprehensive review of submitted documentation and policy terms. This information is provided as guidance only. Final claim decisions will be communicated in writing."
+
+Coverage Questions Disclaimer:
+"Coverage information provided is general in nature. Your specific coverage may vary based on your policy type, effective date, and state regulations. Please review your policy documents or contact our customer service team for personalized information."
+
+Privacy Notice:
+"Your privacy is important to us. We protect your personal health information in accordance with HIPAA regulations. We will never share your information without your consent, except as required by law."
+
+Medical Advice Disclaimer:
+"InsureMail AI provides insurance coverage information only. We do not provide medical advice. Please consult with your healthcare provider for all medical decisions."
+
+Pre-Authorization Reminder:
+"Some procedures require pre-authorization. Failure to obtain required pre-authorization may result in reduced benefits or claim denial. Please verify pre-authorization requirements before scheduling procedures."
+
+Network Provider Notice:
+"For maximum benefits, please use in-network providers. Out-of-network services may result in higher out-of-pocket costs and may not be covered except in emergencies."
+
+Response Time Notice:
+"We strive to respond to all inquiries within 2 business days. Complex questions may require additional time for research and review."
+
+Regulatory Compliance:
+InsureMail AI complies with:
+- HIPAA Privacy and Security Rules
+- Affordable Care Act (ACA) requirements
+- State insurance regulations
+- Federal anti-discrimination laws
+
+For questions about our privacy practices or compliance, contact: compliance@insuremailai.com

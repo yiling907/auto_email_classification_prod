@@ -1,0 +1,18 @@
+From: mike.johnson@example.com
+To: info@insuremailai.com
+Subject: Information about family plans
+Date: Mon, 4 Mar 2026 16:45:00 +0000
+
+Hello,
+
+I'm interested in learning more about your family insurance plans. I currently have an individual plan (INS-2024-11111), but I'm getting married next month and want to add my spouse to my coverage.
+
+Can you provide information about:
+- Family plan options
+- Cost differences
+- How to add a dependent
+- Coverage changes
+
+Thank you!
+
+Mike Johnson
