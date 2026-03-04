@@ -88,3 +88,14 @@ module "monitoring" {
   email_parser_function_name = module.lambda.email_parser_name
   tags                      = local.common_tags
 }
+
+# API Gateway module - REST API for dashboard
+module "api_gateway" {
+  source = "./modules/api-gateway"
+
+  project_name            = var.project_name
+  environment             = var.environment
+  api_handler_lambda_arn  = module.lambda.api_handlers_arn
+  api_handler_lambda_name = module.lambda.api_handlers_name
+  tags                    = local.common_tags
+}

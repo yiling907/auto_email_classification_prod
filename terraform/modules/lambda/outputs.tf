@@ -57,3 +57,13 @@ output "evaluation_metrics_name" {
   description = "Name of the evaluation metrics Lambda function"
   value       = aws_lambda_function.evaluation_metrics.function_name
 }
+
+output "api_handlers_arn" {
+  description = "ARN of the API handlers Lambda function"
+  value       = aws_lambda_function.api_handlers.arn
+}
+
+output "api_handlers_name" {
+  description = "Name of the API handlers Lambda function"
+  value       = aws_lambda_function.api_handlers.function_name
+}

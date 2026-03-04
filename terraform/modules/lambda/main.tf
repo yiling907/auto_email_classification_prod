@@ -198,6 +198,41 @@ resource "aws_cloudwatch_log_group" "evaluation_metrics" {
   tags              = var.tags
 }
 
+# Data source to package API handler Lambda
+data "archive_file" "api_handlers" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_path}/api_handlers"
+  output_path = "${path.module}/builds/api_handlers.zip"
+}
+
+# API Handlers Lambda (for dashboard API)
+resource "aws_lambda_function" "api_handlers" {
+  filename         = data.archive_file.api_handlers.output_path
+  function_name    = "${local.resource_prefix}-api-handlers"
+  role            = var.lambda_execution_role_arn
+  handler         = "lambda_function.lambda_handler"
+  runtime         = var.lambda_runtime
+  timeout         = 30
+  memory_size     = 512
+  source_code_hash = data.archive_file.api_handlers.output_base64sha256
+
+  environment {
+    variables = {
+      EMAIL_TABLE_NAME         = var.email_table_name
+      MODEL_METRICS_TABLE_NAME = var.model_metrics_table_name
+      EMBEDDINGS_TABLE_NAME    = var.embeddings_table_name
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-api-handlers" })
+}
+
+resource "aws_cloudwatch_log_group" "api_handlers" {
+  name              = "/aws/lambda/${aws_lambda_function.api_handlers.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
 # S3 trigger for RAG ingestion (when new documents are uploaded)
 resource "aws_lambda_permission" "allow_s3_rag_ingestion" {
   statement_id  = "AllowExecutionFromS3"

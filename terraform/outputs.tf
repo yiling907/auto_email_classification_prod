@@ -65,3 +65,9 @@ output "step_functions_role_arn" {
   description = "ARN of the Step Functions execution role"
   value       = module.iam.step_functions_role_arn
 }
+
+# API Gateway output
+output "api_gateway_url" {
+  description = "Base URL of the API Gateway for dashboard"
+  value       = module.api_gateway.api_gateway_url
+}
