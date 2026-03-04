@@ -25,13 +25,9 @@ MODELS = {
         'type': 'anthropic',
         'cost_per_1k_input': 0.00025,
         'cost_per_1k_output': 0.00125
-    },
-    'titan-lite': {
-        'id': 'amazon.titan-text-lite-v1',
-        'type': 'amazon',
-        'cost_per_1k_input': 0.0003,
-        'cost_per_1k_output': 0.0004
     }
+    # Note: Titan Lite has reached end of life - removed
+    # Can add other models like Claude 3.5 Sonnet or Haiku v2 when available
 }
 
 

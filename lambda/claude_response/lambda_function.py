@@ -37,13 +37,23 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         email_body = event.get('email_body') or event.get('body')
         subject = event.get('subject', '')
         entities = event.get('entities', {})
-        intent = event.get('intent', 'unknown')
+        intent_data = event.get('intent', {})
         rag_documents = event.get('rag_documents', [])
         crm_validation = event.get('crm_validation', {})
         fraud_score = event.get('fraud_score', {})
 
         if not email_body:
             raise ValueError("Missing email_body in event")
+
+        # Extract intent from multi-LLM results (find first successful result)
+        intent = 'unknown'
+        if isinstance(intent_data, dict) and 'results' in intent_data:
+            for result in intent_data.get('results', []):
+                if result.get('success') and result.get('output_text'):
+                    intent = result['output_text']
+                    break
+        elif isinstance(intent_data, str):
+            intent = intent_data
 
         print(f"Generating response for email: {email_id}")
         print(f"Intent: {intent}, RAG docs: {len(rag_documents)}")

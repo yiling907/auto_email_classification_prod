@@ -105,7 +105,7 @@
         "email_body.$": "$.parsed_email.parsed_data.body",
         "subject.$": "$.parsed_email.parsed_data.subject",
         "entities.$": "$.analysis[1].entities",
-        "intent.$": "$.analysis[0].intent.results[0].output_text",
+        "intent.$": "$.analysis[0].intent",
         "rag_documents.$": "$.rag_results.retrieved_documents",
         "crm_validation.$": "$.crm_validation",
         "fraud_score.$": "$.fraud_score"

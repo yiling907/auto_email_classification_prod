@@ -111,10 +111,8 @@ resource "aws_iam_role_policy" "lambda_bedrock" {
         Resource = [
           "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0",
           "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
-          "arn:aws:bedrock:${var.aws_region}::foundation-model/amazon.titan-text-lite-v1",
           "arn:aws:bedrock:${var.aws_region}::foundation-model/amazon.titan-embed-text-v1",
-          "arn:aws:bedrock:${var.aws_region}::foundation-model/meta.llama3-8b-instruct-v1:0",
-          "arn:aws:bedrock:${var.aws_region}::foundation-model/mistral.mistral-7b-instruct-v0:2"
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
         ]
       }
     ]

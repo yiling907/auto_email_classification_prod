@@ -22,10 +22,9 @@ variable "bedrock_models" {
   default = [
     "anthropic.claude-3-sonnet-20240229-v1:0",
     "anthropic.claude-3-haiku-20240307-v1:0",
-    "amazon.titan-text-lite-v1",
-    "amazon.titan-embed-text-v1",
-    "meta.llama3-8b-instruct-v1:0",
-    "mistral.mistral-7b-instruct-v0:2"
+    "amazon.titan-embed-text-v1"
+    # Note: Removed deprecated models (titan-text-lite-v1, llama3, mistral)
+    # Add newer models as needed
   ]
 }
 
