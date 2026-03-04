@@ -7,8 +7,11 @@ echo "========================================="
 echo "InsureMail AI - Test Pipeline"
 echo "========================================="
 
+# Get project root directory
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 # Get resources from Terraform outputs
-cd "$(dirname "$0")/../terraform"
+cd "$PROJECT_ROOT/terraform"
 
 STATE_MACHINE_ARN=$(terraform output -raw state_machine_arn 2>/dev/null)
 EMAIL_TABLE=$(terraform output -raw email_table_name 2>/dev/null)

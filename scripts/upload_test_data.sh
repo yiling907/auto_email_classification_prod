@@ -7,8 +7,12 @@ echo "========================================="
 echo "InsureMail AI - Upload Test Data"
 echo "========================================="
 
+# Get project root directory
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TEST_DATA_DIR="$PROJECT_ROOT/tests/test_data"
+
 # Get bucket names from Terraform outputs
-cd "$(dirname "$0")/../terraform"
+cd "$PROJECT_ROOT/terraform"
 
 EMAIL_BUCKET=$(terraform output -raw email_bucket_name 2>/dev/null)
 KB_BUCKET=$(terraform output -raw knowledge_base_bucket_name 2>/dev/null)
@@ -25,7 +29,7 @@ echo ""
 
 # Upload knowledge base documents
 echo "Uploading knowledge base documents..."
-TEST_DATA_DIR="$(dirname "$0")/../tests/test_data"
+echo "Test data directory: $TEST_DATA_DIR"
 
 aws s3 cp "$TEST_DATA_DIR/knowledge_base/" "s3://$KB_BUCKET/knowledge_base/" --recursive
 

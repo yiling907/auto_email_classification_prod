@@ -29,8 +29,9 @@ fi
 echo "✓ Prerequisites check passed"
 echo ""
 
-# Navigate to terraform directory
-cd "$(dirname "$0")/../terraform"
+# Get project root and navigate to terraform directory
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_ROOT/terraform"
 
 # Initialize Terraform
 echo "Initializing Terraform..."
