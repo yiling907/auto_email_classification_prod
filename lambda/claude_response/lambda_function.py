@@ -110,7 +110,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'reference_ids': parsed_response.get('reference_ids', []),
             'compliance_checks': parsed_response.get('compliance_checks', {}),
             'latency_ms': latency_ms,
-            'model_id': CLAUDE_MODEL_ID,
+            'model_id': PRIMARY_MODEL_ID,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
 
