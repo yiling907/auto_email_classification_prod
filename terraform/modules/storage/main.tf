@@ -37,6 +37,21 @@ resource "aws_s3_bucket_public_access_block" "emails" {
   restrict_public_buckets = true
 }
 
+# S3 event notification for email parsing (for manually uploaded emails)
+# Note: SES-received emails use SNS → Lambda flow, not S3 → Lambda
+resource "aws_s3_bucket_notification" "emails" {
+  bucket = aws_s3_bucket.emails.id
+
+  lambda_function {
+    lambda_function_arn = var.email_parser_lambda_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "test/"  # Only trigger for test emails in test/ prefix
+    filter_suffix       = ".eml"
+  }
+
+  depends_on = [var.email_parser_lambda_permission_id]
+}
+
 # S3 Bucket for knowledge base documents
 resource "aws_s3_bucket" "knowledge_base" {
   bucket = "${local.resource_prefix}-knowledge-base"
@@ -68,6 +83,20 @@ resource "aws_s3_bucket_public_access_block" "knowledge_base" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+# S3 event notification for RAG ingestion
+resource "aws_s3_bucket_notification" "knowledge_base" {
+  bucket = aws_s3_bucket.knowledge_base.id
+
+  lambda_function {
+    lambda_function_arn = var.rag_ingestion_lambda_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "documents/"
+    filter_suffix       = ""
+  }
+
+  depends_on = [var.rag_ingestion_lambda_permission_id]
 }
 
 # S3 Bucket for logs and evaluation results

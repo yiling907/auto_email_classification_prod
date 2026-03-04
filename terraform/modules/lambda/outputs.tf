@@ -87,3 +87,13 @@ output "email_sender_name" {
   description = "Name of the email sender Lambda function"
   value       = aws_lambda_function.email_sender.function_name
 }
+
+output "email_parser_lambda_permission_id" {
+  description = "ID of the S3 permission for email parser Lambda"
+  value       = aws_lambda_permission.allow_s3_email_parser.id
+}
+
+output "rag_ingestion_lambda_permission_id" {
+  description = "ID of the S3 permission for RAG ingestion Lambda"
+  value       = aws_lambda_permission.allow_s3_rag_ingestion.id
+}

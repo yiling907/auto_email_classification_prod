@@ -12,12 +12,19 @@ locals {
 }
 
 # Storage module - S3 buckets and DynamoDB tables
+# Note: Must be created before Lambda to avoid circular dependency
 module "storage" {
   source = "./modules/storage"
 
   project_name = var.project_name
   environment  = var.environment
   tags         = local.common_tags
+
+  # S3 event triggers (configured after Lambda module)
+  email_parser_lambda_arn            = module.lambda.email_parser_arn
+  email_parser_lambda_permission_id  = module.lambda.email_parser_lambda_permission_id
+  rag_ingestion_lambda_arn           = module.lambda.rag_ingestion_arn
+  rag_ingestion_lambda_permission_id = module.lambda.rag_ingestion_lambda_permission_id
 }
 
 # IAM module - Roles and policies for Lambda and Step Functions
