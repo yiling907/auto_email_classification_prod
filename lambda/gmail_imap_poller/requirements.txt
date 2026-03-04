@@ -1,0 +1,4 @@
+# Gmail IMAP Poller Lambda - Requirements
+# No external dependencies needed - uses Python standard library
+# imaplib, email, json, os, uuid - all built-in
+# boto3 - provided by AWS Lambda runtime

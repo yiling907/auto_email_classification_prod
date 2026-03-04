@@ -1,59 +1,29 @@
-# InsureMail AI Terraform Variables
-# Copy this file to terraform.tfvars and customize for your environment
+# Example Terraform Variables File for InsureMail AI
+# Copy this to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to git (it contains sensitive credentials)
 
 # Project Configuration
 project_name = "insuremail-ai"
 environment  = "dev"
 aws_region   = "us-east-1"
 
-# Lambda Configuration
-lambda_runtime = "python3.11"
-log_retention_days = 7
-
-# Amazon Bedrock Models - Open Source Configuration
-# Using only open-source models for cost optimization and transparency
-bedrock_models = [
-  # Meta Llama 3.1 8B Instruct - Open source (Meta)
-  # $0.30 per 1M input tokens, $0.60 per 1M output tokens
-  "meta.llama3-1-8b-instruct-v1:0",
-
-  # Mistral 7B Instruct - Open source (Mistral AI)
-  # $0.15 per 1M input tokens, $0.20 per 1M output tokens (cheapest)
-  "mistral.mistral-7b-instruct-v0:2",
-
-  # Amazon Titan Text Express - AWS native
-  # $0.20 per 1M input tokens, $0.60 per 1M output tokens
-  "amazon.titan-text-express-v1",
-
-  # Amazon Titan Embeddings - For RAG
-  # $0.10 per 1M tokens
-  "amazon.titan-embed-text-v1"
-
-  # Note: Using 100% open-source models
-  # Removed proprietary models (Claude, GPT)
-  # See docs/COST_OPTIMIZATION.md for comparison
-]
-
-# SES Configuration (Real Email Integration)
-# IMPORTANT: You must verify this email address in SES before deploying
-# Run: ./scripts/setup_ses.sh to automate verification
-sender_email = "support@yourdomain.com"
+# SES Configuration (for sending responses)
+sender_email = "your-verified-email@gmail.com"  # Must be verified in SES
 sender_name  = "InsureMail AI Support"
 
-# Optional: Filter which emails to receive
-# Empty list = receive all emails to this domain
-# Specific list = only receive emails to these addresses
-ses_receipt_recipients = []
-# Example with filtering:
-# ses_receipt_recipients = ["support@yourdomain.com", "claims@yourdomain.com"]
+# Gmail IMAP Configuration (for receiving emails)
+# REQUIRED: Generate App Password at https://myaccount.google.com/apppasswords
+gmail_address      = "your-email@gmail.com"
+gmail_app_password = "xxxx xxxx xxxx xxxx"  # 16-character App Password (NOT your Gmail password)
+imap_server        = "imap.gmail.com"
+mark_emails_as_read = true
 
-# Monitoring Configuration
-enable_bedrock_logging = true
+# Optional: Polling interval
+imap_poll_interval_minutes = 5  # Check Gmail every 5 minutes
 
-# Resource Tags
+# Tags (optional)
 tags = {
-  Project    = "InsureMail AI"
-  ManagedBy  = "Terraform"
-  Repository = "auto_email_classification_prod"
-  Environment = "dev"
+  Project     = "InsureMail AI"
+  Environment = "Development"
+  ManagedBy   = "Terraform"
 }

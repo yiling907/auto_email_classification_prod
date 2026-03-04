@@ -80,3 +80,4 @@ htmlcov/
 tmp/
 temp/
 coverage.xml
+terraform/terraform.tfvars

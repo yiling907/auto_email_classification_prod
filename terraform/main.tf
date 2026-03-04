@@ -60,6 +60,13 @@ module "lambda" {
   state_machine_arn         = module.step_functions.state_machine_arn
   sender_email              = var.sender_email
   sender_name               = var.sender_name
+
+  # Gmail IMAP Configuration
+  gmail_address         = var.gmail_address
+  gmail_app_password    = var.gmail_app_password
+  imap_server           = var.imap_server
+  mark_emails_as_read   = var.mark_emails_as_read ? "true" : "false"
+
   tags                      = local.common_tags
 }
 
@@ -92,13 +99,15 @@ module "bedrock" {
 module "monitoring" {
   source = "./modules/monitoring"
 
-  project_name                  = var.project_name
-  environment                   = var.environment
-  log_retention_days            = var.log_retention_days
-  state_machine_arn             = module.step_functions.state_machine_arn
-  email_parser_function_name    = module.lambda.email_parser_name
-  evaluation_metrics_lambda_arn = module.lambda.evaluation_metrics_arn
-  tags                          = local.common_tags
+  project_name                     = var.project_name
+  environment                      = var.environment
+  log_retention_days               = var.log_retention_days
+  state_machine_arn                = module.step_functions.state_machine_arn
+  email_parser_function_name       = module.lambda.email_parser_name
+  evaluation_metrics_lambda_arn    = module.lambda.evaluation_metrics_arn
+  gmail_imap_poller_lambda_arn     = module.lambda.gmail_imap_poller_arn
+  gmail_imap_poller_lambda_name    = module.lambda.gmail_imap_poller_name
+  tags                             = local.common_tags
 }
 
 # API Gateway module - REST API for dashboard
@@ -112,18 +121,13 @@ module "api_gateway" {
   tags                    = local.common_tags
 }
 
-# SES module - Email receiving and sending
+# SES module - Email sending only (receiving via Gmail IMAP)
 module "ses" {
   source = "./modules/ses"
 
-  project_name               = var.project_name
-  environment                = var.environment
-  support_email              = var.sender_email
-  ses_receipt_recipients     = var.ses_receipt_recipients
-  email_bucket_name          = module.storage.email_bucket_name
-  email_bucket_arn           = module.storage.email_bucket_arn
-  email_receiver_lambda_arn  = module.lambda.email_receiver_arn
-  email_receiver_lambda_name = module.lambda.email_receiver_name
-  log_retention_days         = var.log_retention_days
-  tags                       = local.common_tags
+  project_name       = var.project_name
+  environment        = var.environment
+  support_email      = var.sender_email
+  log_retention_days = var.log_retention_days
+  tags               = local.common_tags
 }

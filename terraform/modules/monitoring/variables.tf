@@ -32,3 +32,13 @@ variable "tags" {
   description = "Common tags for resources"
   type        = map(string)
 }
+
+variable "gmail_imap_poller_lambda_arn" {
+  description = "ARN of the Gmail IMAP poller Lambda function"
+  type        = string
+}
+
+variable "gmail_imap_poller_lambda_name" {
+  description = "Name of the Gmail IMAP poller Lambda function"
+  type        = string
+}

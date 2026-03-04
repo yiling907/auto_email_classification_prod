@@ -88,3 +88,34 @@ variable "tags" {
     Repository = "auto_email_classification_prod"
   }
 }
+
+# Gmail IMAP Configuration
+variable "gmail_address" {
+  description = "Gmail address for IMAP polling (e.g., your-email@gmail.com)"
+  type        = string
+  sensitive   = true
+}
+
+variable "gmail_app_password" {
+  description = "Gmail App Password for IMAP access (NOT your regular password - generate at https://myaccount.google.com/apppasswords)"
+  type        = string
+  sensitive   = true
+}
+
+variable "imap_server" {
+  description = "IMAP server address (default: imap.gmail.com)"
+  type        = string
+  default     = "imap.gmail.com"
+}
+
+variable "imap_poll_interval_minutes" {
+  description = "How often to poll Gmail inbox (in minutes)"
+  type        = number
+  default     = 5
+}
+
+variable "mark_emails_as_read" {
+  description = "Whether to mark processed emails as read in Gmail"
+  type        = bool
+  default     = true
+}

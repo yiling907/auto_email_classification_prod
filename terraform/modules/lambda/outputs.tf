@@ -68,15 +68,26 @@ output "api_handlers_name" {
   value       = aws_lambda_function.api_handlers.function_name
 }
 
-output "email_receiver_arn" {
-  description = "ARN of the email receiver Lambda function"
-  value       = aws_lambda_function.email_receiver.arn
+output "gmail_imap_poller_arn" {
+  description = "ARN of the Gmail IMAP poller Lambda function"
+  value       = aws_lambda_function.gmail_imap_poller.arn
 }
 
-output "email_receiver_name" {
-  description = "Name of the email receiver Lambda function"
-  value       = aws_lambda_function.email_receiver.function_name
+output "gmail_imap_poller_name" {
+  description = "Name of the Gmail IMAP poller Lambda function"
+  value       = aws_lambda_function.gmail_imap_poller.function_name
 }
+
+# REMOVED: email_receiver outputs (switched to IMAP)
+# output "email_receiver_arn" {
+#   description = "ARN of the email receiver Lambda function"
+#   value       = aws_lambda_function.email_receiver.arn
+# }
+#
+# output "email_receiver_name" {
+#   description = "Name of the email receiver Lambda function"
+#   value       = aws_lambda_function.email_receiver.function_name
+# }
 
 output "email_sender_arn" {
   description = "ARN of the email sender Lambda function"

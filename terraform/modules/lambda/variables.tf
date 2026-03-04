@@ -70,3 +70,28 @@ variable "tags" {
   description = "Common tags for resources"
   type        = map(string)
 }
+
+# Gmail IMAP Configuration
+variable "gmail_address" {
+  description = "Gmail address for IMAP polling"
+  type        = string
+  sensitive   = true
+}
+
+variable "gmail_app_password" {
+  description = "Gmail App Password for IMAP access"
+  type        = string
+  sensitive   = true
+}
+
+variable "imap_server" {
+  description = "IMAP server address"
+  type        = string
+  default     = "imap.gmail.com"
+}
+
+variable "mark_emails_as_read" {
+  description = "Whether to mark emails as read after processing"
+  type        = string
+  default     = "true"
+}
