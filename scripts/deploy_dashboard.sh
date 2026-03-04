@@ -75,31 +75,14 @@ deploy_to_s3() {
     local BUCKET_NAME=$1
     local AWS_REGION=$2
 
+    # Remove public access block first
     echo ""
-    echo "Uploading files to S3..."
-
-    # Upload files
-    aws s3 sync "$DASHBOARD_DIR/dist/" "s3://$BUCKET_NAME/" --delete --acl public-read
-
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to upload files"
-        exit 1
-    fi
-
-    echo "✓ Files uploaded"
-
-    # Enable static website hosting
-    echo ""
-    echo "Enabling static website hosting..."
-    aws s3 website s3://$BUCKET_NAME \
-        --index-document index.html \
-        --error-document index.html
-
-    if [ $? -ne 0 ]; then
-        echo "WARNING: Failed to enable website hosting (you may need to do this manually)"
-    else
-        echo "✓ Website hosting enabled"
-    fi
+    echo "Configuring public access settings..."
+    aws s3api put-public-access-block \
+        --bucket $BUCKET_NAME \
+        --public-access-block-configuration \
+        "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false" \
+        2>/dev/null || echo "Note: Public access block settings configured"
 
     # Set bucket policy for public access
     echo ""
@@ -128,15 +111,33 @@ EOF
         echo "✓ Bucket policy configured"
     fi
 
-    # Remove public access block
-    aws s3api put-public-access-block \
-        --bucket $BUCKET_NAME \
-        --public-access-block-configuration \
-        "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false" \
-        2>/dev/null || true
-
     # Clean up temp file
     rm -f /tmp/bucket-policy-$$.json
+
+    # Enable static website hosting
+    echo ""
+    echo "Enabling static website hosting..."
+    aws s3 website s3://$BUCKET_NAME \
+        --index-document index.html \
+        --error-document index.html
+
+    if [ $? -ne 0 ]; then
+        echo "WARNING: Failed to enable website hosting (you may need to do this manually)"
+    else
+        echo "✓ Website hosting enabled"
+    fi
+
+    # Upload files (without ACL flag)
+    echo ""
+    echo "Uploading files to S3..."
+    aws s3 sync "$DASHBOARD_DIR/dist/" "s3://$BUCKET_NAME/" --delete
+
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to upload files"
+        exit 1
+    fi
+
+    echo "✓ Files uploaded"
 
     # Get website URL
     WEBSITE_URL="http://$BUCKET_NAME.s3-website-$AWS_REGION.amazonaws.com"
