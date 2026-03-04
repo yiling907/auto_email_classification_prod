@@ -109,10 +109,16 @@ resource "aws_iam_role_policy" "lambda_bedrock" {
           "bedrock:InvokeModelWithResponseStream"
         ]
         Resource = [
+          # Foundation models (standard model access)
           "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0",
           "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
           "arn:aws:bedrock:${var.aws_region}::foundation-model/amazon.titan-embed-text-v1",
-          "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/mistral.mistral-7b-instruct-v0:2",
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/meta.llama3-1-8b-instruct-v1:0",
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/*",
+
+          # Inference profiles (cross-region access for Llama, etc.)
+          "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/*"
         ]
       }
     ]

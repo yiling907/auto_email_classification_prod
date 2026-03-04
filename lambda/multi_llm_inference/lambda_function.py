@@ -6,6 +6,7 @@ import json
 import os
 from typing import Dict, Any, List
 from datetime import datetime
+from decimal import Decimal
 import boto3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from botocore.exceptions import ClientError
@@ -203,16 +204,16 @@ def invoke_model(
             # Mistral format
             outputs = response_body.get('outputs', [])
             output_text = outputs[0].get('text', '') if outputs else ''
-            # Mistral doesn't provide token counts, estimate
-            input_tokens = len(prompt.split()) * 1.3
-            output_tokens = len(output_text.split()) * 1.3
+            # Mistral doesn't provide token counts, estimate (convert to int for DynamoDB)
+            input_tokens = int(len(prompt.split()) * 1.3)
+            output_tokens = int(len(output_text.split()) * 1.3)
 
         elif model_type == 'amazon':
             # Titan format
             results = response_body.get('results', [])
             output_text = results[0].get('outputText', '') if results else ''
             input_tokens = response_body.get('inputTextTokenCount', 0)
-            output_tokens = results[0].get('tokenCount', 0) if results else len(output_text.split()) * 1.3
+            output_tokens = results[0].get('tokenCount', 0) if results else int(len(output_text.split()) * 1.3)
 
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
@@ -262,20 +263,24 @@ def store_metrics(task_type: str, model_name: str, result: Dict[str, Any]) -> No
         timestamp = datetime.utcnow().isoformat() + 'Z'
         model_timestamp = f"{model_name}#{timestamp}"
 
+        # Convert numeric values to Decimal for DynamoDB compatibility
         item = {
             'task_type': task_type,
             'model_timestamp': model_timestamp,
             'model_name': model_name,
             'model_id': result.get('model_id'),
-            'input_tokens': result.get('input_tokens', 0),
-            'output_tokens': result.get('output_tokens', 0),
-            'latency_ms': result.get('latency_ms', 0),
-            'cost_usd': result.get('cost_usd', 0),
+            'input_tokens': int(result.get('input_tokens', 0)),
+            'output_tokens': int(result.get('output_tokens', 0)),
+            'latency_ms': Decimal(str(result.get('latency_ms', 0))),
+            'cost_usd': Decimal(str(result.get('cost_usd', 0))),
             'success': result.get('success', False),
             'timestamp': timestamp
         }
 
         model_metrics_table.put_item(Item=item)
+        print(f"✓ Stored metrics for {model_name} ({task_type})")
 
     except Exception as e:
-        print(f"Error storing metrics: {str(e)}")
+        print(f"✗ Error storing metrics for {model_name}: {str(e)}")
+        # Re-raise to make failures visible
+        raise
