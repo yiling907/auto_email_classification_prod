@@ -17,20 +17,31 @@ variable "aws_region" {
 }
 
 variable "bedrock_models" {
-  description = "List of Bedrock model IDs to enable (using most cost-effective options)"
+  description = "List of Bedrock model IDs - Using open-source models for cost optimization"
   type        = list(string)
   default = [
-    # Claude 3 Haiku - Most cost-effective Claude model
-    # ~$0.25 per 1M input tokens, $1.25 per 1M output tokens (10x cheaper than Sonnet)
-    "anthropic.claude-3-haiku-20240307-v1:0",
+    # Open Source Models (Free/Low Cost)
 
-    # Amazon Titan Embeddings - For RAG (most cost-effective embedding model)
+    # Meta Llama 3.1 8B Instruct - Open source, cost-effective
+    # ~$0.30 per 1M input tokens, $0.60 per 1M output tokens
+    "meta.llama3-1-8b-instruct-v1:0",
+
+    # Mistral 7B Instruct - Open source, very cost-effective
+    # ~$0.15 per 1M input tokens, $0.20 per 1M output tokens
+    "mistral.mistral-7b-instruct-v0:2",
+
+    # Amazon Titan Text Express - AWS native, cost-effective
+    # ~$0.20 per 1M input tokens, $0.60 per 1M output tokens
+    "amazon.titan-text-express-v1",
+
+    # Amazon Titan Embeddings - For RAG (cheapest embedding model)
     # ~$0.10 per 1M tokens
     "amazon.titan-embed-text-v1"
 
-    # Note: Removed expensive models for cost optimization:
-    # - Claude 3 Sonnet (~$3/$15 per 1M tokens) - 10x more expensive
-    # - Deprecated models (titan-text-lite-v1, llama3, mistral)
+    # Note: Removed proprietary models:
+    # - Claude 3 Haiku ($0.25/$1.25 per 1M) - proprietary
+    # - Claude 3 Sonnet ($3/$15 per 1M) - expensive & proprietary
+    # Using only open-source alternatives for multi-LLM comparison
   ]
 }
 

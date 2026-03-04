@@ -18,16 +18,26 @@ dynamodb = boto3.resource('dynamodb')
 MODEL_METRICS_TABLE_NAME = os.environ['MODEL_METRICS_TABLE_NAME']
 model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME)
 
-# Model configurations
+# Model configurations - Open source models only
 MODELS = {
-    'claude-3-haiku': {
-        'id': 'anthropic.claude-3-haiku-20240307-v1:0',
-        'type': 'anthropic',
-        'cost_per_1k_input': 0.00025,
-        'cost_per_1k_output': 0.00125
+    'llama-3.1-8b': {
+        'id': 'meta.llama3-1-8b-instruct-v1:0',
+        'type': 'meta',
+        'cost_per_1k_input': 0.00030,
+        'cost_per_1k_output': 0.00060
+    },
+    'mistral-7b': {
+        'id': 'mistral.mistral-7b-instruct-v0:2',
+        'type': 'mistral',
+        'cost_per_1k_input': 0.00015,
+        'cost_per_1k_output': 0.00020
+    },
+    'titan-express': {
+        'id': 'amazon.titan-text-express-v1',
+        'type': 'amazon',
+        'cost_per_1k_input': 0.00020,
+        'cost_per_1k_output': 0.00060
     }
-    # Note: Titan Lite has reached end of life - removed
-    # Can add other models like Claude 3.5 Sonnet or Haiku v2 when available
 }
 
 
@@ -132,21 +142,43 @@ def invoke_model(
 
         # Build request based on model type
         if model_type == 'anthropic':
+            # Claude models
             request_body = {
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 1000,
                 "temperature": 0.1,
                 "messages": [{"role": "user", "content": prompt}]
             }
-        else:  # Amazon Titan
+        elif model_type == 'meta':
+            # Llama models
+            request_body = {
+                "prompt": prompt,
+                "max_gen_len": 1000,
+                "temperature": 0.1,
+                "top_p": 0.9
+            }
+        elif model_type == 'mistral':
+            # Mistral models
+            request_body = {
+                "prompt": prompt,
+                "max_tokens": 1000,
+                "temperature": 0.1,
+                "top_p": 0.9,
+                "top_k": 50
+            }
+        elif model_type == 'amazon':
+            # Titan models
             request_body = {
                 "inputText": prompt,
                 "textGenerationConfig": {
                     "maxTokenCount": 1000,
                     "temperature": 0.1,
-                    "topP": 0.9
+                    "topP": 0.9,
+                    "stopSequences": []
                 }
             }
+        else:
+            raise ValueError(f"Unsupported model type: {model_type}")
 
         # Invoke model
         response = bedrock_runtime.invoke_model(
@@ -160,14 +192,35 @@ def invoke_model(
 
         # Extract output based on model type
         if model_type == 'anthropic':
+            # Claude format
             output_text = response_body.get('content', [{}])[0].get('text', '')
             usage = response_body.get('usage', {})
             input_tokens = usage.get('input_tokens', 0)
             output_tokens = usage.get('output_tokens', 0)
-        else:  # Titan
-            output_text = response_body.get('results', [{}])[0].get('outputText', '')
+
+        elif model_type == 'meta':
+            # Llama format
+            output_text = response_body.get('generation', '')
+            input_tokens = response_body.get('prompt_token_count', 0)
+            output_tokens = response_body.get('generation_token_count', 0)
+
+        elif model_type == 'mistral':
+            # Mistral format
+            outputs = response_body.get('outputs', [])
+            output_text = outputs[0].get('text', '') if outputs else ''
+            # Mistral doesn't provide token counts, estimate
+            input_tokens = len(prompt.split()) * 1.3
+            output_tokens = len(output_text.split()) * 1.3
+
+        elif model_type == 'amazon':
+            # Titan format
+            results = response_body.get('results', [])
+            output_text = results[0].get('outputText', '') if results else ''
             input_tokens = response_body.get('inputTextTokenCount', 0)
-            output_tokens = len(output_text.split()) * 1.3  # Rough estimate
+            output_tokens = results[0].get('tokenCount', 0) if results else len(output_text.split()) * 1.3
+
+        else:
+            raise ValueError(f"Unsupported model type: {model_type}")
 
         # Calculate metrics
         latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000

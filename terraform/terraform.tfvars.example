@@ -10,22 +10,28 @@ aws_region   = "us-east-1"
 lambda_runtime = "python3.11"
 log_retention_days = 7
 
-# Amazon Bedrock Models (Cost-Optimized Configuration)
-# Using only the most cost-effective models
+# Amazon Bedrock Models - Open Source Configuration
+# Using only open-source models for cost optimization and transparency
 bedrock_models = [
-  # Claude 3 Haiku - Most cost-effective Claude model (10x cheaper than Sonnet)
-  # $0.25 per 1M input tokens, $1.25 per 1M output tokens
-  # Perfect for production use with insurance emails
-  "anthropic.claude-3-haiku-20240307-v1:0",
+  # Meta Llama 3.1 8B Instruct - Open source (Meta)
+  # $0.30 per 1M input tokens, $0.60 per 1M output tokens
+  "meta.llama3-1-8b-instruct-v1:0",
 
-  # Amazon Titan Embeddings - For RAG (cheapest embedding model)
+  # Mistral 7B Instruct - Open source (Mistral AI)
+  # $0.15 per 1M input tokens, $0.20 per 1M output tokens (cheapest)
+  "mistral.mistral-7b-instruct-v0:2",
+
+  # Amazon Titan Text Express - AWS native
+  # $0.20 per 1M input tokens, $0.60 per 1M output tokens
+  "amazon.titan-text-express-v1",
+
+  # Amazon Titan Embeddings - For RAG
   # $0.10 per 1M tokens
   "amazon.titan-embed-text-v1"
 
-  # Note: Removed expensive models for cost optimization:
-  # - Claude 3 Sonnet: $3/$15 per 1M tokens (10x more expensive)
-  # - Claude 3 Opus: $15/$75 per 1M tokens (50x more expensive)
-  # See docs/COST_OPTIMIZATION.md for detailed comparison
+  # Note: Using 100% open-source models
+  # Removed proprietary models (Claude, GPT)
+  # See docs/COST_OPTIMIZATION.md for comparison
 ]
 
 # SES Configuration (Real Email Integration)

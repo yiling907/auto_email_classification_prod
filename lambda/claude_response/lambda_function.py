@@ -15,10 +15,17 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
-# Using Claude 3 Haiku for cost optimization (10x cheaper than Sonnet)
-# Haiku: ~$0.25 per million input tokens, $1.25 per million output tokens
-# Sonnet: ~$3 per million input tokens, $15 per million output tokens
-CLAUDE_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+
+# Using open-source models for cost optimization
+# Primary model for production responses (can be overridden via env var)
+PRIMARY_MODEL_ID = os.environ.get('PRIMARY_MODEL_ID', 'meta.llama3-1-8b-instruct-v1:0')
+
+# Available open-source models for fallback
+FALLBACK_MODELS = [
+    'meta.llama3-1-8b-instruct-v1:0',    # Llama 3.1 8B: $0.30/$0.60 per 1M tokens
+    'mistral.mistral-7b-instruct-v0:2',  # Mistral 7B: $0.15/$0.20 per 1M tokens
+    'amazon.titan-text-express-v1'       # Titan Express: $0.20/$0.60 per 1M tokens
+]
 
 email_table = dynamodb.Table(EMAIL_TABLE_NAME)
 
@@ -201,7 +208,9 @@ Provide ONLY the JSON response, no additional text."""
 
 def invoke_claude(prompt: str) -> Dict[str, Any]:
     """
-    Invoke Claude 3 model via Bedrock
+    Invoke Bedrock model with fallback support
+
+    Tries primary model first, falls back to alternatives if needed
 
     Args:
         prompt: Input prompt
@@ -209,34 +218,150 @@ def invoke_claude(prompt: str) -> Dict[str, Any]:
     Returns:
         Model response data
     """
-    try:
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2000,
-            "temperature": 0.1,  # Low temperature for consistency
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        }
+    # Try primary model first
+    models_to_try = [PRIMARY_MODEL_ID] + [m for m in FALLBACK_MODELS if m != PRIMARY_MODEL_ID]
 
+    last_error = None
+    for model_id in models_to_try:
+        try:
+            print(f"Trying model: {model_id}")
+            response_body = invoke_bedrock_model(model_id, prompt)
+            print(f"✓ Response received from {model_id}")
+            return response_body
+
+        except Exception as e:
+            print(f"✗ Error with {model_id}: {str(e)}")
+            last_error = e
+            continue
+
+    # All models failed
+    raise Exception(f"All models failed. Last error: {str(last_error)}")
+
+
+def invoke_bedrock_model(model_id: str, prompt: str) -> Dict[str, Any]:
+    """
+    Invoke specific Bedrock model with appropriate API format
+
+    Args:
+        model_id: Bedrock model ID
+        prompt: Input prompt
+
+    Returns:
+        Model response data
+    """
+    try:
+        # Determine model provider and format request accordingly
+        if model_id.startswith('anthropic.'):
+            # Claude models (Anthropic format)
+            request_body = {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 2000,
+                "temperature": 0.1,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+
+        elif model_id.startswith('meta.llama'):
+            # Llama models (Meta format)
+            request_body = {
+                "prompt": prompt,
+                "max_gen_len": 2000,
+                "temperature": 0.1,
+                "top_p": 0.9
+            }
+
+        elif model_id.startswith('mistral.'):
+            # Mistral models (Mistral format)
+            request_body = {
+                "prompt": prompt,
+                "max_tokens": 2000,
+                "temperature": 0.1,
+                "top_p": 0.9,
+                "top_k": 50
+            }
+
+        elif model_id.startswith('amazon.titan'):
+            # Titan models (Amazon format)
+            request_body = {
+                "inputText": prompt,
+                "textGenerationConfig": {
+                    "maxTokenCount": 2000,
+                    "temperature": 0.1,
+                    "topP": 0.9,
+                    "stopSequences": []
+                }
+            }
+
+        else:
+            raise ValueError(f"Unsupported model: {model_id}")
+
+        # Invoke model
         response = bedrock_runtime.invoke_model(
-            modelId=CLAUDE_MODEL_ID,
+            modelId=model_id,
             body=json.dumps(request_body),
             contentType='application/json',
             accept='application/json'
         )
 
         response_body = json.loads(response['body'].read())
-        print(f"Claude response received")
 
-        return response_body
+        # Normalize response format
+        normalized = normalize_response(model_id, response_body)
+
+        return normalized
 
     except Exception as e:
-        print(f"Error invoking Claude: {str(e)}")
+        print(f"Error invoking {model_id}: {str(e)}")
         raise
+
+
+def normalize_response(model_id: str, response_body: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize different model response formats to a common structure
+
+    Args:
+        model_id: Model identifier
+        response_body: Raw response from model
+
+    Returns:
+        Normalized response with 'content' field
+    """
+    if model_id.startswith('anthropic.'):
+        # Claude format - already normalized
+        return response_body
+
+    elif model_id.startswith('meta.llama'):
+        # Llama format
+        return {
+            'content': [{
+                'text': response_body.get('generation', '')
+            }],
+            'usage': response_body.get('generation_token_count', {})
+        }
+
+    elif model_id.startswith('mistral.'):
+        # Mistral format
+        outputs = response_body.get('outputs', [])
+        text = outputs[0].get('text', '') if outputs else ''
+        return {
+            'content': [{'text': text}],
+            'usage': {}
+        }
+
+    elif model_id.startswith('amazon.titan'):
+        # Titan format
+        results = response_body.get('results', [])
+        text = results[0].get('outputText', '') if results else ''
+        return {
+            'content': [{'text': text}],
+            'usage': {}
+        }
+
+    else:
+        # Unknown format - try to extract text field
+        return {
+            'content': [{'text': str(response_body)}],
+            'usage': {}
+        }
 
 
 def parse_claude_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
