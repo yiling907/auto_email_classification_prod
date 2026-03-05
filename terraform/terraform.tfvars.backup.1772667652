@@ -1,0 +1,12 @@
+# InsureMail AI Terraform Variables
+
+project_name = "insuremail-ai"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+# SES Configuration
+sender_email = "shiyizhiya@gmail.com"
+sender_name  = "InsureMail AI Support"
+
+# Optional: Specify which emails to receive (empty = all)
+ses_receipt_recipients = []
