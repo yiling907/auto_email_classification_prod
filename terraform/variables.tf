@@ -64,7 +64,7 @@ variable "enable_bedrock_logging" {
 variable "sender_email" {
   description = "Email address to send responses from (must be verified in SES)"
   type        = string
-  default     = "shiyizhiya@gmail.com"
+  default     = "yilinglei907@gmail.com"
 }
 
 variable "sender_name" {

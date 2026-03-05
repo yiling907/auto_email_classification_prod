@@ -2,13 +2,16 @@
 RAG Ingestion Lambda Function
 Ingests documents from S3, chunks them, and generates embeddings
 """
+import io
 import json
 import os
 import uuid
 from typing import Dict, Any, List
 from datetime import datetime
+from urllib.parse import unquote_plus
 import boto3
 from botocore.exceptions import ClientError
+from pypdf import PdfReader
 
 # Initialize AWS clients
 s3_client = boto3.client('s3')
@@ -39,7 +42,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # S3 event trigger
             record = event['Records'][0]
             bucket = record['s3']['bucket']['name']
-            key = record['s3']['object']['key']
+            key = unquote_plus(record['s3']['object']['key'])
         else:
             # Direct invocation
             bucket = event.get('bucket')
@@ -52,7 +55,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Get document from S3
         response = s3_client.get_object(Bucket=bucket, Key=key)
-        content = response['Body'].read().decode('utf-8')
+        raw_bytes = response['Body'].read()
+
+        # Extract text based on file type
+        if key.lower().endswith('.pdf'):
+            reader = PdfReader(io.BytesIO(raw_bytes))
+            content = '\n'.join(page.extract_text() or '' for page in reader.pages)
+        else:
+            content = raw_bytes.decode('utf-8')
 
         # Determine document type
         doc_type = determine_doc_type(key)

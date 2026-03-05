@@ -53,7 +53,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Send email via SES
         send_response = ses_client.send_email(
-            Source=f"{SENDER_NAME} <{SENDER_EMAIL}>",
+            Source=SENDER_EMAIL,
             Destination={
                 'ToAddresses': [recipient]
             },
@@ -72,8 +72,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         'Charset': 'UTF-8'
                     }
                 }
-            },
-            ReplyToAddresses=[SENDER_EMAIL]
+            }
         )
 
         message_id = send_response['MessageId']

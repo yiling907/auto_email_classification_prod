@@ -7,6 +7,7 @@ import os
 import uuid
 from datetime import datetime
 from email import message_from_string
+from email.utils import parseaddr
 from typing import Dict, Any
 import boto3
 from botocore.exceptions import ClientError
@@ -34,12 +35,21 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         # Extract bucket and key from event
         if 'Records' in event:
-            # S3 event trigger
             record = event['Records'][0]
-            bucket = record['s3']['bucket']['name']
-            key = record['s3']['object']['key']
+            if 's3' in record:
+                # Standard S3 event trigger
+                bucket = record['s3']['bucket']['name']
+                key = record['s3']['object']['key']
+            elif 'Sns' in record:
+                # SNS notification (SES or Gmail IMAP via SNS)
+                sns_message = json.loads(record['Sns']['Message'])
+                action = sns_message.get('receipt', {}).get('action', {})
+                bucket = action.get('bucketName')
+                key = action.get('objectKey')
+            else:
+                raise ValueError(f"Unsupported Records event source: {record.get('eventSource', 'unknown')}")
         else:
-            # Direct invocation
+            # Direct invocation with bucket/key
             bucket = event.get('bucket')
             key = event.get('key')
 
@@ -79,16 +89,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     except ClientError as e:
         print(f"AWS Error: {str(e)}")
-        return {
-            'statusCode': 500,
-            'error': str(e)
-        }
+        raise
     except Exception as e:
         print(f"Error: {str(e)}")
-        return {
-            'statusCode': 500,
-            'error': str(e)
-        }
+        raise
 
 
 def parse_email(raw_email: str) -> Dict[str, Any]:
@@ -105,9 +109,9 @@ def parse_email(raw_email: str) -> Dict[str, Any]:
         # Parse email using Python's email library
         msg = message_from_string(raw_email)
 
-        # Extract fields
-        from_address = msg.get('From', '')
-        to_address = msg.get('To', '')
+        # Extract fields — parseaddr strips display name e.g. "Name <email>" → "email"
+        _, from_address = parseaddr(msg.get('From', ''))
+        _, to_address = parseaddr(msg.get('To', ''))
         subject = msg.get('Subject', '')
         date = msg.get('Date', '')
 
@@ -125,9 +129,12 @@ def parse_email(raw_email: str) -> Dict[str, Any]:
         if not from_address or not body:
             raise ValueError("Invalid email: missing required fields")
 
+        # Store original addresses (needed for sending replies)
+        # PII redaction is applied only in logs, not in stored data
+        print(f"Parsed email from: {redact_pii(from_address)} to: {redact_pii(to_address)}")
         return {
-            'from_address': redact_pii(from_address),
-            'to_address': redact_pii(to_address),
+            'from_address': from_address,
+            'to_address': to_address,
             'subject': subject,
             'date': date,
             'body': body,
