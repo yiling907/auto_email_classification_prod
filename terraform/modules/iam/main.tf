@@ -109,16 +109,111 @@ resource "aws_iam_role_policy" "lambda_bedrock" {
           "bedrock:InvokeModelWithResponseStream"
         ]
         Resource = [
-          # Foundation models (standard model access)
           "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0",
           "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
           "arn:aws:bedrock:${var.aws_region}::foundation-model/amazon.titan-embed-text-v1",
           "arn:aws:bedrock:${var.aws_region}::foundation-model/mistral.mistral-7b-instruct-v0:2",
           "arn:aws:bedrock:${var.aws_region}::foundation-model/meta.llama3-1-8b-instruct-v1:0",
           "arn:aws:bedrock:${var.aws_region}::foundation-model/*",
-
-          # Inference profiles (cross-region access for Llama, etc.)
           "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/*"
+        ]
+      },
+      {
+        # Permissions for creating and managing Bedrock evaluation jobs
+        Effect = "Allow"
+        Action = [
+          "bedrock:CreateEvaluationJob",
+          "bedrock:GetEvaluationJob",
+          "bedrock:ListEvaluationJobs",
+          "bedrock:StopEvaluationJob",
+          "bedrock:TagResource"
+        ]
+        Resource = "*"
+      },
+      {
+        # Allow Lambda to pass the Bedrock evaluation service role to evaluation jobs
+        Effect = "Allow"
+        Action = "iam:PassRole"
+        Resource = aws_iam_role.bedrock_evaluation_service.arn
+      }
+    ]
+  })
+}
+
+# ---------------------------------------------------------------------------
+# Bedrock evaluation service role (assumed by bedrock.amazonaws.com)
+# ---------------------------------------------------------------------------
+
+resource "aws_iam_role" "bedrock_evaluation_service" {
+  name = "${local.resource_prefix}-bedrock-eval-service"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "bedrock.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+        Condition = {
+          StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.current.account_id }
+        }
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-bedrock-eval-service" })
+}
+
+resource "aws_iam_role_policy" "bedrock_evaluation_service" {
+  name = "${local.resource_prefix}-bedrock-eval-service-policy"
+  role = aws_iam_role.bedrock_evaluation_service.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        # Bedrock needs to invoke the subject models and the judge model
+        Sid    = "InvokeFoundationModels"
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:CreateModelInvocationJob",
+          "bedrock:StopModelInvocationJob",
+          "bedrock:GetProvisionedModelThroughput",
+          "bedrock:GetInferenceProfile",
+          "bedrock:ListInferenceProfiles"
+        ]
+        Resource = [
+          "arn:aws:bedrock:*::foundation-model/*",
+          "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:inference-profile/*",
+          "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:provisioned-model/*"
+        ]
+      },
+      {
+        # Read evaluation datasets from knowledge-base bucket
+        Sid    = "ReadDatasets"
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation"]
+        Resource = [
+          var.knowledge_base_bucket_arn,
+          "${var.knowledge_base_bucket_arn}/*"
+        ]
+      },
+      {
+        # Write evaluation results to logs bucket
+        Sid    = "WriteResults"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:PutObject",
+          "s3:GetBucketLocation",
+          "s3:AbortMultipartUpload",
+          "s3:ListBucketMultipartUploads"
+        ]
+        Resource = [
+          var.logs_bucket_arn,
+          "${var.logs_bucket_arn}/*"
         ]
       }
     ]

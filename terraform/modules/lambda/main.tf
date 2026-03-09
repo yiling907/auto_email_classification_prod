@@ -133,8 +133,9 @@ resource "aws_lambda_function" "claude_response" {
 
   environment {
     variables = {
-      EMAIL_TABLE_NAME   = var.email_table_name
-      EVALUATOR_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+      EMAIL_TABLE_NAME         = var.email_table_name
+      MODEL_METRICS_TABLE_NAME = var.model_metrics_table_name
+      EVALUATOR_MODEL_ID       = "anthropic.claude-3-haiku-20240307-v1:0"
     }
   }
 
@@ -325,6 +326,42 @@ resource "aws_cloudwatch_log_group" "gmail_imap_poller" {
 #   retention_in_days = var.log_retention_days
 #   tags              = var.tags
 # }
+
+# Bedrock Evaluation Lambda
+data "archive_file" "bedrock_evaluation" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_path}/bedrock_evaluation"
+  output_path = "${path.module}/builds/bedrock_evaluation.zip"
+}
+
+resource "aws_lambda_function" "bedrock_evaluation" {
+  filename         = data.archive_file.bedrock_evaluation.output_path
+  function_name    = "${local.resource_prefix}-bedrock-evaluation"
+  role             = var.lambda_execution_role_arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = var.lambda_runtime
+  timeout          = 300  # 5 min — submitting 6 jobs + S3 uploads
+  memory_size      = 512
+  source_code_hash = data.archive_file.bedrock_evaluation.output_base64sha256
+
+  environment {
+    variables = {
+      MODEL_METRICS_TABLE_NAME = var.model_metrics_table_name
+      KNOWLEDGE_BASE_BUCKET    = var.knowledge_base_bucket_name
+      LOGS_BUCKET              = var.logs_bucket_name
+      BEDROCK_EVAL_ROLE_ARN    = var.bedrock_eval_role_arn
+      AWS_ACCOUNT_ID           = var.aws_account_id
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-bedrock-evaluation" })
+}
+
+resource "aws_cloudwatch_log_group" "bedrock_evaluation" {
+  name              = "/aws/lambda/${aws_lambda_function.bedrock_evaluation.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
 
 # Data source to package Email Sender Lambda
 data "archive_file" "email_sender" {

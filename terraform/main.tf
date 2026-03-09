@@ -1,5 +1,7 @@
 # Main Terraform configuration for InsureMail AI
 
+data "aws_caller_identity" "current" {}
+
 locals {
   resource_prefix = "${var.project_name}-${var.environment}"
 
@@ -66,6 +68,12 @@ module "lambda" {
   gmail_app_password    = var.gmail_app_password
   imap_server           = var.imap_server
   mark_emails_as_read   = var.mark_emails_as_read ? "true" : "false"
+
+  # Bedrock Evaluation
+  logs_bucket_name      = module.storage.logs_bucket_name
+  bedrock_eval_role_arn = module.iam.bedrock_evaluation_service_role_arn
+  aws_account_id        = data.aws_caller_identity.current.account_id
+  aws_region            = var.aws_region
 
   tags                      = local.common_tags
 }

@@ -99,6 +99,16 @@ output "email_sender_name" {
   value       = aws_lambda_function.email_sender.function_name
 }
 
+output "bedrock_evaluation_arn" {
+  description = "ARN of the Bedrock evaluation Lambda function"
+  value       = aws_lambda_function.bedrock_evaluation.arn
+}
+
+output "bedrock_evaluation_name" {
+  description = "Name of the Bedrock evaluation Lambda function"
+  value       = aws_lambda_function.bedrock_evaluation.function_name
+}
+
 output "email_parser_lambda_permission_id" {
   description = "ID of the S3 permission for email parser Lambda"
   value       = aws_lambda_permission.allow_s3_email_parser.id

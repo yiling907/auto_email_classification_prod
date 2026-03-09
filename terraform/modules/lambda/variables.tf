@@ -95,3 +95,27 @@ variable "mark_emails_as_read" {
   type        = string
   default     = "true"
 }
+
+variable "logs_bucket_name" {
+  description = "Name of the logs S3 bucket (used by bedrock_evaluation for results)"
+  type        = string
+  default     = ""
+}
+
+variable "bedrock_eval_role_arn" {
+  description = "ARN of the Bedrock evaluation service role passed to CreateEvaluationJob"
+  type        = string
+  default     = ""
+}
+
+variable "aws_account_id" {
+  description = "AWS account ID"
+  type        = string
+  default     = ""
+}
+
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}

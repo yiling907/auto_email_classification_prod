@@ -1,0 +1,27 @@
+{
+  "dataset_name": "laya_like_synthetic_email_ops_starter",
+  "created_at": "2026-03-07T16:12:26.088874Z",
+  "record_counts": {
+    "customers": 1000,
+    "emails": 1000,
+    "attachments": 1044,
+    "attachment_content": 1044,
+    "cases": 1000,
+    "knowledge_docs": 312,
+    "draft_responses": 1000
+  },
+  "files": [
+    "customers.jsonl",
+    "emails.jsonl",
+    "attachments.jsonl",
+    "attachment_content.jsonl",
+    "cases.jsonl",
+    "knowledge_docs.jsonl",
+    "draft_responses.jsonl"
+  ],
+  "notes": [
+    "All records are synthetic and designed to resemble an Irish health insurance shared mailbox workflow.",
+    "Emails link to customers, cases, and optional attachments.",
+    "Draft responses are starter records for RAG evaluation."
+  ]
+}

@@ -15,6 +15,7 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
+MODEL_METRICS_TABLE_NAME = os.environ.get('MODEL_METRICS_TABLE_NAME')
 
 # Using open-source models for cost optimization
 # Primary model for production responses (can be overridden via env var)
@@ -27,7 +28,7 @@ EVALUATOR_MODEL_ID = os.environ.get('EVALUATOR_MODEL_ID', 'anthropic.claude-3-ha
 # Available open-source models for fallback (in priority order)
 FALLBACK_MODELS = [
     'mistral.mistral-7b-instruct-v0:2',       # Mistral 7B: $0.15/$0.20 per 1M tokens (cheapest & reliable)
-    'us.meta.llama3-1-8b-instruct-v1:0',      # Llama 3.1 8B: $0.30/$0.60 per 1M (inference profile)
+    'meta.llama3-8b-instruct-v1:0',      # Llama 3.1 8B: $0.30/$0.60 per 1M (inference profile)
     # Removed: amazon.titan-text-express-v1 (EOL - end of life)
 ]
 
@@ -89,6 +90,7 @@ TASK_TYPE_CRITERIA = {
 }
 
 email_table = dynamodb.Table(EMAIL_TABLE_NAME)
+model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME) if MODEL_METRICS_TABLE_NAME else None
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -167,6 +169,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             intent=intent,
             rag_documents=rag_documents,
             primary_model_id=PRIMARY_MODEL_ID
+        )
+
+        # Persist Claude's evaluation scores for this model into the metrics table
+        store_evaluation_metrics(
+            task_type=intent,
+            model_id=PRIMARY_MODEL_ID,
+            latency_ms=latency_ms,
+            confidence_score=confidence,
+            evaluation=evaluation
         )
 
         # Prepare result
@@ -610,6 +621,51 @@ def evaluate_response(
             'evaluator_model': evaluator_id,
             'eval_error': str(e)
         }
+
+
+def store_evaluation_metrics(
+    task_type: str,
+    model_id: str,
+    latency_ms: float,
+    confidence_score: float,
+    evaluation: Dict[str, Any]
+) -> None:
+    """
+    Write Claude's evaluation scores for the primary model into MODEL_METRICS_TABLE_NAME.
+
+    Schema: PK=task_type, SK=model_id#timestamp  (matches classify_intent table layout)
+    """
+    if not model_metrics_table:
+        print("MODEL_METRICS_TABLE_NAME not set — skipping metrics storage")
+        return
+    try:
+        from decimal import Decimal
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+        item = {
+            'task_type': task_type,
+            'model_timestamp': f"{model_id}#{timestamp}",
+            'model_id': model_id,
+            'model_name': model_id.split('.', 1)[-1],   # e.g. "mistral-7b-instruct-v0:2"
+            'latency_ms': Decimal(str(round(latency_ms, 2))),
+            'confidence_score': Decimal(str(round(confidence_score, 4))),
+            # Claude's evaluation scores
+            'eval_accuracy_score':      Decimal(str(evaluation['accuracy_score']))      if evaluation.get('accuracy_score')      is not None else None,
+            'eval_task_accuracy_score': Decimal(str(evaluation['task_accuracy_score'])) if evaluation.get('task_accuracy_score') is not None else None,
+            'eval_compliance_score':    Decimal(str(evaluation['compliance_score']))    if evaluation.get('compliance_score')    is not None else None,
+            'eval_coherence_score':     Decimal(str(evaluation['coherence_score']))     if evaluation.get('coherence_score')     is not None else None,
+            'eval_overall_quality':     Decimal(str(evaluation['overall_quality_score'])) if evaluation.get('overall_quality_score') is not None else None,
+            'evaluator_model': evaluation.get('evaluator_model', ''),
+            'eval_issues': evaluation.get('issues', []),
+            'eval_reasoning': (evaluation.get('reasoning') or '')[:500],
+            'success': not bool(evaluation.get('eval_error')),
+            'timestamp': timestamp,
+        }
+        # Remove None values (DynamoDB rejects them)
+        item = {k: v for k, v in item.items() if v is not None}
+        model_metrics_table.put_item(Item=item)
+        print(f"✓ Stored evaluation metrics for {model_id} (task={task_type})")
+    except Exception as e:
+        print(f"✗ Error storing evaluation metrics: {e}")
 
 
 def update_email_record(email_id: str, result: Dict[str, Any], confidence_level: str) -> None:

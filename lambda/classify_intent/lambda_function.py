@@ -34,7 +34,7 @@ MODELS = {
         'cost_per_1k_output': 0.00020
     },
     'llama-3.1-8b': {
-        'id': 'us.meta.llama3-1-8b-instruct-v1:0',  # Using cross-region inference profile
+        'id': 'meta.llama3-8b-instruct-v1:0',  # Using cross-region inference profile
         'type': 'meta',
         'cost_per_1k_input': 0.00030,
         'cost_per_1k_output': 0.00060
