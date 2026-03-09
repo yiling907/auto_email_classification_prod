@@ -4,7 +4,7 @@ Generates high-confidence insurance email responses using Claude 3
 """
 import json
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
@@ -20,12 +20,73 @@ EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
 # Primary model for production responses (can be overridden via env var)
 PRIMARY_MODEL_ID = os.environ.get('PRIMARY_MODEL_ID', 'mistral.mistral-7b-instruct-v0:2')
 
+# Evaluator model: always different from primary to get an independent quality signal
+# Default to Claude Haiku (cheap, reliable judge)
+EVALUATOR_MODEL_ID = os.environ.get('EVALUATOR_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
+
 # Available open-source models for fallback (in priority order)
 FALLBACK_MODELS = [
     'mistral.mistral-7b-instruct-v0:2',       # Mistral 7B: $0.15/$0.20 per 1M tokens (cheapest & reliable)
     'us.meta.llama3-1-8b-instruct-v1:0',      # Llama 3.1 8B: $0.30/$0.60 per 1M (inference profile)
     # Removed: amazon.titan-text-express-v1 (EOL - end of life)
 ]
+
+# Task-type-specific accuracy criteria for the evaluator
+TASK_TYPE_CRITERIA = {
+    'claim': [
+        "Accurately describes the claim review/processing timeline without guaranteeing outcomes",
+        "References relevant policy coverage clauses where applicable",
+        "Provides clear next steps the customer must take",
+        "Does not approve or deny the claim without verification",
+    ],
+    'enrollment': [
+        "Accurately states eligibility requirements without over-promising",
+        "Provides correct open enrollment period information",
+        "Clearly explains the enrollment steps in order",
+        "Does not confirm enrollment before verification is complete",
+    ],
+    'policy/account': [
+        "Correctly references policy terms without legal misrepresentation",
+        "Accurately describes account management options available",
+        "Includes appropriate disclaimers for policy interpretations",
+        "Does not make binding commitments about policy outcomes",
+    ],
+    'complaint': [
+        "Acknowledges the customer's concern with empathy and professionalism",
+        "Provides a clear resolution path or escalation to a specialist",
+        "Does not dismiss or minimise the complaint",
+        "Offers concrete next steps with expected timeframe",
+    ],
+    'inquiry': [
+        "Fully addresses the customer's specific question",
+        "Provides accurate and relevant information from knowledge base",
+        "Is clear, concise, and avoids unnecessary jargon",
+        "Includes appropriate caveats where information may vary",
+    ],
+    'billing_inquiry': [
+        "Accurately addresses the billing or payment question",
+        "Does not reveal or misstate sensitive financial details",
+        "Provides clear payment options or next steps",
+        "References correct billing policies and timelines",
+    ],
+    'technicalissue': [
+        "Provides actionable troubleshooting steps in clear order",
+        "Escalates to technical support when issue is beyond scope",
+        "Does not make promises about resolution time",
+        "Confirms what information will be needed from the customer",
+    ],
+    'spam': [
+        "Response is appropriately brief and does not engage with spam content",
+        "Does not leak any sensitive policy or account information",
+        "Maintains professional tone",
+    ],
+    'medicalservice': [
+        "Accurately describes what is covered under the medical benefit",
+        "Does not provide medical advice or diagnoses",
+        "References the correct benefit schedule or plan document",
+        "Includes appropriate healthcare disclaimer",
+    ],
+}
 
 email_table = dynamodb.Table(EMAIL_TABLE_NAME)
 
@@ -99,6 +160,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             action = 'escalate'
             confidence_level = 'low'
 
+        # Evaluate response quality with a separate model (LLM-as-judge)
+        evaluation = evaluate_response(
+            email_body=email_body,
+            response_text=parsed_response['response_text'],
+            intent=intent,
+            rag_documents=rag_documents,
+            primary_model_id=PRIMARY_MODEL_ID
+        )
+
         # Prepare result
         result = {
             'statusCode': 200,
@@ -111,6 +181,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'compliance_checks': parsed_response.get('compliance_checks', {}),
             'latency_ms': latency_ms,
             'model_id': PRIMARY_MODEL_ID,
+            'evaluation': evaluation,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
 
@@ -422,21 +493,151 @@ def parse_claude_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
-def update_email_record(email_id: str, result: Dict[str, Any], confidence_level: str) -> None:
-    """Update email record in DynamoDB with response data"""
+def build_evaluation_prompt(
+    email_body: str,
+    response_text: str,
+    intent: str,
+    rag_documents: List[Dict[str, Any]]
+) -> str:
+    """Build a task-type-aware evaluation prompt for the judge model."""
+    intent_key = intent.lower().strip()
+    criteria = TASK_TYPE_CRITERIA.get(intent_key)
+    if not criteria:
+        for key in TASK_TYPE_CRITERIA:
+            if key in intent_key or intent_key in key:
+                criteria = TASK_TYPE_CRITERIA[key]
+                break
+    if not criteria:
+        criteria = TASK_TYPE_CRITERIA['inquiry']
+
+    criteria_text = "\n".join(f"  {i+1}. {c}" for i, c in enumerate(criteria))
+
+    rag_context = "\n\n".join([
+        f"[Reference {i+1}] {doc.get('content', '')[:300]}"
+        for i, doc in enumerate(rag_documents[:3])
+    ]) if rag_documents else "No reference documents."
+
+    return f"""You are an expert insurance AI quality evaluator. Evaluate the accuracy and quality of the AI-generated response below.
+
+CUSTOMER EMAIL:
+{email_body}
+
+DETECTED INTENT / TASK TYPE: {intent}
+
+KNOWLEDGE BASE REFERENCES:
+{rag_context}
+
+AI-GENERATED RESPONSE TO EVALUATE:
+{response_text}
+
+TASK-SPECIFIC ACCURACY CRITERIA for "{intent}":
+{criteria_text}
+
+Score each dimension 0.0–1.0:
+- accuracy_score: Factual accuracy given the knowledge base
+- task_accuracy_score: Satisfies the task-specific criteria above
+- compliance_score: Follows insurance compliance (disclaimers, no unverified guarantees)
+- coherence_score: Clear, professional, well-structured
+- overall_quality_score: Holistic quality
+
+List any specific issues found.
+
+REQUIRED OUTPUT (JSON only, no extra text):
+{{
+    "accuracy_score": 0.0,
+    "task_accuracy_score": 0.0,
+    "compliance_score": 0.0,
+    "coherence_score": 0.0,
+    "overall_quality_score": 0.0,
+    "issues": [],
+    "reasoning": "brief explanation"
+}}"""
+
+
+def evaluate_response(
+    email_body: str,
+    response_text: str,
+    intent: str,
+    rag_documents: List[Dict[str, Any]],
+    primary_model_id: str
+) -> Dict[str, Any]:
+    """
+    Invoke a separate evaluator model to score the generated response.
+
+    Always uses a model different from the primary response model to provide
+    an independent quality signal per task type.
+    """
+    evaluator_id = EVALUATOR_MODEL_ID
+    # Guarantee evaluator != primary
+    if evaluator_id == primary_model_id:
+        evaluator_id = (
+            'anthropic.claude-3-haiku-20240307-v1:0'
+            if not primary_model_id.startswith('anthropic.')
+            else 'mistral.mistral-7b-instruct-v0:2'
+        )
+
+    print(f"Evaluating response with {evaluator_id} (primary was {primary_model_id})")
+
     try:
+        prompt = build_evaluation_prompt(email_body, response_text, intent, rag_documents)
+        eval_start = datetime.utcnow()
+        raw = invoke_bedrock_model(evaluator_id, prompt)
+        eval_latency_ms = (datetime.utcnow() - eval_start).total_seconds() * 1000
+
+        text = raw.get('content', [{}])[0].get('text', '{}')
+        if '```json' in text:
+            text = text.split('```json')[1].split('```')[0].strip()
+        elif '```' in text:
+            text = text.split('```')[1].split('```')[0].strip()
+
+        eval_result = json.loads(text)
+        eval_result['evaluator_model'] = evaluator_id
+        eval_result['eval_latency_ms'] = round(eval_latency_ms, 2)
+        print(f"Evaluation complete — overall_quality={eval_result.get('overall_quality_score')}, "
+              f"task_accuracy={eval_result.get('task_accuracy_score')}")
+        return eval_result
+
+    except Exception as e:
+        print(f"Evaluation error: {e}")
+        return {
+            'accuracy_score': None,
+            'task_accuracy_score': None,
+            'compliance_score': None,
+            'coherence_score': None,
+            'overall_quality_score': None,
+            'issues': [str(e)],
+            'reasoning': 'Evaluation failed',
+            'evaluator_model': evaluator_id,
+            'eval_error': str(e)
+        }
+
+
+def update_email_record(email_id: str, result: Dict[str, Any], confidence_level: str) -> None:
+    """Update email record in DynamoDB with response data and evaluation scores."""
+    try:
+        evaluation = result.get('evaluation', {})
         email_table.update_item(
             Key={'email_id': email_id},
-            UpdateExpression='SET response_text = :text, confidence_score = :score, '
-                           'confidence_level = :level, processing_status = :status, '
-                           'action = :action, response_timestamp = :ts',
+            UpdateExpression=(
+                'SET response_text = :text, confidence_score = :score, '
+                'confidence_level = :level, processing_status = :status, '
+                'action = :action, response_timestamp = :ts, '
+                'eval_accuracy = :ea, eval_task_accuracy = :eta, '
+                'eval_compliance = :ec, eval_overall = :eo, '
+                'evaluator_model = :em'
+            ),
             ExpressionAttributeValues={
                 ':text': result['response_text'],
-                ':score': result['confidence_score'],
+                ':score': str(result['confidence_score']),
                 ':level': confidence_level,
                 ':status': 'completed',
                 ':action': result['action'],
-                ':ts': result['timestamp']
+                ':ts': result['timestamp'],
+                ':ea': str(evaluation.get('accuracy_score', '')),
+                ':eta': str(evaluation.get('task_accuracy_score', '')),
+                ':ec': str(evaluation.get('compliance_score', '')),
+                ':eo': str(evaluation.get('overall_quality_score', '')),
+                ':em': evaluation.get('evaluator_model', ''),
             }
         )
         print(f"Updated email record: {email_id}")

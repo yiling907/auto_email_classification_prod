@@ -127,13 +127,14 @@ resource "aws_lambda_function" "claude_response" {
   role            = var.lambda_execution_role_arn
   handler         = "lambda_function.lambda_handler"
   runtime         = var.lambda_runtime
-  timeout         = 120  # 2 minutes for Claude API
+  timeout         = 180  # 3 minutes: primary model call + evaluator model call
   memory_size     = 1024
   source_code_hash = data.archive_file.claude_response.output_base64sha256
 
   environment {
     variables = {
-      EMAIL_TABLE_NAME = var.email_table_name
+      EMAIL_TABLE_NAME   = var.email_table_name
+      EVALUATOR_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
     }
   }
 
