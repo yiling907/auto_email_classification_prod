@@ -5,6 +5,7 @@ import EmailsList from './pages/EmailsList'
 import EmailDetail from './pages/EmailDetail'
 import ModelMetrics from './pages/ModelMetrics'
 import RAGMetrics from './pages/RAGMetrics'
+import Evaluations from './pages/Evaluations'
 import './App.css'
 
 // Set API base URL from environment or default
@@ -22,6 +23,7 @@ function App() {
               <Link to="/emails">Emails</Link>
               <Link to="/models">Model Performance</Link>
               <Link to="/rag">RAG Effectiveness</Link>
+              <Link to="/evaluations">Evaluations</Link>
             </div>
           </div>
         </nav>
@@ -33,6 +35,7 @@ function App() {
             <Route path="/email/:emailId" element={<EmailDetail apiUrl={API_BASE_URL} />} />
             <Route path="/models" element={<ModelMetrics apiUrl={API_BASE_URL} />} />
             <Route path="/rag" element={<RAGMetrics apiUrl={API_BASE_URL} />} />
+            <Route path="/evaluations" element={<Evaluations apiUrl={API_BASE_URL} />} />
           </Routes>
         </main>
 
