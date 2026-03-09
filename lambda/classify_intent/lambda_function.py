@@ -19,6 +19,12 @@ dynamodb = boto3.resource('dynamodb')
 MODEL_METRICS_TABLE_NAME = os.environ['MODEL_METRICS_TABLE_NAME']
 model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME)
 
+# Valid output categories for email_classification task
+VALID_CATEGORIES = {
+    'enrollment', 'claim', 'policy/account', 'medicalservice',
+    'complaint', 'inquiry', 'technicalissue', 'spam'
+}
+
 # Model configurations - Working open source models only
 MODELS = {
     'mistral-7b': {
@@ -222,6 +228,10 @@ def invoke_model(
         latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
         cost = calculate_cost(input_tokens, output_tokens, model_config)
 
+        # Normalise output for email_classification task
+        if task_type == 'email_classification':
+            output_text = parse_classification_output(output_text)
+
         result = {
             'model_name': model_name,
             'model_id': model_id,
@@ -248,6 +258,26 @@ def invoke_model(
             'latency_ms': latency_ms,
             'success': False
         }
+
+
+def parse_classification_output(raw: str) -> str:
+    """
+    Normalise model output for the email_classification task.
+
+    Strips whitespace/punctuation and validates against VALID_CATEGORIES.
+    Returns the matched category (title-cased) or 'Inquiry' as a safe fallback.
+    """
+    candidate = raw.strip().strip('.,;:"\' \n').split('\n')[0].strip()
+    if candidate.lower() in VALID_CATEGORIES:
+        return candidate.title()
+
+    # Partial match – model may have added extra words (e.g. "Claim inquiry")
+    for category in VALID_CATEGORIES:
+        if category in candidate.lower():
+            return category.title()
+
+    print(f"Unrecognised classification output: {repr(raw)!r} – defaulting to Inquiry")
+    return 'Inquiry'
 
 
 def calculate_cost(input_tokens: int, output_tokens: int, model_config: Dict[str, Any]) -> float:

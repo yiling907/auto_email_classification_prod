@@ -30,10 +30,10 @@ data "archive_file" "claude_response" {
   output_path = "${path.module}/builds/claude_response.zip"
 }
 
-data "archive_file" "multi_llm_inference" {
+data "archive_file" "classify_intent" {
   type        = "zip"
-  source_dir  = "${local.lambda_source_path}/multi_llm_inference"
-  output_path = "${path.module}/builds/multi_llm_inference.zip"
+  source_dir  = "${local.lambda_source_path}/classify_intent"
+  output_path = "${path.module}/builds/classify_intent.zip"
 }
 
 data "archive_file" "evaluation_metrics" {
@@ -147,15 +147,15 @@ resource "aws_cloudwatch_log_group" "claude_response" {
 }
 
 # Multi-LLM Inference Lambda
-resource "aws_lambda_function" "multi_llm_inference" {
-  filename         = data.archive_file.multi_llm_inference.output_path
+resource "aws_lambda_function" "classify_intent" {
+  filename         = data.archive_file.classify_intent.output_path
   function_name    = "${local.resource_prefix}-multi-llm-inference"
   role            = var.lambda_execution_role_arn
   handler         = "lambda_function.lambda_handler"
   runtime         = var.lambda_runtime
   timeout         = 180  # 3 minutes for parallel model calls
   memory_size     = 1024
-  source_code_hash = data.archive_file.multi_llm_inference.output_base64sha256
+  source_code_hash = data.archive_file.classify_intent.output_base64sha256
 
   environment {
     variables = {
@@ -166,8 +166,8 @@ resource "aws_lambda_function" "multi_llm_inference" {
   tags = merge(var.tags, { Name = "${local.resource_prefix}-multi-llm-inference" })
 }
 
-resource "aws_cloudwatch_log_group" "multi_llm_inference" {
-  name              = "/aws/lambda/${aws_lambda_function.multi_llm_inference.function_name}"
+resource "aws_cloudwatch_log_group" "classify_intent" {
+  name              = "/aws/lambda/${aws_lambda_function.classify_intent.function_name}"
   retention_in_days = var.log_retention_days
   tags              = var.tags
 }

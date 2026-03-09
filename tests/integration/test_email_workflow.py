@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/email_parser'))
 import lambda_function as email_parser
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/multi_llm_inference'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/classify_intent'))
 import lambda_function as multi_llm
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/rag_retrieval'))

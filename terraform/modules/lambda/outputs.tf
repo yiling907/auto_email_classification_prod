@@ -38,14 +38,14 @@ output "claude_response_name" {
   value       = aws_lambda_function.claude_response.function_name
 }
 
-output "multi_llm_inference_arn" {
+output "classify_intent_arn" {
   description = "ARN of the multi-LLM inference Lambda function"
-  value       = aws_lambda_function.multi_llm_inference.arn
+  value       = aws_lambda_function.classify_intent.arn
 }
 
-output "multi_llm_inference_name" {
+output "classify_intent_name" {
   description = "Name of the multi-LLM inference Lambda function"
-  value       = aws_lambda_function.multi_llm_inference.function_name
+  value       = aws_lambda_function.classify_intent.function_name
 }
 
 output "evaluation_metrics_arn" {

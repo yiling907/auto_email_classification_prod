@@ -1,5 +1,5 @@
 """
-Unit tests for multi_llm_inference Lambda function
+Unit tests for classify_intent Lambda function
 """
 import json
 import sys
@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch, MagicMock
 import pytest
 
 # Add lambda directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/multi_llm_inference'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/classify_intent'))
 import lambda_function
 
 

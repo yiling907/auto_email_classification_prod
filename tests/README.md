@@ -84,7 +84,7 @@ tests/
 ├── conftest.py                          # Shared fixtures and configuration
 ├── requirements.txt                     # Test dependencies
 ├── unit/                                # Unit tests
-│   ├── test_multi_llm_inference.py     # Multi-LLM inference tests
+│   ├── test_classify_intent.py     # Multi-LLM inference tests
 │   ├── test_evaluation_metrics.py      # Metrics calculation tests
 │   ├── test_rag_ingestion.py           # RAG document ingestion tests
 │   ├── test_rag_retrieval.py           # RAG document retrieval tests
@@ -149,10 +149,10 @@ bash scripts/run_tests.sh all false
 pytest tests/
 
 # Specific file
-pytest tests/unit/test_multi_llm_inference.py
+pytest tests/unit/test_classify_intent.py
 
 # Specific test
-pytest tests/unit/test_multi_llm_inference.py::TestMultiLLMInference::test_store_metrics_success
+pytest tests/unit/test_classify_intent.py::TestMultiLLMInference::test_store_metrics_success
 
 # With markers
 pytest tests/ -m "unit"
@@ -203,7 +203,7 @@ addopts =
 ```
 Name                                          Stmts   Miss  Cover
 -----------------------------------------------------------------
-lambda/multi_llm_inference/lambda_function.py   120     18    85%
+lambda/classify_intent/lambda_function.py   120     18    85%
 lambda/evaluation_metrics/lambda_function.py     80     12    85%
 lambda/rag_ingestion/lambda_function.py          95     15    84%
 lambda/rag_retrieval/lambda_function.py          75     10    87%

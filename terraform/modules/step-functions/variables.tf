@@ -28,7 +28,7 @@ variable "claude_response_lambda_arn" {
   type        = string
 }
 
-variable "multi_llm_inference_lambda_arn" {
+variable "classify_intent_lambda_arn" {
   description = "ARN of the multi-LLM inference Lambda function"
   type        = string
 }

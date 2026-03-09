@@ -6,7 +6,7 @@
 
 ## **Answer: Multi-LLM Inference Lambda**
 
-The `insuremail-ai-dev-model-metrics` DynamoDB table is populated by the **`multi_llm_inference` Lambda function**.
+The `insuremail-ai-dev-model-metrics` DynamoDB table is populated by the **`classify_intent` Lambda function**.
 
 ---
 
@@ -70,7 +70,7 @@ Send Email
 
 ## **Code Location**
 
-### **File**: `lambda/multi_llm_inference/lambda_function.py`
+### **File**: `lambda/classify_intent/lambda_function.py`
 
 ### **Function**: `store_metrics()` (lines 259-281)
 
@@ -133,8 +133,8 @@ def invoke_model(model_name, model_config, prompt, task_type):
 1. **Email arrives** → SES receives it
 2. **Email receiver Lambda** → Triggers Step Functions
 3. **Step Functions** → Runs parallel analysis:
-   - **Intent Classification** → Calls `multi_llm_inference` with `task_type="intent_classification"`
-   - **Entity Extraction** → Calls `multi_llm_inference` with `task_type="entity_extraction"`
+   - **Intent Classification** → Calls `classify_intent` with `task_type="intent_classification"`
+   - **Entity Extraction** → Calls `classify_intent` with `task_type="entity_extraction"`
 4. **Multi-LLM Inference runs**:
    - Invokes **Mistral 7B** → Stores metrics
    - Invokes **Llama 3.1 8B** → Stores metrics
@@ -173,7 +173,7 @@ def invoke_model(model_name, model_config, prompt, task_type):
 The table is currently empty because:
 
 1. ✅ **Infrastructure deployed** - Table exists
-2. ✅ **Lambda function deployed** - multi_llm_inference exists
+2. ✅ **Lambda function deployed** - classify_intent exists
 3. ❌ **No emails processed yet** - Need to trigger the workflow
 
 ### **To Populate Data**:
@@ -203,7 +203,7 @@ aws stepfunctions start-execution \
 ```json
 {
   "Type": "Task",
-  "Resource": "${multi_llm_inference_lambda_arn}",
+  "Resource": "${classify_intent_lambda_arn}",
   "Comment": "Classify email intent using multiple LLMs",
   "Parameters": {
     "prompt.$": "States.Format('Classify the intent of this email into one of: claim_inquiry, policy_question, complaint, general_inquiry. Email: {}', $.parsed_email.parsed_data.body)",
@@ -218,7 +218,7 @@ aws stepfunctions start-execution \
 ```json
 {
   "Type": "Task",
-  "Resource": "${multi_llm_inference_lambda_arn}",
+  "Resource": "${classify_intent_lambda_arn}",
   "Comment": "Extract entities using multiple LLMs",
   "Parameters": {
     "prompt.$": "States.Format('Extract entities (policy number, member name, claim amount, dates) from: {}', $.parsed_email.parsed_data.body)",
@@ -244,7 +244,7 @@ aws dynamodb scan --table-name insuremail-ai-dev-model-metrics --max-items 5
 
 ### **2. Check Lambda Logs**
 ```bash
-# View multi_llm_inference logs
+# View classify_intent logs
 aws logs tail /aws/lambda/insuremail-ai-dev-multi-llm-inference --follow
 
 # Filter for metrics storage
@@ -284,7 +284,7 @@ Body: I submitted a claim last week (Policy #12345) for $500.
 
    **Intent Classification Branch**:
    ```python
-   # multi_llm_inference called with:
+   # classify_intent called with:
    task_type = "intent_classification"
    prompt = "Classify the intent of this email into one of: claim_inquiry, ..."
 
@@ -303,7 +303,7 @@ Body: I submitted a claim last week (Policy #12345) for $500.
 
    **Entity Extraction Branch**:
    ```python
-   # multi_llm_inference called with:
+   # classify_intent called with:
    task_type = "entity_extraction"
    prompt = "Extract entities (policy number, member name, ...) from: ..."
 
@@ -337,7 +337,7 @@ $ aws dynamodb scan --table-name insuremail-ai-dev-model-metrics --select COUNT
 
 | Question | Answer |
 |----------|--------|
-| **Where?** | `lambda/multi_llm_inference/lambda_function.py` line 278 |
+| **Where?** | `lambda/classify_intent/lambda_function.py` line 278 |
 | **When?** | Every time an email is processed (2 models × 2 tasks = 4 records per email) |
 | **What?** | Model performance metrics (tokens, latency, cost, success) |
 | **Why empty?** | No emails processed yet - need to send test email |

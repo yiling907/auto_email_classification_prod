@@ -25,7 +25,7 @@ Comprehensive test suite implemented for all Python Lambda functions and Terrafo
 ### 2. **Unit Tests** ✅
 
 **Files Created:**
-- `tests/unit/test_multi_llm_inference.py` - 15+ test cases
+- `tests/unit/test_classify_intent.py` - 15+ test cases
 - `tests/unit/test_evaluation_metrics.py` - 12+ test cases
 - `tests/unit/test_rag_ingestion.py` - 10+ test cases
 - `tests/unit/test_rag_retrieval.py` - 12+ test cases
@@ -156,7 +156,7 @@ make ci                # Simulate CI pipeline
 
 | Function | Tests | Coverage | Status |
 |----------|-------|----------|--------|
-| multi_llm_inference | 15 | 85% | ✅ |
+| classify_intent | 15 | 85% | ✅ |
 | evaluation_metrics | 12 | 85% | ✅ |
 | rag_ingestion | 10 | 84% | ✅ |
 | rag_retrieval | 12 | 87% | ✅ |
@@ -232,10 +232,10 @@ bash scripts/run_tests.sh lint
 pytest tests/
 
 # Specific file
-pytest tests/unit/test_multi_llm_inference.py
+pytest tests/unit/test_classify_intent.py
 
 # Specific test
-pytest tests/unit/test_multi_llm_inference.py::TestMultiLLMInference::test_store_metrics_success
+pytest tests/unit/test_classify_intent.py::TestMultiLLMInference::test_store_metrics_success
 
 # With markers
 pytest tests/ -m "unit"

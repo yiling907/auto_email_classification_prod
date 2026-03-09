@@ -56,7 +56,7 @@ The `evaluation_metrics` Lambda function is now **fully integrated** into the sy
 
 **Files Modified**:
 - `lambda/claude_response/lambda_function.py` (line 113 + model configs)
-- `lambda/multi_llm_inference/lambda_function.py` (model list)
+- `lambda/classify_intent/lambda_function.py` (model list)
 - `terraform/variables.tf` (bedrock_models list)
 
 **Status**: ✅ Deployed and tested

@@ -18,7 +18,7 @@ Error storing metrics: Float types are not supported. Use Decimal types instead.
 
 ### The Bug
 
-**File**: `lambda/multi_llm_inference/lambda_function.py`
+**File**: `lambda/classify_intent/lambda_function.py`
 
 **Lines 201-202** (Mistral token estimation):
 ```python

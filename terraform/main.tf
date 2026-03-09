@@ -80,7 +80,7 @@ module "step_functions" {
   email_parser_lambda_arn         = module.lambda.email_parser_arn
   rag_retrieval_lambda_arn        = module.lambda.rag_retrieval_arn
   claude_response_lambda_arn      = module.lambda.claude_response_arn
-  multi_llm_inference_lambda_arn  = module.lambda.multi_llm_inference_arn
+  classify_intent_lambda_arn  = module.lambda.classify_intent_arn
   email_sender_lambda_arn         = module.lambda.email_sender_arn
   tags                            = local.common_tags
 }

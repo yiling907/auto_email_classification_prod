@@ -25,11 +25,11 @@
           "States": {
             "ClassifyIntent": {
               "Type": "Task",
-              "Resource": "${multi_llm_inference_lambda_arn}",
-              "Comment": "Classify email intent using multiple LLMs",
+              "Resource": "${classify_intent_lambda_arn}",
+              "Comment": "Classify email into medical insurance category using multiple LLMs",
               "Parameters": {
-                "prompt.$": "States.Format('Classify the intent of this email into one of: claim_inquiry, policy_question, complaint, general_inquiry. Email: {}', $.parsed_email.parsed_data.body)",
-                "task_type": "intent_classification"
+                "prompt.$": "States.Format('You are a medical insurance email classifier.\nClassify the email into ONE category:\n- Enrollment\n- Claim\n- Policy/Account\n- MedicalService\n- Complaint\n- Inquiry\n- TechnicalIssue\n- Spam\n\nOnly output the category name, no explanation.\n\nEmail: {}\nCategory:', $.parsed_email.parsed_data.body)",
+                "task_type": "email_classification"
               },
               "ResultPath": "$.intent",
               "End": true
