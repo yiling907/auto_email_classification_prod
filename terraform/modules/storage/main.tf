@@ -174,19 +174,14 @@ resource "aws_dynamodb_table" "email_processing" {
 }
 
 # DynamoDB table for model performance metrics
+# PK: metric_key = "{model_id}#{task_type}#{email_id}"
 resource "aws_dynamodb_table" "model_metrics" {
   name         = "${local.resource_prefix}-model-metrics"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "task_type"
-  range_key    = "model_timestamp"
+  hash_key     = "metric_key"
 
   attribute {
-    name = "task_type"
-    type = "S"
-  }
-
-  attribute {
-    name = "model_timestamp"
+    name = "metric_key"
     type = "S"
   }
 

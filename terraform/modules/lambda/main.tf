@@ -156,6 +156,8 @@ resource "aws_lambda_function" "classify_intent" {
   environment {
     variables = {
       MODEL_METRICS_TABLE_NAME = var.model_metrics_table_name
+      EMAIL_TABLE_NAME         = var.email_table_name
+      ACTIVE_MODEL             = "mistral-7b"
     }
   }
 

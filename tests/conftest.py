@@ -74,17 +74,11 @@ def dynamodb_tables():
             BillingMode='PAY_PER_REQUEST'
         )
 
-        # Model metrics table
+        # Model metrics table — PK: metric_key = "{model_id}#{task_type}#{email_id}"
         metrics_table = dynamodb.create_table(
             TableName='test-model-metrics',
-            KeySchema=[
-                {'AttributeName': 'task_type', 'KeyType': 'HASH'},
-                {'AttributeName': 'model_timestamp', 'KeyType': 'RANGE'}
-            ],
-            AttributeDefinitions=[
-                {'AttributeName': 'task_type', 'AttributeType': 'S'},
-                {'AttributeName': 'model_timestamp', 'AttributeType': 'S'}
-            ],
+            KeySchema=[{'AttributeName': 'metric_key', 'KeyType': 'HASH'}],
+            AttributeDefinitions=[{'AttributeName': 'metric_key', 'AttributeType': 'S'}],
             BillingMode='PAY_PER_REQUEST'
         )
 

@@ -1,198 +1,444 @@
 """
-Unit tests for classify_intent Lambda function
+Unit tests for classify_intent Lambda function.
+Covers classification, accuracy evaluation, output parsers, metrics storage,
+model invocation, and the lambda_handler toggle logic.
 """
 import json
 import sys
 import os
 from decimal import Decimal
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 import pytest
+from moto import mock_aws
+import boto3
 
 # Clear any cached lambda_function module from other test files
 sys.modules.pop('lambda_function', None)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/classify_intent'))
-import lambda_function
+import lambda_function as lf
 
 
-class TestMultiLLMInference:
-    """Test cases for multi-LLM inference Lambda"""
+# ── Shared helpers ────────────────────────────────────────────────────────────
 
-    def test_lambda_handler_success(self, lambda_env_vars, dynamodb_tables, lambda_context):
-        """Test successful lambda handler execution"""
-        event = {
-            'prompt': 'Classify the intent of this email: I need help with my claim',
-            'task_type': 'intent_classification'
-        }
+SAMPLE_BODY = (
+    'I submitted my hospital claim for POL-IE-123456 two weeks ago '
+    'and have not received any update. Please advise.'
+)
+SAMPLE_SUBJECT = 'Claim status enquiry'
+SAMPLE_EMAIL_ID = 'email-test-001'
 
-        with patch.object(lambda_function, 'run_parallel_inference') as mock_inference:
-            mock_inference.return_value = [
-                {
-                    'model_name': 'mistral-7b',
-                    'output_text': 'claim_inquiry',
-                    'success': True
-                }
-            ]
+VALID_CLASSIFICATION = {
+    'customer_intent': 'claim_status',
+    'secondary_intent': '',
+    'business_line': 'health_insurance',
+    'urgency': 'medium',
+    'sentiment': 'frustrated',
+    'gold_route_team': 'claims_team',
+    'gold_priority': 'normal',
+    'requires_human_review': False,
+}
 
-            result = lambda_function.lambda_handler(event, lambda_context)
+def _make_mistral_response(text: str) -> dict:
+    mock = {'body': MagicMock()}
+    mock['body'].read.return_value = json.dumps(
+        {'outputs': [{'text': text}]}
+    ).encode('utf-8')
+    return mock
 
-            assert result['statusCode'] == 200
-            assert result['task_type'] == 'intent_classification'
-            assert len(result['results']) == 1
-            assert result['results'][0]['model_name'] == 'mistral-7b'
+def _make_llama_response(text: str) -> dict:
+    mock = {'body': MagicMock()}
+    mock['body'].read.return_value = json.dumps({
+        'generation': text,
+        'prompt_token_count': 300,
+        'generation_token_count': 80,
+    }).encode('utf-8')
+    return mock
 
-    def test_lambda_handler_missing_prompt(self, lambda_env_vars, lambda_context):
-        """Test handler with missing prompt"""
-        event = {'task_type': 'intent_classification'}
 
-        result = lambda_function.lambda_handler(event, lambda_context)
+# ── _parse_classification ─────────────────────────────────────────────────────
 
-        assert result['statusCode'] == 500
-        assert 'error' in result
-        assert 'Missing prompt' in result['error']
+class TestParseClassification:
 
-    def test_store_metrics_success(self, lambda_env_vars, dynamodb_tables):
-        """Test metrics storage to DynamoDB"""
-        result = {
-            'model_id': 'mistral.mistral-7b-instruct-v0:2',
-            'input_tokens': 450,
-            'output_tokens': 85,
-            'latency_ms': 1850.5,
-            'cost_usd': 0.000085,
-            'success': True
-        }
+    def test_valid_json_parsed_correctly(self):
+        raw = json.dumps({
+            'customer_intent': 'claim_status',
+            'secondary_intent': '',
+            'business_line': 'health_insurance',
+            'urgency': 'medium',
+            'sentiment': 'frustrated',
+            'gold_route_team': 'claims_team',
+            'gold_priority': 'normal',
+            'requires_human_review': False,
+        })
+        result = lf._parse_classification(raw)
+        assert result['customer_intent'] == 'claim_status'
+        assert result['gold_route_team'] == 'claims_team'
+        assert result['business_line'] == 'health_insurance'
 
-        # Should not raise exception
-        lambda_function.store_metrics('intent_classification', 'mistral-7b', result)
+    def test_invalid_intent_falls_back_to_other(self):
+        raw = json.dumps({'customer_intent': 'nonsense_value'})
+        assert lf._parse_classification(raw)['customer_intent'] == 'other'
 
-        # Verify data was stored
-        table = dynamodb_tables['metrics']
-        response = table.scan()
-        assert response['Count'] == 1
+    def test_invalid_urgency_falls_back_to_low(self):
+        raw = json.dumps({'customer_intent': 'claim_status', 'urgency': 'critical'})
+        assert lf._parse_classification(raw)['urgency'] == 'low'
 
-        item = response['Items'][0]
-        assert item['task_type'] == 'intent_classification'
+    def test_invalid_sentiment_falls_back_to_neutral(self):
+        raw = json.dumps({'customer_intent': 'claim_status', 'sentiment': 'angry'})
+        assert lf._parse_classification(raw)['sentiment'] == 'neutral'
+
+    def test_invalid_route_team_inferred_from_intent(self):
+        raw = json.dumps({'customer_intent': 'claim_status', 'gold_route_team': 'bad_team'})
+        assert lf._parse_classification(raw)['gold_route_team'] == 'claims_team'
+
+    def test_invalid_priority_falls_back_to_normal(self):
+        raw = json.dumps({'customer_intent': 'claim_status', 'gold_priority': 'critical'})
+        assert lf._parse_classification(raw)['gold_priority'] == 'normal'
+
+    def test_complaint_forces_human_review(self):
+        raw = json.dumps({'customer_intent': 'complaint', 'requires_human_review': False})
+        assert lf._parse_classification(raw)['requires_human_review'] is True
+
+    def test_pre_authorisation_forces_human_review(self):
+        raw = json.dumps({'customer_intent': 'pre_authorisation'})
+        assert lf._parse_classification(raw)['requires_human_review'] is True
+
+    def test_urgent_priority_forces_human_review(self):
+        raw = json.dumps({'customer_intent': 'claim_status', 'gold_priority': 'urgent'})
+        assert lf._parse_classification(raw)['requires_human_review'] is True
+
+    def test_markdown_fences_stripped(self):
+        raw = '```json\n{"customer_intent": "payment_issue"}\n```'
+        result = lf._parse_classification(raw)
+        assert result['customer_intent'] == 'payment_issue'
+
+    def test_malformed_json_returns_safe_defaults(self):
+        result = lf._parse_classification('not json at all')
+        assert result['customer_intent'] == 'other'
+        assert result['business_line'] == 'health_insurance'
+
+    def test_business_line_always_health_insurance(self):
+        raw = json.dumps({'customer_intent': 'renewal_query', 'business_line': 'life_insurance'})
+        assert lf._parse_classification(raw)['business_line'] == 'health_insurance'
+
+
+# ── _parse_accuracy ───────────────────────────────────────────────────────────
+
+class TestParseAccuracy:
+
+    def test_all_ones_parsed(self):
+        raw = json.dumps({f: 1 for f in lf.CLASSIFICATION_FIELDS})
+        result = lf._parse_accuracy(raw)
+        assert all(v == 1 for v in result.values())
+
+    def test_all_zeros_parsed(self):
+        raw = json.dumps({f: 0 for f in lf.CLASSIFICATION_FIELDS})
+        result = lf._parse_accuracy(raw)
+        assert all(v == 0 for v in result.values())
+
+    def test_missing_field_defaults_to_zero(self):
+        raw = json.dumps({'customer_intent': 1})   # other fields missing
+        result = lf._parse_accuracy(raw)
+        assert result['customer_intent'] == 1
+        assert result['urgency'] == 0
+
+    def test_malformed_json_all_zeros(self):
+        result = lf._parse_accuracy('not valid json')
+        assert all(v == 0 for v in result.values())
+
+    def test_markdown_fences_stripped(self):
+        raw = '```json\n{"customer_intent": 1, "secondary_intent": 1, "business_line": 1, "urgency": 1, "sentiment": 1, "gold_route_team": 1, "gold_priority": 1}\n```'
+        result = lf._parse_accuracy(raw)
+        assert result['customer_intent'] == 1
+
+
+# ── _calculate_cost ───────────────────────────────────────────────────────────
+
+class TestCalculateCost:
+
+    def test_mistral_cost(self):
+        cfg = lf.MODELS['mistral-7b']
+        cost = lf._calculate_cost(1000, 200, cfg)
+        expected = 1.0 * 0.00015 + 0.2 * 0.00020
+        assert abs(cost - expected) < 1e-8
+
+    def test_zero_tokens_zero_cost(self):
+        cfg = lf.MODELS['llama-3.1-8b']
+        assert lf._calculate_cost(0, 0, cfg) == 0.0
+
+
+# ── _other_model ──────────────────────────────────────────────────────────────
+
+class TestOtherModel:
+
+    def test_other_of_mistral_is_llama(self):
+        assert lf._other_model('mistral-7b') == 'llama-3.1-8b'
+
+    def test_other_of_llama_is_mistral(self):
+        assert lf._other_model('llama-3.1-8b') == 'mistral-7b'
+
+
+# ── _invoke_model ─────────────────────────────────────────────────────────────
+
+class TestInvokeModel:
+
+    def test_mistral_output_extracted(self):
+        cfg = lf.MODELS['mistral-7b']
+        with patch.object(lf.bedrock_runtime, 'invoke_model',
+                          return_value=_make_mistral_response('{"customer_intent":"claim_status"}')):
+            text, inp, out = lf._invoke_model(cfg, 'hello prompt')
+        assert 'claim_status' in text
+        assert inp > 0
+        assert out > 0
+
+    def test_llama_output_extracted(self):
+        cfg = lf.MODELS['llama-3.1-8b']
+        with patch.object(lf.bedrock_runtime, 'invoke_model',
+                          return_value=_make_llama_response('{"customer_intent":"renewal_query"}')):
+            text, inp, out = lf._invoke_model(cfg, 'hello prompt')
+        assert 'renewal_query' in text
+        assert inp == 300
+        assert out == 80
+
+    def test_bedrock_error_propagates(self):
+        cfg = lf.MODELS['mistral-7b']
+        with patch.object(lf.bedrock_runtime, 'invoke_model',
+                          side_effect=Exception('Throttled')):
+            with pytest.raises(Exception, match='Throttled'):
+                lf._invoke_model(cfg, 'prompt')
+
+
+# ── _store_metrics ────────────────────────────────────────────────────────────
+
+class TestStoreMetrics:
+
+    @mock_aws
+    def test_metrics_written_to_dynamodb(self, lambda_env_vars):
+        dynamo = boto3.resource('dynamodb', region_name='us-east-1')
+        table = dynamo.create_table(
+            TableName='test-model-metrics',
+            KeySchema=[{'AttributeName': 'metric_key', 'KeyType': 'HASH'}],
+            AttributeDefinitions=[{'AttributeName': 'metric_key', 'AttributeType': 'S'}],
+            BillingMode='PAY_PER_REQUEST',
+        )
+
+        lf._store_metrics({
+            'model_id':   'mistral.mistral-7b-instruct-v0:2',
+            'model_name': 'mistral-7b',
+            'email_id':   SAMPLE_EMAIL_ID,
+            'task_type':  'email_classification',
+            'cost_usd':   0.000123,
+            'latency_ms': 1234.5,
+            'timestamp':  '2026-03-10T12:00:00Z',
+        })
+
+        items = table.scan()['Items']
+        assert len(items) == 1
+        item = items[0]
+        assert item['metric_key'] == (
+            f'mistral.mistral-7b-instruct-v0:2#email_classification#{SAMPLE_EMAIL_ID}'
+        )
         assert item['model_name'] == 'mistral-7b'
-        assert item['input_tokens'] == 450
-        assert item['output_tokens'] == 85
-        assert isinstance(item['latency_ms'], Decimal)
         assert isinstance(item['cost_usd'], Decimal)
-
-    def test_store_metrics_float_conversion(self, lambda_env_vars, dynamodb_tables):
-        """Test that float values are properly converted to Decimal"""
-        result = {
-            'model_id': 'test-model',
-            'input_tokens': 100.5,  # Float input
-            'output_tokens': 50.7,  # Float input
-            'latency_ms': 1234.567,
-            'cost_usd': 0.000123,
-            'success': True
-        }
-
-        lambda_function.store_metrics('test_task', 'test-model', result)
-
-        table = dynamodb_tables['metrics']
-        response = table.scan()
-        item = response['Items'][0]
-
-        # Verify values are correctly truncated to integers (moto returns Decimal for numbers)
-        assert int(item['input_tokens']) == 100   # float 100.5 → int 100
-        assert int(item['output_tokens']) == 50   # float 50.7  → int 50
         assert isinstance(item['latency_ms'], Decimal)
-        assert isinstance(item['cost_usd'], Decimal)
 
-    def test_calculate_cost(self):
-        """Test cost calculation"""
-        model_config = {
-            'cost_per_1k_input': 0.00015,
-            'cost_per_1k_output': 0.00020
-        }
+    @mock_aws
+    def test_accuracy_scores_stored(self, lambda_env_vars):
+        dynamo = boto3.resource('dynamodb', region_name='us-east-1')
+        dynamo.create_table(
+            TableName='test-model-metrics',
+            KeySchema=[{'AttributeName': 'metric_key', 'KeyType': 'HASH'}],
+            AttributeDefinitions=[{'AttributeName': 'metric_key', 'AttributeType': 'S'}],
+            BillingMode='PAY_PER_REQUEST',
+        )
 
-        cost = lambda_function.calculate_cost(450, 85, model_config)
+        lf._store_metrics({
+            'model_id':        'meta.llama3-8b-instruct-v1:0',
+            'model_name':      'llama-3.1-8b',
+            'email_id':        SAMPLE_EMAIL_ID,
+            'task_type':       'accuracy_evaluation',
+            'cost_usd':        0.000050,
+            'latency_ms':      900.0,
+            'timestamp':       '2026-03-10T12:00:00Z',
+            'accuracy_scores': {'customer_intent': 1, 'urgency': 0},
+            'overall_accuracy': 0.5,
+        })
 
-        expected = (450 / 1000) * 0.00015 + (85 / 1000) * 0.00020
-        assert abs(cost - expected) < 0.000001
+        items = boto3.resource('dynamodb', region_name='us-east-1') \
+                     .Table('test-model-metrics').scan()['Items']
+        assert len(items) == 1
+        assert 'accuracy_scores' in items[0]
+        assert isinstance(items[0]['overall_accuracy'], Decimal)
 
-    def test_invoke_model_mistral_format(self, lambda_env_vars):
-        """Test Mistral model invocation and response parsing"""
-        model_config = {
-            'id': 'mistral.mistral-7b-instruct-v0:2',
-            'type': 'mistral',
-            'cost_per_1k_input': 0.00015,
-            'cost_per_1k_output': 0.00020
-        }
 
-        mock_response = {
-            'body': MagicMock()
-        }
-        mock_response['body'].read.return_value = json.dumps({
-            'outputs': [{'text': 'claim_inquiry'}]
-        }).encode('utf-8')
+# ── classify_email ────────────────────────────────────────────────────────────
 
-        with patch.object(lambda_function.bedrock_runtime, 'invoke_model', return_value=mock_response):
-            with patch.object(lambda_function, 'store_metrics'):
-                result = lambda_function.invoke_model(
-                    'mistral-7b',
-                    model_config,
-                    'Test prompt',
-                    'intent_classification'
+class TestClassifyEmail:
+
+    def test_classify_email_mistral_success(self, lambda_env_vars):
+        clf_json = json.dumps(VALID_CLASSIFICATION)
+        with patch.object(lf.bedrock_runtime, 'invoke_model',
+                          return_value=_make_mistral_response(clf_json)):
+            with patch.object(lf, '_store_metrics'):
+                clf, metrics = lf.classify_email(
+                    SAMPLE_EMAIL_ID, SAMPLE_SUBJECT, SAMPLE_BODY, 'mistral-7b'
                 )
+        assert clf['customer_intent'] == 'claim_status'
+        assert clf['business_line'] == 'health_insurance'
+        assert metrics['model_name'] == 'mistral-7b'
+        assert metrics['task_type'] == 'email_classification'
+        assert metrics['email_id'] == SAMPLE_EMAIL_ID
+        assert metrics['cost_usd'] >= 0
+        assert metrics['latency_ms'] >= 0
 
-                assert result['success'] is True
-                assert result['model_name'] == 'mistral-7b'
-                assert result['output_text'] == 'claim_inquiry'
-                assert result['input_tokens'] > 0
-                assert result['output_tokens'] > 0
+    def test_classify_email_llama_success(self, lambda_env_vars):
+        clf_json = json.dumps(VALID_CLASSIFICATION)
+        with patch.object(lf.bedrock_runtime, 'invoke_model',
+                          return_value=_make_llama_response(clf_json)):
+            with patch.object(lf, '_store_metrics'):
+                clf, metrics = lf.classify_email(
+                    SAMPLE_EMAIL_ID, SAMPLE_SUBJECT, SAMPLE_BODY, 'llama-3.1-8b'
+                )
+        assert clf['customer_intent'] == 'claim_status'
+        assert metrics['model_name'] == 'llama-3.1-8b'
 
-    def test_invoke_model_error_handling(self, lambda_env_vars):
-        """Test error handling when model invocation fails"""
-        model_config = {
-            'id': 'test-model',
-            'type': 'mistral',
-            'cost_per_1k_input': 0.00015,
-            'cost_per_1k_output': 0.00020
-        }
-
-        with patch.object(lambda_function.bedrock_runtime, 'invoke_model', side_effect=Exception('Model error')):
-            result = lambda_function.invoke_model(
-                'test-model',
-                model_config,
-                'Test prompt',
-                'test_task'
-            )
-
-            assert result['success'] is False
-            assert 'error' in result
-            assert 'Model error' in result['error']
-            assert 'latency_ms' in result
+    def test_classify_email_stores_metrics(self, lambda_env_vars):
+        clf_json = json.dumps(VALID_CLASSIFICATION)
+        with patch.object(lf.bedrock_runtime, 'invoke_model',
+                          return_value=_make_mistral_response(clf_json)):
+            with patch.object(lf, '_store_metrics') as mock_store:
+                lf.classify_email(SAMPLE_EMAIL_ID, SAMPLE_SUBJECT, SAMPLE_BODY, 'mistral-7b')
+        mock_store.assert_called_once()
+        stored = mock_store.call_args[0][0]
+        assert stored['model_id'] == lf.MODELS['mistral-7b']['id']
 
 
-class TestParallelInference:
-    """Test parallel model inference"""
+# ── evaluate_accuracy ─────────────────────────────────────────────────────────
 
-    def test_run_parallel_inference(self, lambda_env_vars):
-        """Test parallel inference across multiple models"""
-        with patch.object(lambda_function, 'invoke_model') as mock_invoke:
-            mock_invoke.side_effect = [
-                {'model_name': 'mistral-7b', 'success': True},
-                {'model_name': 'llama-3.1-8b', 'success': True}
-            ]
+class TestEvaluateAccuracy:
 
-            results = lambda_function.run_parallel_inference('Test prompt', 'test_task')
+    def test_evaluate_accuracy_returns_per_field_scores(self, lambda_env_vars):
+        scores = {f: 1 for f in lf.CLASSIFICATION_FIELDS}
+        with patch.object(lf.bedrock_runtime, 'invoke_model',
+                          return_value=_make_llama_response(json.dumps(scores))):
+            with patch.object(lf, '_store_metrics'):
+                result = lf.evaluate_accuracy(
+                    SAMPLE_EMAIL_ID, SAMPLE_SUBJECT, SAMPLE_BODY,
+                    VALID_CLASSIFICATION, 'llama-3.1-8b'
+                )
+        assert result['judge_model'] == 'llama-3.1-8b'
+        assert all(v == 1 for v in result['per_field'].values())
+        assert result['overall_score'] == 1.0
 
-            assert len(results) == 2
-            assert all(r['success'] for r in results)
+    def test_evaluate_accuracy_partial_scores(self, lambda_env_vars):
+        scores = {f: (1 if i % 2 == 0 else 0)
+                  for i, f in enumerate(lf.CLASSIFICATION_FIELDS)}
+        with patch.object(lf.bedrock_runtime, 'invoke_model',
+                          return_value=_make_mistral_response(json.dumps(scores))):
+            with patch.object(lf, '_store_metrics'):
+                result = lf.evaluate_accuracy(
+                    SAMPLE_EMAIL_ID, SAMPLE_SUBJECT, SAMPLE_BODY,
+                    VALID_CLASSIFICATION, 'mistral-7b'
+                )
+        assert 0.0 < result['overall_score'] < 1.0
 
-    def test_run_parallel_inference_partial_failure(self, lambda_env_vars):
-        """Test parallel inference with some models failing"""
-        with patch.object(lambda_function, 'invoke_model') as mock_invoke:
-            mock_invoke.side_effect = [
-                {'model_name': 'mistral-7b', 'success': True},
-                Exception('Model unavailable')
-            ]
 
-            results = lambda_function.run_parallel_inference('Test prompt', 'test_task')
+# ── lambda_handler ────────────────────────────────────────────────────────────
 
-            # Should return results for both (one success, one failure)
-            assert len(results) == 2
-            assert results[0]['success'] is True
-            assert results[1]['success'] is False
+class TestLambdaHandler:
+
+    def _mock_both_models(self, clf_text, acc_text):
+        """Return side_effect list: first call = classifier, second = judge."""
+        return [
+            _make_mistral_response(clf_text),
+            _make_llama_response(acc_text),
+        ]
+
+    def test_handler_success_default_model(self, lambda_env_vars, lambda_context):
+        clf_json = json.dumps(VALID_CLASSIFICATION)
+        acc_json = json.dumps({f: 1 for f in lf.CLASSIFICATION_FIELDS})
+        side_effects = self._mock_both_models(clf_json, acc_json)
+
+        with patch.object(lf.bedrock_runtime, 'invoke_model', side_effect=side_effects):
+            with patch.object(lf, '_store_metrics'):
+                with patch.object(lf, '_update_email_record'):
+                    result = lf.lambda_handler(
+                        {'email_id': SAMPLE_EMAIL_ID,
+                         'email_body': SAMPLE_BODY,
+                         'subject': SAMPLE_SUBJECT},
+                        lambda_context,
+                    )
+        assert result['statusCode'] == 200
+        assert result['active_model'] == 'mistral-7b'
+        clf = result['classification']
+        assert clf['customer_intent'] == 'claim_status'
+        assert clf['business_line'] == 'health_insurance'
+        assert 'metrics' in result
+        assert 'accuracy_evaluation' in result
+        assert result['accuracy_evaluation']['judge_model'] == 'llama-3.1-8b'
+
+    def test_handler_model_toggle_to_llama(self, lambda_env_vars, lambda_context):
+        clf_json = json.dumps(VALID_CLASSIFICATION)
+        acc_json = json.dumps({f: 1 for f in lf.CLASSIFICATION_FIELDS})
+        side_effects = [
+            _make_llama_response(clf_json),
+            _make_mistral_response(acc_json),
+        ]
+
+        with patch.object(lf.bedrock_runtime, 'invoke_model', side_effect=side_effects):
+            with patch.object(lf, '_store_metrics'):
+                with patch.object(lf, '_update_email_record'):
+                    result = lf.lambda_handler(
+                        {'email_id': SAMPLE_EMAIL_ID,
+                         'email_body': SAMPLE_BODY,
+                         'active_model': 'llama-3.1-8b'},
+                        lambda_context,
+                    )
+        assert result['statusCode'] == 200
+        assert result['active_model'] == 'llama-3.1-8b'
+        assert result['accuracy_evaluation']['judge_model'] == 'mistral-7b'
+
+    def test_handler_missing_email_body_returns_500(self, lambda_env_vars, lambda_context):
+        result = lf.lambda_handler({'email_id': 'x'}, lambda_context)
+        assert result['statusCode'] == 500
+        assert 'Missing email_body' in result['error']
+
+    def test_handler_unknown_model_returns_500(self, lambda_env_vars, lambda_context):
+        result = lf.lambda_handler(
+            {'email_id': 'x', 'email_body': 'hi', 'active_model': 'gpt-99'},
+            lambda_context,
+        )
+        assert result['statusCode'] == 500
+        assert 'Unknown model' in result['error']
+
+    def test_handler_updates_email_record(self, lambda_env_vars, lambda_context):
+        clf_json = json.dumps(VALID_CLASSIFICATION)
+        acc_json = json.dumps({f: 1 for f in lf.CLASSIFICATION_FIELDS})
+        side_effects = self._mock_both_models(clf_json, acc_json)
+
+        with patch.object(lf.bedrock_runtime, 'invoke_model', side_effect=side_effects):
+            with patch.object(lf, '_store_metrics'):
+                with patch.object(lf, '_update_email_record') as mock_update:
+                    lf.lambda_handler(
+                        {'email_id': SAMPLE_EMAIL_ID,
+                         'email_body': SAMPLE_BODY},
+                        lambda_context,
+                    )
+        mock_update.assert_called_once_with(SAMPLE_EMAIL_ID, VALID_CLASSIFICATION)
+
+    def test_handler_stores_two_metrics_records(self, lambda_env_vars, lambda_context):
+        """One for classification, one for accuracy evaluation."""
+        clf_json = json.dumps(VALID_CLASSIFICATION)
+        acc_json = json.dumps({f: 1 for f in lf.CLASSIFICATION_FIELDS})
+        side_effects = self._mock_both_models(clf_json, acc_json)
+
+        with patch.object(lf.bedrock_runtime, 'invoke_model', side_effect=side_effects):
+            with patch.object(lf, '_store_metrics') as mock_store:
+                with patch.object(lf, '_update_email_record'):
+                    lf.lambda_handler(
+                        {'email_id': SAMPLE_EMAIL_ID, 'email_body': SAMPLE_BODY},
+                        lambda_context,
+                    )
+        assert mock_store.call_count == 2
+        task_types = {c[0][0]['task_type'] for c in mock_store.call_args_list}
+        assert task_types == {'email_classification', 'accuracy_evaluation'}

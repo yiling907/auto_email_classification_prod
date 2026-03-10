@@ -65,24 +65,36 @@ Date: {sample_email['timestamp']}
         assert parsed_result['parsed_data']['sender_email'] == sample_email['sender_email']
         assert parsed_result['parsed_data']['body_text'] != ''
 
-        # Step 2: Multi-LLM Inference (Intent Classification)
+        # Step 2: Email Classification (classify_intent)
+        clf_json = json.dumps({
+            'customer_intent': 'claim_status', 'secondary_intent': '',
+            'business_line': 'health_insurance', 'urgency': 'medium',
+            'sentiment': 'frustrated', 'gold_route_team': 'claims_team',
+            'gold_priority': 'normal', 'requires_human_review': False,
+        })
+        acc_json = json.dumps({f: 1 for f in (
+            'customer_intent', 'secondary_intent', 'business_line',
+            'urgency', 'sentiment', 'gold_route_team', 'gold_priority')})
         intent_event = {
-            'prompt': f"Classify intent: {sample_email['body']}",
-            'task_type': 'intent_classification'
+            'email_id': parsed_result['email_id'],
+            'email_body': sample_email['body_text'],
+            'subject': sample_email['subject'],
         }
+        # classify call (mistral) then accuracy call (llama)
+        side_effects = [
+            {'body': MagicMock(read=lambda: json.dumps(
+                {'outputs': [{'text': clf_json}]}).encode('utf-8'))},
+            {'body': MagicMock(read=lambda: json.dumps({
+                'generation': acc_json,
+                'prompt_token_count': 200, 'generation_token_count': 50,
+            }).encode('utf-8'))},
+        ]
 
-        mock_bedrock_response = {
-            'body': MagicMock()
-        }
-        mock_bedrock_response['body'].read.return_value = json.dumps({
-            'outputs': [{'text': 'claim_inquiry'}]
-        }).encode('utf-8')
-
-        with patch.object(multi_llm.bedrock_runtime, 'invoke_model', return_value=mock_bedrock_response):
+        with patch.object(multi_llm.bedrock_runtime, 'invoke_model', side_effect=side_effects):
             intent_result = multi_llm.lambda_handler(intent_event, lambda_context)
 
             assert intent_result['statusCode'] == 200
-            assert len(intent_result['results']) > 0
+            assert intent_result['classification']['customer_intent'] == 'claim_status'
 
         # Step 3: RAG Retrieval
         # Add RAG document to database
@@ -222,27 +234,43 @@ class TestMetricsCollection:
     ):
         """Test that metrics are properly collected during inference"""
 
+        clf_json = json.dumps({
+            'customer_intent': 'claim_status', 'secondary_intent': '',
+            'business_line': 'health_insurance', 'urgency': 'low',
+            'sentiment': 'neutral', 'gold_route_team': 'claims_team',
+            'gold_priority': 'normal', 'requires_human_review': False,
+        })
+        acc_json = json.dumps({f: 1 for f in (
+            'customer_intent', 'secondary_intent', 'business_line',
+            'urgency', 'sentiment', 'gold_route_team', 'gold_priority')})
+
+        side_effects = [
+            {'body': MagicMock(read=lambda: json.dumps(
+                {'outputs': [{'text': clf_json}]}).encode('utf-8'))},
+            {'body': MagicMock(read=lambda: json.dumps({
+                'generation': acc_json,
+                'prompt_token_count': 200, 'generation_token_count': 50,
+            }).encode('utf-8'))},
+        ]
+
         event = {
-            'prompt': 'Test prompt for metrics',
-            'task_type': 'test_task'
+            'email_id': 'integ-test-001',
+            'email_body': 'I need help with my claim.',
+            'subject': 'Claim query',
         }
 
-        mock_response = {
-            'body': MagicMock()
-        }
-        mock_response['body'].read.return_value = json.dumps({
-            'outputs': [{'text': 'test_output'}]
-        }).encode('utf-8')
-
-        with patch.object(multi_llm.bedrock_runtime, 'invoke_model', return_value=mock_response):
+        with patch.object(multi_llm.bedrock_runtime, 'invoke_model', side_effect=side_effects):
             result = multi_llm.lambda_handler(event, lambda_context)
 
-            # Verify metrics were stored
+            # Verify metrics were stored (classification + accuracy = 2 records)
             table = dynamodb_tables['metrics']
             response = table.scan()
 
-            assert response['Count'] > 0
-            item = response['Items'][0]
-            assert item['task_type'] == 'test_task'
+            assert response['Count'] == 2
+            task_types = {item['task_type'] for item in response['Items']}
+            assert 'email_classification' in task_types
+            assert 'accuracy_evaluation' in task_types
+            item = next(i for i in response['Items']
+                        if i['task_type'] == 'email_classification')
             assert 'latency_ms' in item
             assert 'cost_usd' in item

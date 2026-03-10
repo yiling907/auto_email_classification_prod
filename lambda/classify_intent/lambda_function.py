@@ -1,35 +1,67 @@
 """
-Multi-LLM Inference Lambda Function
-Runs multiple Bedrock models in parallel for benchmarking
+Email Classification Lambda
+Classifies inbound insurance emails across 7 label dimensions using a configurable
+LLM model (default: mistral-7b), then evaluates classification accuracy using the
+other available model as a judge.
 """
 import json
 import os
-from typing import Dict, Any, List
-from datetime import datetime
+from typing import Dict, Any, Tuple
+from datetime import datetime, timezone
 from decimal import Decimal
 import boto3
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from botocore.exceptions import ClientError
 
-# Initialize AWS clients
+# ── AWS clients ──────────────────────────────────────────────────────────────
 bedrock_runtime = boto3.client('bedrock-runtime')
 dynamodb = boto3.resource('dynamodb')
 
-# Environment variables
+# ── Environment variables ────────────────────────────────────────────────────
 MODEL_METRICS_TABLE_NAME = os.environ['MODEL_METRICS_TABLE_NAME']
-model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME)
+EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
+# Toggle: which model performs the primary classification.
+# Can be overridden per-invocation via event['active_model'].
+ACTIVE_MODEL = os.environ.get('ACTIVE_MODEL', 'mistral-7b')
 
-# Valid output categories for email_classification task (laya dataset — 17 intents)
-VALID_CATEGORIES = {
+model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME)
+email_table = dynamodb.Table(EMAIL_TABLE_NAME)
+
+# ── Model registry ───────────────────────────────────────────────────────────
+MODELS = {
+    'mistral-7b': {
+        'id': 'mistral.mistral-7b-instruct-v0:2',
+        'type': 'mistral',
+        'cost_per_1k_input': 0.00015,
+        'cost_per_1k_output': 0.00020,
+    },
+    'llama-3.1-8b': {
+        'id': 'meta.llama3-8b-instruct-v1:0',
+        'type': 'meta',
+        'cost_per_1k_input': 0.00030,
+        'cost_per_1k_output': 0.00060,
+    },
+}
+
+# ── Schema enumerations ──────────────────────────────────────────────────────
+VALID_INTENTS = {
     'coverage_query', 'claim_submission', 'claim_status',
     'claim_reimbursement_query', 'pre_authorisation', 'payment_issue',
     'policy_change', 'renewal_query', 'cancellation_request',
     'enrollment_new_policy', 'dependent_addition', 'complaint',
     'document_followup', 'hospital_network_query', 'id_verification',
-    'broker_query', 'other'
+    'broker_query', 'other',
 }
 
-# Maps each intent to the appropriate handling team
+VALID_URGENCY = {'low', 'medium', 'high'}
+VALID_SENTIMENT = {'positive', 'neutral', 'frustrated', 'upset'}
+VALID_PRIORITY = {'normal', 'high', 'urgent'}
+VALID_ROUTE_TEAMS = {
+    'claims_team', 'complaints_team', 'customer_support_team',
+    'finance_support_team', 'general_support_team', 'medical_review_team',
+    'operations_team', 'policy_admin_team', 'provider_support_team',
+    'renewals_team', 'retention_team', 'sales_enrollment_team',
+}
+
 INTENT_TO_ROUTE = {
     'coverage_query':            'customer_support_team',
     'claim_submission':          'claims_team',
@@ -50,52 +82,99 @@ INTENT_TO_ROUTE = {
     'other':                     'general_support_team',
 }
 
-# Model configurations - Working open source models only
-MODELS = {
-    'mistral-7b': {
-        'id': 'mistral.mistral-7b-instruct-v0:2',
-        'type': 'mistral',
-        'cost_per_1k_input': 0.00015,
-        'cost_per_1k_output': 0.00020
-    },
-    'llama-3.1-8b': {
-        'id': 'meta.llama3-8b-instruct-v1:0',  # Using cross-region inference profile
-        'type': 'meta',
-        'cost_per_1k_input': 0.00030,
-        'cost_per_1k_output': 0.00060
-    }
-    # Removed: titan-express (amazon.titan-text-express-v1 reached EOL)
-}
+CLASSIFICATION_FIELDS = (
+    'customer_intent', 'secondary_intent', 'business_line',
+    'urgency', 'sentiment', 'gold_route_team', 'gold_priority',
+)
 
+# ── Prompts ───────────────────────────────────────────────────────────────────
+_CLASSIFICATION_PROMPT = """\
+You are an AI assistant for an Irish health insurance company.
+Classify the customer email below. Output ONLY a JSON object — no other text.
+
+EMAIL SUBJECT: {subject}
+EMAIL BODY: {body}
+
+Valid values per field:
+- customer_intent   : {intents}
+- secondary_intent  : (same 17 values as customer_intent, or "" if none)
+- business_line     : health_insurance
+- urgency           : low | medium | high
+- sentiment         : positive | neutral | frustrated | upset
+- gold_route_team   : {teams}
+- gold_priority     : normal | high | urgent
+- requires_human_review : true | false  (true when complaint, pre_authorisation, or urgent priority)
+
+{{"customer_intent": "...", "secondary_intent": "...", "business_line": "health_insurance", \
+"urgency": "...", "sentiment": "...", "gold_route_team": "...", "gold_priority": "...", \
+"requires_human_review": false}}"""
+
+_ACCURACY_PROMPT = """\
+You are a quality-assurance reviewer for a health insurance AI system.
+An LLM classified the email below. Evaluate whether each field is correct (1) or incorrect (0).
+Consider only what can be reasonably inferred from the email text.
+
+EMAIL SUBJECT: {subject}
+EMAIL BODY: {body}
+
+CLASSIFICATION TO EVALUATE:
+{classification}
+
+Output ONLY a JSON object — no other text.
+{{"customer_intent": <0|1>, "secondary_intent": <0|1>, "business_line": <0|1>, \
+"urgency": <0|1>, "sentiment": <0|1>, "gold_route_team": <0|1>, "gold_priority": <0|1>}}"""
+
+
+# ── Lambda handler ────────────────────────────────────────────────────────────
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
-    Main Lambda handler for multi-LLM inference
+    Classify a single inbound email and evaluate the classification accuracy.
 
-    Args:
-        event: Contains prompt and task_type
-        context: Lambda context
+    Event fields:
+        email_id     (str)  — identifier stored in the email table
+        email_body   (str)  — plain text body (also accepts 'body_text')
+        subject      (str)  — email subject line (optional)
+        active_model (str)  — override the default model toggle (optional)
 
     Returns:
-        Dict with results from all models
+        statusCode, email_id, active_model, classification, metrics, accuracy_evaluation
     """
     try:
-        prompt = event.get('prompt')
-        task_type = event.get('task_type', 'intent_classification')
+        email_id   = event.get('email_id', '')
+        email_body = event.get('email_body') or event.get('body_text', '')
+        subject    = event.get('subject', '')
+        active_model = (event.get('active_model') or ACTIVE_MODEL).strip()
 
-        if not prompt:
-            raise ValueError("Missing prompt in event")
+        if not email_body:
+            raise ValueError("Missing email_body in event")
+        if active_model not in MODELS:
+            raise ValueError(
+                f"Unknown model '{active_model}'. Valid values: {list(MODELS)}"
+            )
 
-        print(f"Running multi-LLM inference for task: {task_type}")
+        # ── Step 1: classify with the active model ────────────────────────
+        classification, clf_metrics = classify_email(
+            email_id, subject, email_body, active_model
+        )
 
-        # Run all models in parallel
-        results = run_parallel_inference(prompt, task_type)
+        # ── Step 2: update email table ────────────────────────────────────
+        if email_id:
+            _update_email_record(email_id, classification)
+
+        # ── Step 3: judge accuracy with the other model ───────────────────
+        judge_model = _other_model(active_model)
+        accuracy = evaluate_accuracy(
+            email_id, subject, email_body, classification, judge_model
+        )
 
         return {
             'statusCode': 200,
-            'task_type': task_type,
-            'results': results,
-            'num_models': len(results)
+            'email_id': email_id,
+            'active_model': active_model,
+            'classification': classification,
+            'metrics': clf_metrics,
+            'accuracy_evaluation': accuracy,
         }
 
     except Exception as e:
@@ -103,287 +182,350 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 500,
             'error': str(e),
-            'results': []
+            'results': [],
         }
 
 
-def run_parallel_inference(prompt: str, task_type: str) -> List[Dict[str, Any]]:
-    """
-    Run inference on multiple models in parallel
+# ── Classification ────────────────────────────────────────────────────────────
 
-    Args:
-        prompt: Input prompt
-        task_type: Type of task (for metrics tracking)
+def classify_email(
+    email_id: str,
+    subject: str,
+    body: str,
+    model_name: str,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Invoke the chosen model to classify the email across 7 label dimensions.
 
     Returns:
-        List of results from each model
+        (classification_dict, metrics_dict)
     """
-    results = []
+    model_config = MODELS[model_name]
+    prompt = _CLASSIFICATION_PROMPT.format(
+        subject=subject,
+        body=body,
+        intents=', '.join(sorted(VALID_INTENTS)),
+        teams=', '.join(sorted(VALID_ROUTE_TEAMS)),
+    )
 
-    with ThreadPoolExecutor(max_workers=len(MODELS)) as executor:
-        future_to_model = {
-            executor.submit(invoke_model, model_name, model_config, prompt, task_type): model_name
-            for model_name, model_config in MODELS.items()
-        }
+    start = datetime.now(timezone.utc)
+    raw_output, input_tokens, output_tokens = _invoke_model(model_config, prompt)
+    latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
-        for future in as_completed(future_to_model):
-            model_name = future_to_model[future]
-            try:
-                result = future.result()
-                results.append(result)
-                print(f"Completed: {model_name}")
-            except Exception as e:
-                print(f"Error with {model_name}: {str(e)}")
-                results.append({
-                    'model_name': model_name,
-                    'error': str(e),
-                    'success': False
-                })
+    classification = _parse_classification(raw_output)
+    cost = _calculate_cost(input_tokens, output_tokens, model_config)
+    timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
-    return results
+    metrics = {
+        'model_id':   model_config['id'],
+        'model_name': model_name,
+        'email_id':   email_id,
+        'task_type':  'email_classification',
+        'cost_usd':   cost,
+        'latency_ms': latency_ms,
+        'timestamp':  timestamp,
+    }
+    _store_metrics(metrics)
+
+    print(
+        f"Classified email {email_id!r} with {model_name}: "
+        f"intent={classification.get('customer_intent')} "
+        f"latency={latency_ms:.0f}ms cost=${cost:.6f}"
+    )
+    return classification, metrics
 
 
-def invoke_model(
-    model_name: str,
-    model_config: Dict[str, Any],
-    prompt: str,
-    task_type: str
+# ── Accuracy evaluation ───────────────────────────────────────────────────────
+
+def evaluate_accuracy(
+    email_id: str,
+    subject: str,
+    body: str,
+    classification: Dict[str, Any],
+    judge_model_name: str,
 ) -> Dict[str, Any]:
     """
-    Invoke a single model and collect metrics
-
-    Args:
-        model_name: Name of the model
-        model_config: Model configuration
-        prompt: Input prompt
-        task_type: Task type
+    Use the judge model to score each classification field as 0 (wrong) or 1 (correct).
 
     Returns:
-        Dict with model output and metrics
+        {judge_model, per_field: {field: 0|1}, overall_score: float}
     """
-    start_time = datetime.utcnow()
+    model_config = MODELS[judge_model_name]
+    clf_summary = {f: classification.get(f, '') for f in CLASSIFICATION_FIELDS}
+    prompt = _ACCURACY_PROMPT.format(
+        subject=subject,
+        body=body,
+        classification=json.dumps(clf_summary, indent=2),
+    )
 
-    try:
-        model_id = model_config['id']
-        model_type = model_config['type']
+    start = datetime.now(timezone.utc)
+    raw_output, input_tokens, output_tokens = _invoke_model(model_config, prompt)
+    latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
-        # Build request based on model type
-        if model_type == 'anthropic':
-            # Claude models
-            request_body = {
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 1000,
-                "temperature": 0.1,
-                "messages": [{"role": "user", "content": prompt}]
-            }
-        elif model_type == 'meta':
-            # Llama models
-            request_body = {
-                "prompt": prompt,
-                "max_gen_len": 1000,
-                "temperature": 0.1,
-                "top_p": 0.9
-            }
-        elif model_type == 'mistral':
-            # Mistral models
-            request_body = {
-                "prompt": prompt,
-                "max_tokens": 1000,
-                "temperature": 0.1,
-                "top_p": 0.9,
-                "top_k": 50
-            }
-        elif model_type == 'amazon':
-            # Titan models
-            request_body = {
-                "inputText": prompt,
-                "textGenerationConfig": {
-                    "maxTokenCount": 1000,
-                    "temperature": 0.1,
-                    "topP": 0.9,
-                    "stopSequences": []
-                }
-            }
-        else:
-            raise ValueError(f"Unsupported model type: {model_type}")
+    per_field = _parse_accuracy(raw_output)
+    overall = round(sum(per_field.values()) / len(per_field), 4) if per_field else 0.0
+    cost = _calculate_cost(input_tokens, output_tokens, model_config)
+    timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
-        # Invoke model
-        response = bedrock_runtime.invoke_model(
-            modelId=model_id,
-            body=json.dumps(request_body),
-            contentType='application/json',
-            accept='application/json'
-        )
+    eval_metrics = {
+        'model_id':   model_config['id'],
+        'model_name': judge_model_name,
+        'email_id':   email_id,
+        'task_type':  'accuracy_evaluation',
+        'cost_usd':   cost,
+        'latency_ms': latency_ms,
+        'timestamp':  timestamp,
+        'accuracy_scores': per_field,
+        'overall_accuracy': overall,
+    }
+    _store_metrics(eval_metrics)
 
-        response_body = json.loads(response['body'].read())
-
-        # Extract output based on model type
-        if model_type == 'anthropic':
-            # Claude format
-            output_text = response_body.get('content', [{}])[0].get('text', '')
-            usage = response_body.get('usage', {})
-            input_tokens = usage.get('input_tokens', 0)
-            output_tokens = usage.get('output_tokens', 0)
-
-        elif model_type == 'meta':
-            # Llama format
-            output_text = response_body.get('generation', '')
-            input_tokens = response_body.get('prompt_token_count', 0)
-            output_tokens = response_body.get('generation_token_count', 0)
-
-        elif model_type == 'mistral':
-            # Mistral format
-            outputs = response_body.get('outputs', [])
-            output_text = outputs[0].get('text', '') if outputs else ''
-            # Mistral doesn't provide token counts, estimate (convert to int for DynamoDB)
-            input_tokens = int(len(prompt.split()) * 1.3)
-            output_tokens = int(len(output_text.split()) * 1.3)
-
-        elif model_type == 'amazon':
-            # Titan format
-            results = response_body.get('results', [])
-            output_text = results[0].get('outputText', '') if results else ''
-            input_tokens = response_body.get('inputTextTokenCount', 0)
-            output_tokens = results[0].get('tokenCount', 0) if results else int(len(output_text.split()) * 1.3)
-
-        else:
-            raise ValueError(f"Unsupported model type: {model_type}")
-
-        # Calculate metrics
-        latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-        cost = calculate_cost(input_tokens, output_tokens, model_config)
-
-        # Normalise output for email_classification task
-        if task_type == 'email_classification':
-            output_text = parse_classification_output(output_text)
-
-        result = {
-            'model_name': model_name,
-            'model_id': model_id,
-            'output_text': output_text,
-            'input_tokens': input_tokens,
-            'output_tokens': output_tokens,
-            'latency_ms': latency_ms,
-            'cost_usd': cost,
-            'success': True,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-
-        # Store metrics
-        store_metrics(task_type, model_name, result)
-
-        return result
-
-    except Exception as e:
-        latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-        print(f"Error invoking {model_name}: {str(e)}")
-        return {
-            'model_name': model_name,
-            'error': str(e),
-            'latency_ms': latency_ms,
-            'success': False
-        }
+    print(
+        f"Accuracy evaluation for {email_id!r} by {judge_model_name}: "
+        f"overall={overall:.2f} per_field={per_field}"
+    )
+    return {
+        'judge_model':  judge_model_name,
+        'per_field':    per_field,
+        'overall_score': overall,
+    }
 
 
-CLASSIFICATION_PROMPT_TEMPLATE = """You are an AI assistant for a health insurance company.
-Classify the customer email below into exactly one of the following 17 intent categories:
+# ── Model invocation ──────────────────────────────────────────────────────────
 
-coverage_query, claim_submission, claim_status, claim_reimbursement_query,
-pre_authorisation, payment_issue, policy_change, renewal_query,
-cancellation_request, enrollment_new_policy, dependent_addition, complaint,
-document_followup, hospital_network_query, id_verification, broker_query, other
-
-EMAIL:
-{email_body}
-
-Respond with ONLY a JSON object in this exact format (no other text):
-{{"intent": "<one of the 17 categories>", "confidence": <0.0-1.0>, "route_team": "<team>"}}"""
-
-
-def build_classification_prompt(email_body: str) -> str:
-    """Build a classification prompt for the 17 laya intent categories."""
-    return CLASSIFICATION_PROMPT_TEMPLATE.format(email_body=email_body)
-
-
-def parse_classification_output(raw: str) -> str:
+def _invoke_model(
+    model_config: Dict[str, Any],
+    prompt: str,
+) -> Tuple[str, int, int]:
     """
-    Normalise model output for the email_classification task.
-
-    Tries JSON parsing first (expected format: {"intent": ..., "confidence": ..., "route_team": ...}).
-    Falls back to string matching against VALID_CATEGORIES.
-    Returns a JSON string with intent, confidence, and route_team on success,
-    or a plain fallback category string.
+    Invoke a Bedrock model and return (output_text, input_tokens, output_tokens).
     """
-    import json as _json
-    text = raw.strip()
+    model_id   = model_config['id']
+    model_type = model_config['type']
 
-    # Extract JSON if wrapped in markdown code fences
-    if '```json' in text:
-        text = text.split('```json')[1].split('```')[0].strip()
-    elif '```' in text:
-        text = text.split('```')[1].split('```')[0].strip()
-
-    # Try JSON parse
-    try:
-        parsed = _json.loads(text)
-        intent = parsed.get('intent', '').strip().lower()
-        if intent in VALID_CATEGORIES:
-            route_team = parsed.get('route_team') or INTENT_TO_ROUTE.get(intent, 'general_support_team')
-            confidence = float(parsed.get('confidence', 0.7))
-            return _json.dumps({
-                'intent': intent,
-                'confidence': round(confidence, 4),
-                'route_team': route_team,
-            })
-    except (_json.JSONDecodeError, ValueError, TypeError):
-        pass
-
-    # Fallback: string matching
-    candidate = text.strip('.,;:"\' \n').split('\n')[0].strip().lower()
-    if candidate in VALID_CATEGORIES:
-        route_team = INTENT_TO_ROUTE.get(candidate, 'general_support_team')
-        return _json.dumps({'intent': candidate, 'confidence': 0.5, 'route_team': route_team})
-
-    for category in VALID_CATEGORIES:
-        if category in candidate:
-            route_team = INTENT_TO_ROUTE.get(category, 'general_support_team')
-            return _json.dumps({'intent': category, 'confidence': 0.4, 'route_team': route_team})
-
-    print(f"Unrecognised classification output: {repr(raw)!r} – defaulting to other")
-    return _json.dumps({'intent': 'other', 'confidence': 0.2, 'route_team': 'general_support_team'})
-
-
-def calculate_cost(input_tokens: int, output_tokens: int, model_config: Dict[str, Any]) -> float:
-    """Calculate cost in USD"""
-    input_cost = (input_tokens / 1000) * model_config['cost_per_1k_input']
-    output_cost = (output_tokens / 1000) * model_config['cost_per_1k_output']
-    return round(input_cost + output_cost, 6)
-
-
-def store_metrics(task_type: str, model_name: str, result: Dict[str, Any]) -> None:
-    """Store model performance metrics in DynamoDB"""
-    try:
-        timestamp = datetime.utcnow().isoformat() + 'Z'
-        model_timestamp = f"{model_name}#{timestamp}"
-
-        # Convert numeric values to Decimal for DynamoDB compatibility
-        item = {
-            'task_type': task_type,
-            'model_timestamp': model_timestamp,
-            'model_name': model_name,
-            'model_id': result.get('model_id'),
-            'input_tokens': int(result.get('input_tokens', 0)),
-            'output_tokens': int(result.get('output_tokens', 0)),
-            'latency_ms': Decimal(str(result.get('latency_ms', 0))),
-            'cost_usd': Decimal(str(result.get('cost_usd', 0))),
-            'success': result.get('success', False),
-            'timestamp': timestamp
+    if model_type == 'mistral':
+        request_body = {
+            'prompt': prompt,
+            'max_tokens': 512,
+            'temperature': 0.1,
+            'top_p': 0.9,
+            'top_k': 50,
         }
+    elif model_type == 'meta':
+        request_body = {
+            'prompt': prompt,
+            'max_gen_len': 512,
+            'temperature': 0.1,
+            'top_p': 0.9,
+        }
+    else:
+        raise ValueError(f"Unsupported model type: {model_type}")
+
+    response = bedrock_runtime.invoke_model(
+        modelId=model_id,
+        body=json.dumps(request_body),
+        contentType='application/json',
+        accept='application/json',
+    )
+    response_body = json.loads(response['body'].read())
+
+    if model_type == 'mistral':
+        outputs = response_body.get('outputs', [])
+        output_text = outputs[0].get('text', '') if outputs else ''
+        input_tokens  = int(len(prompt.split()) * 1.3)
+        output_tokens = int(len(output_text.split()) * 1.3)
+    elif model_type == 'meta':
+        output_text   = response_body.get('generation', '')
+        input_tokens  = response_body.get('prompt_token_count', 0)
+        output_tokens = response_body.get('generation_token_count', 0)
+    else:
+        output_text   = ''
+        input_tokens  = 0
+        output_tokens = 0
+
+    return output_text, input_tokens, output_tokens
+
+
+# ── Output parsers ─────────────────────────────────────────────────────────────
+
+def _parse_classification(raw: str) -> Dict[str, Any]:
+    """
+    Parse model output into a validated classification dict.
+    Falls back gracefully on malformed JSON.
+    """
+    text = _strip_fences(raw)
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        print(f"JSON parse error in classification output: {raw!r}")
+        parsed = {}
+
+    intent = str(parsed.get('customer_intent', '')).strip().lower()
+    if intent not in VALID_INTENTS:
+        intent = 'other'
+
+    secondary = str(parsed.get('secondary_intent', '')).strip().lower()
+    if secondary not in VALID_INTENTS:
+        secondary = ''
+
+    urgency = str(parsed.get('urgency', 'low')).strip().lower()
+    if urgency not in VALID_URGENCY:
+        urgency = 'low'
+
+    sentiment = str(parsed.get('sentiment', 'neutral')).strip().lower()
+    if sentiment not in VALID_SENTIMENT:
+        sentiment = 'neutral'
+
+    route = str(parsed.get('gold_route_team', '')).strip().lower()
+    if route not in VALID_ROUTE_TEAMS:
+        route = INTENT_TO_ROUTE.get(intent, 'general_support_team')
+
+    priority = str(parsed.get('gold_priority', 'normal')).strip().lower()
+    if priority not in VALID_PRIORITY:
+        priority = 'normal'
+
+    # Determine requires_human_review
+    raw_review = parsed.get('requires_human_review', False)
+    if isinstance(raw_review, bool):
+        requires_review = raw_review
+    else:
+        requires_review = str(raw_review).lower() in ('true', '1', 'yes')
+    # Override: complaints and pre_authorisations always need human review
+    if intent in ('complaint', 'pre_authorisation') or priority == 'urgent':
+        requires_review = True
+
+    return {
+        'customer_intent':      intent,
+        'secondary_intent':     secondary,
+        'business_line':        'health_insurance',
+        'urgency':              urgency,
+        'sentiment':            sentiment,
+        'gold_route_team':      route,
+        'gold_priority':        priority,
+        'requires_human_review': requires_review,
+    }
+
+
+def _parse_accuracy(raw: str) -> Dict[str, int]:
+    """
+    Parse judge-model output into per-field binary scores {field: 0|1}.
+    Defaults to 0 for any unparseable field.
+    """
+    text = _strip_fences(raw)
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        print(f"JSON parse error in accuracy output: {raw!r}")
+        parsed = {}
+
+    result = {}
+    for field in CLASSIFICATION_FIELDS:
+        val = parsed.get(field, 0)
+        result[field] = 1 if str(val) in ('1', 'true', 'True') or val == 1 else 0
+    return result
+
+
+def _extract_json(text: str) -> str:
+    """
+    Extract the first complete JSON object from text by tracking brace depth.
+    Handles preamble text and markdown code fences (e.g. Llama-style responses).
+    """
+    text = text.strip()
+    start = text.find('{')
+    if start == -1:
+        return text
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return text
+
+
+# Keep old name as alias for backward compatibility
+def _strip_fences(text: str) -> str:
+    return _extract_json(text)
+
+
+# ── DynamoDB helpers ──────────────────────────────────────────────────────────
+
+def _store_metrics(metrics: Dict[str, Any]) -> None:
+    """
+    Persist a metrics record.
+    Primary key: metric_key = "{model_id}#{task_type}#{email_id}"
+    """
+    try:
+        metric_key = f"{metrics['model_id']}#{metrics['task_type']}#{metrics['email_id']}"
+
+        item: Dict[str, Any] = {
+            'metric_key': metric_key,
+            'model_id':   metrics['model_id'],
+            'model_name': metrics['model_name'],
+            'email_id':   metrics['email_id'],
+            'task_type':  metrics['task_type'],
+            'cost_usd':   Decimal(str(round(metrics['cost_usd'], 6))),
+            'latency_ms': Decimal(str(round(metrics['latency_ms'], 2))),
+            'timestamp':  metrics['timestamp'],
+        }
+        # Attach accuracy fields when present (accuracy_evaluation task)
+        if 'accuracy_scores' in metrics:
+            item['accuracy_scores'] = {k: int(v) for k, v in metrics['accuracy_scores'].items()}
+            item['overall_accuracy'] = Decimal(str(metrics['overall_accuracy']))
 
         model_metrics_table.put_item(Item=item)
-        print(f"✓ Stored metrics for {model_name} ({task_type})")
+        print(f"Stored metrics: {metric_key}")
 
     except Exception as e:
-        print(f"✗ Error storing metrics for {model_name}: {str(e)}")
-        # Re-raise to make failures visible
+        print(f"Error storing metrics: {str(e)}")
         raise
+
+
+def _update_email_record(email_id: str, classification: Dict[str, Any]) -> None:
+    """Update the email record with the 7 classification label fields."""
+    try:
+        email_table.update_item(
+            Key={'email_id': email_id},
+            UpdateExpression=(
+                'SET customer_intent = :ci, secondary_intent = :si, '
+                'business_line = :bl, urgency = :ug, sentiment = :se, '
+                'gold_route_team = :rt, gold_priority = :gp, '
+                'requires_human_review = :rhr, '
+                'classification_timestamp = :ts'
+            ),
+            ExpressionAttributeValues={
+                ':ci':  classification['customer_intent'],
+                ':si':  classification['secondary_intent'],
+                ':bl':  classification['business_line'],
+                ':ug':  classification['urgency'],
+                ':se':  classification['sentiment'],
+                ':rt':  classification['gold_route_team'],
+                ':gp':  classification['gold_priority'],
+                ':rhr': classification['requires_human_review'],
+                ':ts':  datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            },
+        )
+        print(f"Updated email record: {email_id}")
+    except Exception as e:
+        print(f"Error updating email record {email_id}: {str(e)}")
+        raise
+
+
+# ── Utility ───────────────────────────────────────────────────────────────────
+
+def _other_model(active_model: str) -> str:
+    """Return the model name that is NOT the active model."""
+    others = [m for m in MODELS if m != active_model]
+    return others[0]
+
+
+def _calculate_cost(
+    input_tokens: int,
+    output_tokens: int,
+    model_config: Dict[str, Any],
+) -> float:
+    input_cost  = (input_tokens  / 1000) * model_config['cost_per_1k_input']
+    output_cost = (output_tokens / 1000) * model_config['cost_per_1k_output']
+    return round(input_cost + output_cost, 6)
