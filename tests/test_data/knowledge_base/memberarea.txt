@@ -1,0 +1,5 @@
+PAGE TITLE: Member Area | Check Cover | Make a Claim | Laya Healthcare
+============================================================
+DESCRIPTION: Laya Healthcare member portal to check cover and benefits and make a claim
+
+SOURCE URL: https://www.layahealthcare.ie/memberarea

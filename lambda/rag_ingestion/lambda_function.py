@@ -11,7 +11,12 @@ from datetime import datetime
 from urllib.parse import unquote_plus
 import boto3
 from botocore.exceptions import ClientError
-from pypdf import PdfReader
+
+try:
+    from pypdf import PdfReader
+    PYPDF_AVAILABLE = True
+except ImportError:
+    PYPDF_AVAILABLE = False
 
 # Initialize AWS clients
 s3_client = boto3.client('s3')
@@ -59,6 +64,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Extract text based on file type
         if key.lower().endswith('.pdf'):
+            if not PYPDF_AVAILABLE:
+                raise RuntimeError("pypdf is not installed; cannot process PDF files")
             reader = PdfReader(io.BytesIO(raw_bytes))
             content = '\n'.join(page.extract_text() or '' for page in reader.pages)
         else:

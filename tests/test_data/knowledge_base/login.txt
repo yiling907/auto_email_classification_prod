@@ -1,0 +1,5 @@
+PAGE TITLE: Login | Laya Healthcare
+============================================================
+DESCRIPTION: Login to see your Laya Healthcare cover. Private Health Insurance Ireland from Laya Healthcare.
+
+SOURCE URL: https://www.layahealthcare.ie/login

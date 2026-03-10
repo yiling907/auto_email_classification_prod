@@ -1,0 +1,86 @@
+PAGE TITLE: Our Services | Urgent Care | Laya Health & Wellbeing Clinics
+============================================================
+DESCRIPTION: Our Services | Urgent Care | Laya Health & Wellbeing Clinics
+
+SOURCE URL: https://www.layahealthcare.ie/clinics/services
+
+
+## What we treat
+
+### Ireland’s faster urgent care - be seen within 60 minutes, 365 days a year
+If you’re struck by sudden back pain, sustain a sports injury or have an ear infection or UTI, our expert medical team can treat you at a Laya Health and Wellbeing Clinic. Our clinics are open 10am - 10pm, 365 days a year, to everyone over the age of 12 months, and you won’t wait any more than an hour to be seen.
+Our members can also avail of a range of wellbeing services – things like HeartBeat cardiac screening and consultations with a Healthcoach.
+  - Wounds (including stitches)
+  - Sports injuries
+  - Fractures (full digital x-ray on-site)
+  - Minor burns
+  - Back pain
+  - Nausea, diarrhoea and vomiting
+  - Urinary tract infections
+  - Skin infections
+  - Ear infections
+  - Book a video consultation
+  - Pregnancy-related issues
+  - Chest pain or irregular heartbeat
+  - Unconsciousness, seizures, stroke
+  - Mental health issues
+  - Overdose, poisoning or attempted suicide
+  - Severe abdominal pain
+  - Severe breathing difficulties
+  - Vision problems or severe head injuries
+  - Vomiting requiring IV fluids
+  - Severe headache
+  - Children under the age of 12 months
+Please go to your nearest hospital or emergency department if you or the person you are looking after are suffering from any of these issues.
+Patients who require medical treatment for a sore throat, runny nose, headache or fever can avail of the walk-in service once they present a negative antigen test on arrival. Video consultations for appropriate minor illnesses including kidney infections and skin and eye issues are available with one of our Clinic Doctors.
+
+### Become a Member
+We’re always thinking of new ways to make you better before you’re even ill. Join today to avail of our exceptional range of member benefits and safeguard your future.
+  - {{ page.title }}
+  - {{ page.suptitle }} {{ page.title }} {{ page.description }}
+
+### {{ page.title }}
+{{ page.description }}
+
+### Become a member
+
+#### Stay a beat ahead with laya healthcare
+We’re always thinking of new ways to make you better before you’re even ill. Join today to avail of our exceptional range of member benefits and safeguard your future.
+  - {{ page.title }}
+  - {{ page.suptitle }} {{ page.title }} {{ page.description }}
+
+### {{ page.title }}
+{{ page.description }}
+
+### Our wellbeing services
+
+#### Healthcoach
+Available to all members aged 18+
+Make the most of our expert preventative healthcare service. Get an individual assessment and track your progress with your customised plan in our Healthcoach app.
+  - One-to-one appointment
+  - Personalised assessment
+  - Tailored plan and tracking
+  - Support and inspiration
+
+#### HeartBeat Cardiac Screening
+Available to all members aged 12+
+Don’t wait until you’re sick to look after your heart. Our HeartBeat screening service is designed to reduce your risk of heart disease and sudden adult death syndrome.
+  - Electrocardiogram (ECG)
+  - Physical examination
+  - Blood pressure and BMI check
+  - Cardiologist review
+
+#### Out of hours services
+Get expert medical advice when you need it.
+Any time of the day or night, we make sure you can get professional advice from a nurse, doctor or fully qualified counsellor through our phone lines.
+  - 24/7 GPline
+  - 24/7 Nurseline
+  - 24/7 Mental Wellbeing Support Programme
+Before you visit, here are some of our
+
+### Frequently asked questions
+  - {{ question.question }}
+
+#### {{ question.question }}
+Didn’t find an answer to your question? Contact us at 0818 933 030
+Urgent care clinics available to all aged 12+ months. Wellbeing benefits available to laya healthcare members. Faster access in comparison with non-private healthcare facilities.

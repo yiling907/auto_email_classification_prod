@@ -34,9 +34,9 @@ fi
 echo "Knowledge Base Bucket: $KB_BUCKET"
 echo ""
 
-# Show current documents
-echo "Current knowledge base documents:"
-aws s3 ls "s3://$KB_BUCKET/documents/" --recursive 2>/dev/null || echo "  (none yet)"
+# Show current knowledge_base
+echo "Current knowledge base knowledge_base:"
+aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive 2>/dev/null || echo "  (none yet)"
 echo ""
 
 # Upload options
@@ -44,10 +44,10 @@ echo "========================================="
 echo "Upload Options"
 echo "========================================="
 echo ""
-echo "1) Upload test/sample documents (from tests/test_data/knowledge_base/)"
+echo "1) Upload test/sample knowledge_base (from tests/test_data/knowledge_base/)"
 echo "2) Upload custom document(s)"
-echo "3) List current documents"
-echo "4) Delete all documents"
+echo "3) List current knowledge_base"
+echo "4) Delete all knowledge_base"
 echo "5) Exit"
 echo ""
 read -p "Select option [1-5]: " OPTION
@@ -55,7 +55,7 @@ read -p "Select option [1-5]: " OPTION
 case $OPTION in
     1)
         echo ""
-        echo "Uploading test documents..."
+        echo "Uploading test knowledge_base..."
         echo ""
 
         # Check if test data exists
@@ -65,17 +65,17 @@ case $OPTION in
         fi
 
         # Upload all files in knowledge_base directory
-        aws s3 sync "$PROJECT_ROOT/tests/test_data/knowledge_base/" "s3://$KB_BUCKET/documents/" \
+        aws s3 sync "$PROJECT_ROOT/tests/test_data/knowledge_base/" "s3://$KB_BUCKET/knowledge_base/" \
             --exclude "*.md" \
             --exclude ".gitkeep"
 
         echo ""
-        echo "✓ Test documents uploaded"
+        echo "✓ Test knowledge_base uploaded"
         echo ""
         echo "Uploaded files:"
-        aws s3 ls "s3://$KB_BUCKET/documents/" --recursive
+        aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive
         echo ""
-        echo "Note: RAG ingestion Lambda will automatically process these documents"
+        echo "Note: RAG ingestion Lambda will automatically process these knowledge_base"
         echo "Check CloudWatch Logs: /aws/lambda/insuremail-ai-dev-rag-ingestion"
         ;;
 
@@ -91,30 +91,30 @@ case $OPTION in
         if [ -d "$UPLOAD_PATH" ]; then
             # Upload directory
             echo "Uploading directory: $UPLOAD_PATH"
-            aws s3 sync "$UPLOAD_PATH" "s3://$KB_BUCKET/documents/"
+            aws s3 sync "$UPLOAD_PATH" "s3://$KB_BUCKET/knowledge_base/"
         else
             # Upload single file
             FILENAME=$(basename "$UPLOAD_PATH")
             echo "Uploading file: $FILENAME"
-            aws s3 cp "$UPLOAD_PATH" "s3://$KB_BUCKET/documents/$FILENAME"
+            aws s3 cp "$UPLOAD_PATH" "s3://$KB_BUCKET/knowledge_base/$FILENAME"
         fi
 
         echo ""
         echo "✓ Upload complete"
         echo ""
         echo "Uploaded files:"
-        aws s3 ls "s3://$KB_BUCKET/documents/" --recursive
+        aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive
         ;;
 
     3)
         echo ""
-        echo "Current documents in knowledge base:"
-        aws s3 ls "s3://$KB_BUCKET/documents/" --recursive
+        echo "Current knowledge_base in knowledge base:"
+        aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive
         echo ""
 
-        # Count documents
-        DOC_COUNT=$(aws s3 ls "s3://$KB_BUCKET/documents/" --recursive | wc -l | xargs)
-        echo "Total documents: $DOC_COUNT"
+        # Count knowledge_base
+        DOC_COUNT=$(aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive | wc -l | xargs)
+        echo "Total knowledge_base: $DOC_COUNT"
         echo ""
 
         # Check DynamoDB for processed embeddings
@@ -127,13 +127,13 @@ case $OPTION in
 
     4)
         echo ""
-        echo "⚠ WARNING: This will delete ALL documents from the knowledge base!"
+        echo "⚠ WARNING: This will delete ALL knowledge_base from the knowledge base!"
         read -p "Are you sure? (type 'yes' to confirm): " CONFIRM
 
         if [ "$CONFIRM" = "yes" ]; then
-            echo "Deleting all documents..."
-            aws s3 rm "s3://$KB_BUCKET/documents/" --recursive
-            echo "✓ All documents deleted"
+            echo "Deleting all knowledge_base..."
+            aws s3 rm "s3://$KB_BUCKET/knowledge_base/" --recursive
+            echo "✓ All knowledge_base deleted"
 
             # Also clear DynamoDB embeddings
             read -p "Also delete processed embeddings from DynamoDB? (y/n): " DELETE_EMB
@@ -169,7 +169,7 @@ echo "========================================="
 echo "Next Steps"
 echo "========================================="
 echo ""
-echo "1. Wait ~30 seconds for Lambda to process documents"
+echo "1. Wait ~30 seconds for Lambda to process knowledge_base"
 echo "2. Check CloudWatch Logs:"
 echo "   aws logs tail /aws/lambda/insuremail-ai-dev-rag-ingestion --follow"
 echo ""
@@ -177,5 +177,5 @@ echo "3. Verify embeddings in DynamoDB:"
 echo "   aws dynamodb scan --table-name $(terraform output -raw embeddings_table_name) --select COUNT"
 echo ""
 echo "4. Test RAG retrieval:"
-echo "   Send a test email and check if relevant documents are retrieved"
+echo "   Send a test email and check if relevant knowledge_base are retrieved"
 echo ""
