@@ -46,10 +46,16 @@ JUDGE_MODEL = 'anthropic.claude-3-haiku-20240307-v1:0'
 DATASET_PREFIX = 'eval-datasets/'
 RESULTS_PREFIX = 'bedrock-eval-results/'
 
-# Dataset local paths (relative to Lambda package root)
+# Dataset local paths (relative to Lambda package root) — bundled static datasets
 DATASETS = {
     'model_eval': 'insurance_model_eval.jsonl',
     'rag_eval': 'insurance_rag_eval.jsonl',
+}
+
+# Laya-generated dataset S3 keys (uploaded by scripts/generate_eval_datasets.py)
+LAYA_DATASETS = {
+    'model_eval': 'eval-datasets/laya_model_eval.jsonl',
+    'rag_eval':   'eval-datasets/laya_rag_eval.jsonl',
 }
 
 # Metrics to request from Bedrock for each job
@@ -87,11 +93,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 def submit_all_jobs(event: Dict[str, Any]) -> Dict[str, Any]:
     """Upload datasets and submit one Bedrock evaluation job per model + RAG."""
-    print("Uploading evaluation datasets to S3...")
-    upload_datasets()
+    dataset_source = event.get('dataset_source', 'bundled')
 
-    model_dataset_uri = f"s3://{KNOWLEDGE_BASE_BUCKET}/{DATASET_PREFIX}insurance_model_eval.jsonl"
-    rag_dataset_uri = f"s3://{KNOWLEDGE_BASE_BUCKET}/{DATASET_PREFIX}insurance_rag_eval.jsonl"
+    if dataset_source == 'laya':
+        # Use pre-uploaded laya datasets — skip local upload
+        print("Using laya-generated datasets from S3 (skipping upload).")
+        model_dataset_uri = f"s3://{KNOWLEDGE_BASE_BUCKET}/{LAYA_DATASETS['model_eval']}"
+        rag_dataset_uri   = f"s3://{KNOWLEDGE_BASE_BUCKET}/{LAYA_DATASETS['rag_eval']}"
+    else:
+        print("Uploading bundled evaluation datasets to S3...")
+        upload_datasets()
+        model_dataset_uri = f"s3://{KNOWLEDGE_BASE_BUCKET}/{DATASET_PREFIX}insurance_model_eval.jsonl"
+        rag_dataset_uri   = f"s3://{KNOWLEDGE_BASE_BUCKET}/{DATASET_PREFIX}insurance_rag_eval.jsonl"
     output_uri = f"s3://{LOGS_BUCKET}/{RESULTS_PREFIX}"
 
     submitted_jobs = []

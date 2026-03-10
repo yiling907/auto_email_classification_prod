@@ -5,6 +5,7 @@ Sends auto-response emails via Amazon SES
 import json
 import os
 import boto3
+from datetime import datetime
 from typing import Dict, Any
 from botocore.exceptions import ClientError
 
@@ -86,7 +87,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 ExpressionAttributeValues={
                     ':sent': True,
                     ':mid': message_id,
-                    ':ts': boto3.dynamodb.types.Decimal(str(context.get_remaining_time_in_millis()))
+                    ':ts': datetime.utcnow().isoformat() + 'Z'
                 }
             )
 

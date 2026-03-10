@@ -17,18 +17,17 @@ dynamodb = boto3.resource('dynamodb')
 EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
 MODEL_METRICS_TABLE_NAME = os.environ.get('MODEL_METRICS_TABLE_NAME')
 
-# Using open-source models for cost optimization
-# Primary model for production responses (can be overridden via env var)
-PRIMARY_MODEL_ID = os.environ.get('PRIMARY_MODEL_ID', 'mistral.mistral-7b-instruct-v0:2')
+# Primary model for production responses — Claude 3 Sonnet as required by CLAUDE.md
+PRIMARY_MODEL_ID = os.environ.get('PRIMARY_MODEL_ID', 'anthropic.claude-3-sonnet-20240229-v1:0')
 
 # Evaluator model: always different from primary to get an independent quality signal
 # Default to Claude Haiku (cheap, reliable judge)
 EVALUATOR_MODEL_ID = os.environ.get('EVALUATOR_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
 
-# Available open-source models for fallback (in priority order)
+# Fallback models tried in order if the primary model is unavailable
 FALLBACK_MODELS = [
-    'mistral.mistral-7b-instruct-v0:2',       # Mistral 7B: $0.15/$0.20 per 1M tokens (cheapest & reliable)
-    'meta.llama3-8b-instruct-v1:0',      # Llama 3.1 8B: $0.30/$0.60 per 1M (inference profile)
+    'mistral.mistral-7b-instruct-v0:2',   # Mistral 7B: cheapest fallback
+    'meta.llama3-8b-instruct-v1:0',       # Llama 3.1 8B: second fallback
     # Removed: amazon.titan-text-express-v1 (EOL - end of life)
 ]
 

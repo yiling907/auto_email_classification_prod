@@ -19,10 +19,35 @@ dynamodb = boto3.resource('dynamodb')
 MODEL_METRICS_TABLE_NAME = os.environ['MODEL_METRICS_TABLE_NAME']
 model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME)
 
-# Valid output categories for email_classification task
+# Valid output categories for email_classification task (laya dataset — 17 intents)
 VALID_CATEGORIES = {
-    'enrollment', 'claim', 'policy/account', 'medicalservice',
-    'complaint', 'inquiry', 'technicalissue', 'spam'
+    'coverage_query', 'claim_submission', 'claim_status',
+    'claim_reimbursement_query', 'pre_authorisation', 'payment_issue',
+    'policy_change', 'renewal_query', 'cancellation_request',
+    'enrollment_new_policy', 'dependent_addition', 'complaint',
+    'document_followup', 'hospital_network_query', 'id_verification',
+    'broker_query', 'other'
+}
+
+# Maps each intent to the appropriate handling team
+INTENT_TO_ROUTE = {
+    'coverage_query':            'customer_support_team',
+    'claim_submission':          'claims_team',
+    'claim_status':              'claims_team',
+    'claim_reimbursement_query': 'claims_team',
+    'pre_authorisation':         'medical_review_team',
+    'payment_issue':             'finance_support_team',
+    'policy_change':             'policy_admin_team',
+    'renewal_query':             'renewals_team',
+    'cancellation_request':      'retention_team',
+    'enrollment_new_policy':     'sales_enrollment_team',
+    'dependent_addition':        'policy_admin_team',
+    'complaint':                 'complaints_team',
+    'document_followup':         'operations_team',
+    'hospital_network_query':    'provider_support_team',
+    'id_verification':           'operations_team',
+    'broker_query':              'general_support_team',
+    'other':                     'general_support_team',
 }
 
 # Model configurations - Working open source models only
@@ -260,24 +285,72 @@ def invoke_model(
         }
 
 
+CLASSIFICATION_PROMPT_TEMPLATE = """You are an AI assistant for a health insurance company.
+Classify the customer email below into exactly one of the following 17 intent categories:
+
+coverage_query, claim_submission, claim_status, claim_reimbursement_query,
+pre_authorisation, payment_issue, policy_change, renewal_query,
+cancellation_request, enrollment_new_policy, dependent_addition, complaint,
+document_followup, hospital_network_query, id_verification, broker_query, other
+
+EMAIL:
+{email_body}
+
+Respond with ONLY a JSON object in this exact format (no other text):
+{{"intent": "<one of the 17 categories>", "confidence": <0.0-1.0>, "route_team": "<team>"}}"""
+
+
+def build_classification_prompt(email_body: str) -> str:
+    """Build a classification prompt for the 17 laya intent categories."""
+    return CLASSIFICATION_PROMPT_TEMPLATE.format(email_body=email_body)
+
+
 def parse_classification_output(raw: str) -> str:
     """
     Normalise model output for the email_classification task.
 
-    Strips whitespace/punctuation and validates against VALID_CATEGORIES.
-    Returns the matched category (title-cased) or 'Inquiry' as a safe fallback.
+    Tries JSON parsing first (expected format: {"intent": ..., "confidence": ..., "route_team": ...}).
+    Falls back to string matching against VALID_CATEGORIES.
+    Returns a JSON string with intent, confidence, and route_team on success,
+    or a plain fallback category string.
     """
-    candidate = raw.strip().strip('.,;:"\' \n').split('\n')[0].strip()
-    if candidate.lower() in VALID_CATEGORIES:
-        return candidate.title()
+    import json as _json
+    text = raw.strip()
 
-    # Partial match – model may have added extra words (e.g. "Claim inquiry")
+    # Extract JSON if wrapped in markdown code fences
+    if '```json' in text:
+        text = text.split('```json')[1].split('```')[0].strip()
+    elif '```' in text:
+        text = text.split('```')[1].split('```')[0].strip()
+
+    # Try JSON parse
+    try:
+        parsed = _json.loads(text)
+        intent = parsed.get('intent', '').strip().lower()
+        if intent in VALID_CATEGORIES:
+            route_team = parsed.get('route_team') or INTENT_TO_ROUTE.get(intent, 'general_support_team')
+            confidence = float(parsed.get('confidence', 0.7))
+            return _json.dumps({
+                'intent': intent,
+                'confidence': round(confidence, 4),
+                'route_team': route_team,
+            })
+    except (_json.JSONDecodeError, ValueError, TypeError):
+        pass
+
+    # Fallback: string matching
+    candidate = text.strip('.,;:"\' \n').split('\n')[0].strip().lower()
+    if candidate in VALID_CATEGORIES:
+        route_team = INTENT_TO_ROUTE.get(candidate, 'general_support_team')
+        return _json.dumps({'intent': candidate, 'confidence': 0.5, 'route_team': route_team})
+
     for category in VALID_CATEGORIES:
-        if category in candidate.lower():
-            return category.title()
+        if category in candidate:
+            route_team = INTENT_TO_ROUTE.get(category, 'general_support_team')
+            return _json.dumps({'intent': category, 'confidence': 0.4, 'route_team': route_team})
 
-    print(f"Unrecognised classification output: {repr(raw)!r} – defaulting to Inquiry")
-    return 'Inquiry'
+    print(f"Unrecognised classification output: {repr(raw)!r} – defaulting to other")
+    return _json.dumps({'intent': 'other', 'confidence': 0.2, 'route_team': 'general_support_team'})
 
 
 def calculate_cost(input_tokens: int, output_tokens: int, model_config: Dict[str, Any]) -> float:

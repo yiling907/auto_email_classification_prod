@@ -6,8 +6,32 @@ import json
 import pytest
 from decimal import Decimal
 from datetime import datetime
-from moto import mock_dynamodb, mock_s3, mock_ses, mock_stepfunctions, mock_lambda
+from moto import mock_aws
 import boto3
+
+# Set environment variables before any lambda module is imported
+_DEFAULT_ENV = {
+    'AWS_ACCESS_KEY_ID':              'testing',
+    'AWS_SECRET_ACCESS_KEY':          'testing',
+    'AWS_SECURITY_TOKEN':             'testing',
+    'AWS_SESSION_TOKEN':              'testing',
+    'AWS_DEFAULT_REGION':             'us-east-1',
+    'EMAIL_TABLE_NAME':               'test-emails',
+    'MODEL_METRICS_TABLE_NAME':       'test-model-metrics',
+    'EMBEDDINGS_TABLE_NAME':          'test-embeddings',
+    'STATE_MACHINE_ARN':              'arn:aws:states:us-east-1:123456789012:stateMachine:test-state-machine',
+    'EMAIL_BUCKET_NAME':              'test-emails-bucket',
+    'KNOWLEDGE_BASE_BUCKET_NAME':     'test-knowledge-base-bucket',
+    'KNOWLEDGE_BASE_BUCKET':          'test-knowledge-base-bucket',
+    'LOGS_BUCKET':                    'test-logs-bucket',
+    'SENDER_EMAIL':                   'test@example.com',
+    'SENDER_NAME':                    'Test Sender',
+    'PRIMARY_MODEL_ID':               'mistral.mistral-7b-instruct-v0:2',
+    'EVALUATION_METRICS_FUNCTION_NAME': 'test-evaluation-metrics',
+    'BEDROCK_EVAL_ROLE_ARN':          'arn:aws:iam::123456789012:role/test-bedrock-eval-role',
+}
+for _k, _v in _DEFAULT_ENV.items():
+    os.environ.setdefault(_k, _v)
 
 
 # Set environment variables for testing
@@ -39,7 +63,7 @@ def lambda_env_vars(monkeypatch):
 @pytest.fixture
 def dynamodb_tables():
     """Create mock DynamoDB tables"""
-    with mock_dynamodb():
+    with mock_aws():
         dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 
         # Email processing table
@@ -82,7 +106,7 @@ def dynamodb_tables():
 @pytest.fixture
 def s3_buckets():
     """Create mock S3 buckets"""
-    with mock_s3():
+    with mock_aws():
         s3 = boto3.client('s3', region_name='us-east-1')
 
         s3.create_bucket(Bucket='test-emails-bucket')

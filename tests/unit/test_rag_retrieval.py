@@ -7,6 +7,7 @@ import os
 from unittest.mock import patch, MagicMock
 import pytest
 
+sys.modules.pop('lambda_function', None)  # avoid module-cache collision when run with other lambda tests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/rag_retrieval'))
 import lambda_function
 
@@ -91,28 +92,33 @@ class TestRAGRetrieval:
         assert similarity == 0.0
 
     def test_retrieve_similar_documents_ranking(self, lambda_env_vars, dynamodb_tables):
-        """Test that documents are ranked by similarity"""
+        """Test that documents are ranked by cosine similarity"""
         table = dynamodb_tables['embeddings']
 
-        # Add documents with different embeddings
-        docs = []
-        for i in range(3):
-            doc = {
-                'doc_id': f'doc_{i}',
+        # Use directionally distinct embeddings so cosine similarities are clearly ordered.
+        # query = [1, 0, 0, ...]
+        # doc_0: [0, 1, 0, ...] → cos = 0.0  (orthogonal)
+        # doc_1: [1, 1, 0, ...] → cos ≈ 0.707 (45 degrees)
+        # doc_2: [1, 0, 0, ...] → cos = 1.0  (identical direction)
+        dim = 1536
+        embeddings = {
+            'doc_0': [0.0, 1.0] + [0.0] * (dim - 2),
+            'doc_1': [1.0, 1.0] + [0.0] * (dim - 2),
+            'doc_2': [1.0, 0.0] + [0.0] * (dim - 2),
+        }
+        for doc_id, emb in embeddings.items():
+            table.put_item(Item={
+                'doc_id': doc_id,
                 'doc_type': 'policy',
-                'content': f'Document {i} content',
-                'embedding': json.dumps([float(i)] * 1536),  # Different embeddings
-                'metadata': {}
-            }
-            table.put_item(Item=doc)
-            docs.append(doc)
+                'content': f'Content for {doc_id}',
+                'embedding': json.dumps(emb),
+                'metadata': {},
+            })
 
-        # Query with embedding similar to doc_2
-        query_embedding = [2.0] * 1536
-
+        # Query pointing along dim-0 → doc_2 should be most similar
+        query_embedding = [1.0, 0.0] + [0.0] * (dim - 2)
         results = lambda_function.retrieve_similar_documents(query_embedding, top_k=3)
 
-        # doc_2 should be most similar (closest embedding values)
         assert len(results) <= 3
         if len(results) > 0:
             assert results[0]['doc_id'] == 'doc_2'

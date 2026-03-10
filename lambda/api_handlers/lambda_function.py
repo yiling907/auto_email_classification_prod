@@ -155,19 +155,15 @@ def get_emails_list(event: Dict[str, Any]) -> Dict[str, Any]:
         limit = int(params.get('limit', 50))
         confidence_level = params.get('confidence_level')
 
-        # Scan emails
-        scan_kwargs = {'Limit': limit}
-
+        # Scan emails (scan + filter is acceptable for demo scale)
         if confidence_level:
-            # Use GSI to query by confidence level
-            response = email_table.query(
-                IndexName='timestamp-index',
-                KeyConditionExpression=Key('confidence_level').eq(confidence_level),
+            from boto3.dynamodb.conditions import Attr
+            response = email_table.scan(
+                FilterExpression=Attr('confidence_level').eq(confidence_level),
                 Limit=limit,
-                ScanIndexForward=False
             )
         else:
-            response = email_table.scan(**scan_kwargs)
+            response = email_table.scan(Limit=limit)
 
         emails = response.get('Items', [])
 

@@ -96,6 +96,59 @@ def query_metrics(task_type: str, days: int) -> List[Dict[str, Any]]:
         return []
 
 
+def _avg(values: List[float]) -> float:
+    return round(sum(values) / len(values), 4) if values else 0.0
+
+
+def aggregate_laya_metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Aggregate laya evaluation metrics written by run_local_evaluation.py.
+
+    Reads fields: intent_accuracy, routing_accuracy, missed_escalation_rate,
+    false_escalation_rate, extraction_record_accuracy from DynamoDB items
+    with task_type == 'laya_eval'.
+
+    Also aggregates Bedrock-eval LLM-as-judge scores:
+    score_correctness, score_completeness, score_helpfulness, score_faithfulness.
+    """
+    laya_items = [i for i in items if i.get('task_type') == 'laya_eval']
+    bedrock_items = [i for i in items if str(i.get('task_type', '')).startswith('bedrock_eval#')]
+
+    def _collect(key: str, source: List[Dict]) -> List[float]:
+        vals = []
+        for i in source:
+            v = i.get(key)
+            if v is not None:
+                try:
+                    vals.append(float(v))
+                except (TypeError, ValueError):
+                    pass
+        return vals
+
+    laya_summary: Dict[str, Any] = {}
+    if laya_items:
+        laya_summary = {
+            'sample_count': len(laya_items),
+            'avg_intent_accuracy':           _avg(_collect('intent_accuracy', laya_items)),
+            'avg_routing_accuracy':          _avg(_collect('routing_accuracy', laya_items)),
+            'avg_missed_escalation_rate':    _avg(_collect('missed_escalation_rate', laya_items)),
+            'avg_false_escalation_rate':     _avg(_collect('false_escalation_rate', laya_items)),
+            'avg_extraction_record_accuracy':_avg(_collect('extraction_record_accuracy', laya_items)),
+        }
+
+    bedrock_summary: Dict[str, Any] = {}
+    if bedrock_items:
+        bedrock_summary = {
+            'sample_count':           len(bedrock_items),
+            'avg_score_correctness':  _avg(_collect('score_correctness', bedrock_items)),
+            'avg_score_completeness': _avg(_collect('score_completeness', bedrock_items)),
+            'avg_score_helpfulness':  _avg(_collect('score_helpfulness', bedrock_items)),
+            'avg_score_faithfulness': _avg(_collect('score_faithfulness', bedrock_items)),
+        }
+
+    return {'laya_eval': laya_summary, 'bedrock_eval': bedrock_summary}
+
+
 def calculate_statistics(metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Calculate aggregate statistics from metrics
@@ -128,10 +181,10 @@ def calculate_statistics(metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
         successful = [m for m in model_metrics if m.get('success', False)]
 
         if model_metrics:
-            latencies = [m.get('latency_ms', 0) for m in successful]
-            costs = [m.get('cost_usd', 0) for m in successful]
-            tokens_in = [m.get('input_tokens', 0) for m in successful]
-            tokens_out = [m.get('output_tokens', 0) for m in successful]
+            latencies = [float(m.get('latency_ms', 0)) for m in successful]
+            costs = [float(m.get('cost_usd', 0)) for m in successful]
+            tokens_in = [int(m.get('input_tokens', 0)) for m in successful]
+            tokens_out = [int(m.get('output_tokens', 0)) for m in successful]
 
             model_stats[model_name] = {
                 'total_requests': len(model_metrics),
@@ -147,9 +200,12 @@ def calculate_statistics(metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
             }
 
     # Calculate overall stats
-    all_latencies = [m.get('latency_ms', 0) for m in metrics if m.get('success', False)]
-    all_costs = [m.get('cost_usd', 0) for m in metrics]
+    all_latencies = [float(m.get('latency_ms', 0)) for m in metrics if m.get('success', False)]
+    all_costs = [float(m.get('cost_usd', 0)) for m in metrics]
     successful_count = len([m for m in metrics if m.get('success', False)])
+
+    # Aggregate laya + bedrock eval metrics
+    laya_and_bedrock = aggregate_laya_metrics(metrics)
 
     overall_stats = {
         'total_requests': len(metrics),
@@ -157,7 +213,9 @@ def calculate_statistics(metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
         'success_rate': successful_count / len(metrics) if metrics else 0,
         'avg_latency_ms': sum(all_latencies) / len(all_latencies) if all_latencies else 0,
         'total_cost_usd': sum(all_costs),
-        'by_model': model_stats
+        'by_model': model_stats,
+        'laya_eval': laya_and_bedrock['laya_eval'],
+        'bedrock_eval': laya_and_bedrock['bedrock_eval'],
     }
 
     return overall_stats

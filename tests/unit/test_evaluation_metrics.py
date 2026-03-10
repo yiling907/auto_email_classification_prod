@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 import pytest
 
+sys.modules.pop('lambda_function', None)  # avoid module-cache collision when run with other lambda tests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/evaluation_metrics'))
 import lambda_function
 
