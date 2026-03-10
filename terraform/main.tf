@@ -69,12 +69,6 @@ module "lambda" {
   imap_server           = var.imap_server
   mark_emails_as_read   = var.mark_emails_as_read ? "true" : "false"
 
-  # Bedrock Evaluation
-  logs_bucket_name      = module.storage.logs_bucket_name
-  bedrock_eval_role_arn = module.iam.bedrock_evaluation_service_role_arn
-  aws_account_id        = data.aws_caller_identity.current.account_id
-  aws_region            = var.aws_region
-
   tags                      = local.common_tags
 }
 
@@ -112,7 +106,6 @@ module "monitoring" {
   log_retention_days               = var.log_retention_days
   state_machine_arn                = module.step_functions.state_machine_arn
   email_parser_function_name       = module.lambda.email_parser_name
-  evaluation_metrics_lambda_arn    = module.lambda.evaluation_metrics_arn
   gmail_imap_poller_lambda_arn     = module.lambda.gmail_imap_poller_arn
   gmail_imap_poller_lambda_name    = module.lambda.gmail_imap_poller_name
   tags                             = local.common_tags

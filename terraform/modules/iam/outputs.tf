@@ -18,7 +18,3 @@ output "step_functions_role_name" {
   value       = aws_iam_role.step_functions.name
 }
 
-output "bedrock_evaluation_service_role_arn" {
-  description = "ARN of the Bedrock evaluation service role (passed to CreateEvaluationJob)"
-  value       = aws_iam_role.bedrock_evaluation_service.arn
-}

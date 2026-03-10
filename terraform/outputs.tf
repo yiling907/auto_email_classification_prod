@@ -40,7 +40,6 @@ output "lambda_functions" {
     rag_retrieval       = module.lambda.rag_retrieval_arn
     claude_response     = module.lambda.claude_response_arn
     classify_intent = module.lambda.classify_intent_arn
-    evaluation_metrics  = module.lambda.evaluation_metrics_arn
   }
 }
 

@@ -8,17 +8,14 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 import boto3
 from decimal import Decimal
-from boto3.dynamodb.conditions import Key
 
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
-lambda_client = boto3.client('lambda')
 
 # Environment variables
 EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
 MODEL_METRICS_TABLE_NAME = os.environ['MODEL_METRICS_TABLE_NAME']
 EMBEDDINGS_TABLE_NAME = os.environ['EMBEDDINGS_TABLE_NAME']
-EVALUATION_METRICS_FUNCTION_NAME = os.environ.get('EVALUATION_METRICS_FUNCTION_NAME', '')
 
 email_table = dynamodb.Table(EMAIL_TABLE_NAME)
 model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME)
@@ -56,8 +53,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             response = get_model_metrics(event)
         elif path == '/api/metrics/rag':
             response = get_rag_metrics()
-        elif path == '/api/metrics/evaluations':
-            response = get_evaluation_metrics()
         else:
             response = {
                 'statusCode': 404,
@@ -209,45 +204,8 @@ def get_email_detail(email_id: str) -> Dict[str, Any]:
 
 
 def get_model_metrics(event: Dict[str, Any]) -> Dict[str, Any]:
-    """Get model performance metrics - delegates to evaluation_metrics Lambda"""
+    """Get model performance metrics"""
     try:
-        # Get query parameters
-        params = event.get('queryStringParameters') or {}
-        task_type = params.get('task_type', 'all')
-        days = int(params.get('days', 7))
-
-        # Call evaluation_metrics Lambda if configured
-        if EVALUATION_METRICS_FUNCTION_NAME:
-            try:
-                response = lambda_client.invoke(
-                    FunctionName=EVALUATION_METRICS_FUNCTION_NAME,
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps({
-                        'task_type': task_type,
-                        'days': days
-                    })
-                )
-
-                payload = json.loads(response['Payload'].read())
-
-                if payload.get('statusCode') == 200:
-                    # Extract statistics from evaluation_metrics response
-                    # and return in the format expected by frontend
-                    stats = payload.get('statistics', {})
-                    return {
-                        'statusCode': 200,
-                        'headers': {'Content-Type': 'application/json'},
-                        'body': json.dumps({
-                            'by_model': stats.get('by_model', {}),
-                            'total_metrics': stats.get('total_requests', 0)
-                        }, cls=DecimalEncoder)
-                    }
-
-            except Exception as e:
-                print(f"Error calling evaluation_metrics Lambda: {str(e)}")
-                # Fall back to direct calculation below
-
-        # Fallback: Direct calculation (for backward compatibility)
         response = model_metrics_table.scan()
         metrics = response.get('Items', [])
 
@@ -288,100 +246,6 @@ def get_model_metrics(event: Dict[str, Any]) -> Dict[str, Any]:
 
     except Exception as e:
         print(f"Error in get_model_metrics: {str(e)}")
-        raise
-
-
-def get_evaluation_metrics() -> Dict[str, Any]:
-    """
-    Return all evaluation results from MODEL_METRICS_TABLE_NAME:
-    - bedrock_evals: Bedrock automated evaluation jobs (correctness/completeness/helpfulness/faithfulness)
-    - claude_evals:  Claude-as-judge scores stored by claude_response (accuracy/compliance/coherence/overall)
-    """
-    try:
-        response = model_metrics_table.scan()
-        items = response.get('Items', [])
-
-        bedrock_by_key: Dict[str, Any] = {}
-        claude_by_model: Dict[str, Any] = {}
-
-        for item in items:
-            task_type = item.get('task_type', '')
-
-            # --- Bedrock evaluation job records ---
-            if task_type.startswith('bedrock_eval#'):
-                model = item.get('model_name', 'unknown')
-                eval_type = item.get('eval_type', 'unknown')
-                key = f"{model}|{eval_type}"
-                # Keep only the most recent completed record per model+eval_type
-                if key not in bedrock_by_key or item.get('timestamp', '') > bedrock_by_key[key].get('timestamp', ''):
-                    bedrock_by_key[key] = {
-                        'model_name': model,
-                        'eval_type': eval_type,
-                        'score_correctness':  float(item.get('score_correctness', 0) or 0),
-                        'score_completeness': float(item.get('score_completeness', 0) or 0),
-                        'score_helpfulness':  float(item.get('score_helpfulness', 0) or 0),
-                        'score_faithfulness': float(item.get('score_faithfulness', 0) or 0),
-                        'eval_status': item.get('eval_status', ''),
-                        'judge_model': item.get('judge_model', ''),
-                        'timestamp': item.get('timestamp', ''),
-                    }
-
-            # --- Claude-as-judge records (stored by claude_response Lambda) ---
-            elif item.get('eval_overall_quality') is not None:
-                model_id = item.get('model_id', '')
-                if 'mistral' in model_id:
-                    label = 'mistral-7b'
-                elif 'llama' in model_id:
-                    label = 'llama-3-8b'
-                elif 'haiku' in model_id or 'claude' in model_id.lower():
-                    label = 'claude-haiku'
-                else:
-                    label = model_id.split('.')[-1][:20] if model_id else item.get('model_name', 'unknown')
-
-                entry = claude_by_model.setdefault(label, {
-                    'model_name': label,
-                    'model_id': model_id,
-                    'scores': [],
-                    'by_task': {},
-                })
-                scores = {
-                    'accuracy':      float(item.get('eval_accuracy_score', 0) or 0),
-                    'task_accuracy': float(item.get('eval_task_accuracy_score', 0) or 0),
-                    'compliance':    float(item.get('eval_compliance_score', 0) or 0),
-                    'coherence':     float(item.get('eval_coherence_score', 0) or 0),
-                    'overall':       float(item.get('eval_overall_quality', 0) or 0),
-                }
-                entry['scores'].append(scores)
-                entry['by_task'].setdefault(task_type, []).append(scores)
-
-        # Average Claude scores per model
-        for data in claude_by_model.values():
-            raw = data['scores']
-            if raw:
-                data['avg_scores'] = {
-                    k: round(sum(s[k] for s in raw) / len(raw), 4)
-                    for k in raw[0]
-                }
-                data['sample_count'] = len(raw)
-            # Average per task
-            for t, tscores in data['by_task'].items():
-                data['by_task'][t] = {
-                    k: round(sum(s[k] for s in tscores) / len(tscores), 4)
-                    for k in tscores[0]
-                }
-            del data['scores']  # don't send raw array to frontend
-
-        return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({
-                'bedrock_evals': list(bedrock_by_key.values()),
-                'claude_evals': list(claude_by_model.values()),
-            }, cls=DecimalEncoder),
-        }
-
-    except Exception as e:
-        print(f"Error in get_evaluation_metrics: {e}")
         raise
 
 

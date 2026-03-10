@@ -48,16 +48,6 @@ output "classify_intent_name" {
   value       = aws_lambda_function.classify_intent.function_name
 }
 
-output "evaluation_metrics_arn" {
-  description = "ARN of the evaluation metrics Lambda function"
-  value       = aws_lambda_function.evaluation_metrics.arn
-}
-
-output "evaluation_metrics_name" {
-  description = "Name of the evaluation metrics Lambda function"
-  value       = aws_lambda_function.evaluation_metrics.function_name
-}
-
 output "api_handlers_arn" {
   description = "ARN of the API handlers Lambda function"
   value       = aws_lambda_function.api_handlers.arn
@@ -97,16 +87,6 @@ output "email_sender_arn" {
 output "email_sender_name" {
   description = "Name of the email sender Lambda function"
   value       = aws_lambda_function.email_sender.function_name
-}
-
-output "bedrock_evaluation_arn" {
-  description = "ARN of the Bedrock evaluation Lambda function"
-  value       = aws_lambda_function.bedrock_evaluation.arn
-}
-
-output "bedrock_evaluation_name" {
-  description = "Name of the Bedrock evaluation Lambda function"
-  value       = aws_lambda_function.bedrock_evaluation.function_name
 }
 
 output "email_parser_lambda_permission_id" {

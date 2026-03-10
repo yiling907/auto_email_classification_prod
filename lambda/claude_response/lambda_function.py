@@ -4,7 +4,7 @@ Generates high-confidence insurance email responses using Claude 3
 """
 import json
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
@@ -15,81 +15,17 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
-MODEL_METRICS_TABLE_NAME = os.environ.get('MODEL_METRICS_TABLE_NAME')
 
 # Primary model for production responses — Claude 3 Sonnet as required by CLAUDE.md
 PRIMARY_MODEL_ID = os.environ.get('PRIMARY_MODEL_ID', 'anthropic.claude-3-sonnet-20240229-v1:0')
-
-# Evaluator model: always different from primary to get an independent quality signal
-# Default to Claude Haiku (cheap, reliable judge)
-EVALUATOR_MODEL_ID = os.environ.get('EVALUATOR_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
 
 # Fallback models tried in order if the primary model is unavailable
 FALLBACK_MODELS = [
     'mistral.mistral-7b-instruct-v0:2',   # Mistral 7B: cheapest fallback
     'meta.llama3-8b-instruct-v1:0',       # Llama 3.1 8B: second fallback
-    # Removed: amazon.titan-text-express-v1 (EOL - end of life)
 ]
 
-# Task-type-specific accuracy criteria for the evaluator
-TASK_TYPE_CRITERIA = {
-    'claim': [
-        "Accurately describes the claim review/processing timeline without guaranteeing outcomes",
-        "References relevant policy coverage clauses where applicable",
-        "Provides clear next steps the customer must take",
-        "Does not approve or deny the claim without verification",
-    ],
-    'enrollment': [
-        "Accurately states eligibility requirements without over-promising",
-        "Provides correct open enrollment period information",
-        "Clearly explains the enrollment steps in order",
-        "Does not confirm enrollment before verification is complete",
-    ],
-    'policy/account': [
-        "Correctly references policy terms without legal misrepresentation",
-        "Accurately describes account management options available",
-        "Includes appropriate disclaimers for policy interpretations",
-        "Does not make binding commitments about policy outcomes",
-    ],
-    'complaint': [
-        "Acknowledges the customer's concern with empathy and professionalism",
-        "Provides a clear resolution path or escalation to a specialist",
-        "Does not dismiss or minimise the complaint",
-        "Offers concrete next steps with expected timeframe",
-    ],
-    'inquiry': [
-        "Fully addresses the customer's specific question",
-        "Provides accurate and relevant information from knowledge base",
-        "Is clear, concise, and avoids unnecessary jargon",
-        "Includes appropriate caveats where information may vary",
-    ],
-    'billing_inquiry': [
-        "Accurately addresses the billing or payment question",
-        "Does not reveal or misstate sensitive financial details",
-        "Provides clear payment options or next steps",
-        "References correct billing policies and timelines",
-    ],
-    'technicalissue': [
-        "Provides actionable troubleshooting steps in clear order",
-        "Escalates to technical support when issue is beyond scope",
-        "Does not make promises about resolution time",
-        "Confirms what information will be needed from the customer",
-    ],
-    'spam': [
-        "Response is appropriately brief and does not engage with spam content",
-        "Does not leak any sensitive policy or account information",
-        "Maintains professional tone",
-    ],
-    'medicalservice': [
-        "Accurately describes what is covered under the medical benefit",
-        "Does not provide medical advice or diagnoses",
-        "References the correct benefit schedule or plan document",
-        "Includes appropriate healthcare disclaimer",
-    ],
-}
-
 email_table = dynamodb.Table(EMAIL_TABLE_NAME)
-model_metrics_table = dynamodb.Table(MODEL_METRICS_TABLE_NAME) if MODEL_METRICS_TABLE_NAME else None
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -161,24 +97,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             action = 'escalate'
             confidence_level = 'low'
 
-        # Evaluate response quality with a separate model (LLM-as-judge)
-        evaluation = evaluate_response(
-            email_body=email_body,
-            response_text=parsed_response['response_text'],
-            intent=intent,
-            rag_documents=rag_documents,
-            primary_model_id=PRIMARY_MODEL_ID
-        )
-
-        # Persist Claude's evaluation scores for this model into the metrics table
-        store_evaluation_metrics(
-            task_type=intent,
-            model_id=PRIMARY_MODEL_ID,
-            latency_ms=latency_ms,
-            confidence_score=confidence,
-            evaluation=evaluation
-        )
-
         # Prepare result
         result = {
             'statusCode': 200,
@@ -191,7 +109,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'compliance_checks': parsed_response.get('compliance_checks', {}),
             'latency_ms': latency_ms,
             'model_id': PRIMARY_MODEL_ID,
-            'evaluation': evaluation,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
 
@@ -292,14 +209,7 @@ def invoke_claude(prompt: str) -> Dict[str, Any]:
     Invoke Bedrock model with fallback support
 
     Tries primary model first, falls back to alternatives if needed
-
-    Args:
-        prompt: Input prompt
-
-    Returns:
-        Model response data
     """
-    # Try primary model first
     models_to_try = [PRIMARY_MODEL_ID] + [m for m in FALLBACK_MODELS if m != PRIMARY_MODEL_ID]
 
     last_error = None
@@ -315,43 +225,27 @@ def invoke_claude(prompt: str) -> Dict[str, Any]:
             last_error = e
             continue
 
-    # All models failed
     raise Exception(f"All models failed. Last error: {str(last_error)}")
 
 
 def invoke_bedrock_model(model_id: str, prompt: str) -> Dict[str, Any]:
-    """
-    Invoke specific Bedrock model with appropriate API format
-
-    Args:
-        model_id: Bedrock model ID
-        prompt: Input prompt
-
-    Returns:
-        Model response data
-    """
+    """Invoke specific Bedrock model with appropriate API format"""
     try:
-        # Determine model provider and format request accordingly
         if model_id.startswith('anthropic.'):
-            # Claude models (Anthropic format)
             request_body = {
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 2000,
                 "temperature": 0.1,
                 "messages": [{"role": "user", "content": prompt}]
             }
-
         elif model_id.startswith('meta.llama'):
-            # Llama models (Meta format)
             request_body = {
                 "prompt": prompt,
                 "max_gen_len": 2000,
                 "temperature": 0.1,
                 "top_p": 0.9
             }
-
         elif model_id.startswith('mistral.'):
-            # Mistral models (Mistral format)
             request_body = {
                 "prompt": prompt,
                 "max_tokens": 2000,
@@ -359,9 +253,7 @@ def invoke_bedrock_model(model_id: str, prompt: str) -> Dict[str, Any]:
                 "top_p": 0.9,
                 "top_k": 50
             }
-
         elif model_id.startswith('amazon.titan'):
-            # Titan models (Amazon format)
             request_body = {
                 "inputText": prompt,
                 "textGenerationConfig": {
@@ -371,11 +263,9 @@ def invoke_bedrock_model(model_id: str, prompt: str) -> Dict[str, Any]:
                     "stopSequences": []
                 }
             }
-
         else:
             raise ValueError(f"Unsupported model: {model_id}")
 
-        # Invoke model
         response = bedrock_runtime.invoke_model(
             modelId=model_id,
             body=json.dumps(request_body),
@@ -384,11 +274,7 @@ def invoke_bedrock_model(model_id: str, prompt: str) -> Dict[str, Any]:
         )
 
         response_body = json.loads(response['body'].read())
-
-        # Normalize response format
-        normalized = normalize_response(model_id, response_body)
-
-        return normalized
+        return normalize_response(model_id, response_body)
 
     except Exception as e:
         print(f"Error invoking {model_id}: {str(e)}")
@@ -396,75 +282,35 @@ def invoke_bedrock_model(model_id: str, prompt: str) -> Dict[str, Any]:
 
 
 def normalize_response(model_id: str, response_body: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Normalize different model response formats to a common structure
-
-    Args:
-        model_id: Model identifier
-        response_body: Raw response from model
-
-    Returns:
-        Normalized response with 'content' field
-    """
+    """Normalize different model response formats to a common structure"""
     if model_id.startswith('anthropic.'):
-        # Claude format - already normalized
         return response_body
-
     elif model_id.startswith('meta.llama'):
-        # Llama format
         return {
-            'content': [{
-                'text': response_body.get('generation', '')
-            }],
+            'content': [{'text': response_body.get('generation', '')}],
             'usage': response_body.get('generation_token_count', {})
         }
-
     elif model_id.startswith('mistral.'):
-        # Mistral format
         outputs = response_body.get('outputs', [])
         text = outputs[0].get('text', '') if outputs else ''
-        return {
-            'content': [{'text': text}],
-            'usage': {}
-        }
-
+        return {'content': [{'text': text}], 'usage': {}}
     elif model_id.startswith('amazon.titan'):
-        # Titan format
         results = response_body.get('results', [])
         text = results[0].get('outputText', '') if results else ''
-        return {
-            'content': [{'text': text}],
-            'usage': {}
-        }
-
+        return {'content': [{'text': text}], 'usage': {}}
     else:
-        # Unknown format - try to extract text field
-        return {
-            'content': [{'text': str(response_body)}],
-            'usage': {}
-        }
+        return {'content': [{'text': str(response_body)}], 'usage': {}}
 
 
 def parse_claude_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Parse Claude response and extract JSON
-
-    Args:
-        response_data: Raw response from Claude
-
-    Returns:
-        Parsed response dict
-    """
+    """Parse Claude response and extract JSON"""
     try:
-        # Extract text content
         content = response_data.get('content', [])
         if not content:
             raise ValueError("Empty response from Claude")
 
         text = content[0].get('text', '')
 
-        # Try to parse as JSON
-        # Claude might wrap JSON in markdown code blocks
         if '```json' in text:
             text = text.split('```json')[1].split('```')[0].strip()
         elif '```' in text:
@@ -472,11 +318,9 @@ def parse_claude_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
 
         parsed = json.loads(text)
 
-        # Validate required fields
         if 'response_text' not in parsed or 'confidence_score' not in parsed:
             raise ValueError("Missing required fields in response")
 
-        # Ensure confidence is in valid range
         confidence = float(parsed['confidence_score'])
         parsed['confidence_score'] = max(0.0, min(1.0, confidence))
 
@@ -484,7 +328,6 @@ def parse_claude_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
 
     except json.JSONDecodeError as e:
         print(f"JSON parse error: {str(e)}")
-        # Return default response
         return {
             'response_text': "We have received your email and will respond shortly.",
             'confidence_score': 0.3,
@@ -503,184 +346,19 @@ def parse_claude_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
-def build_evaluation_prompt(
-    email_body: str,
-    response_text: str,
-    intent: str,
-    rag_documents: List[Dict[str, Any]]
-) -> str:
-    """Build a task-type-aware evaluation prompt for the judge model."""
-    intent_key = intent.lower().strip()
-    criteria = TASK_TYPE_CRITERIA.get(intent_key)
-    if not criteria:
-        for key in TASK_TYPE_CRITERIA:
-            if key in intent_key or intent_key in key:
-                criteria = TASK_TYPE_CRITERIA[key]
-                break
-    if not criteria:
-        criteria = TASK_TYPE_CRITERIA['inquiry']
-
-    criteria_text = "\n".join(f"  {i+1}. {c}" for i, c in enumerate(criteria))
-
-    rag_context = "\n\n".join([
-        f"[Reference {i+1}] {doc.get('content', '')[:300]}"
-        for i, doc in enumerate(rag_documents[:3])
-    ]) if rag_documents else "No reference documents."
-
-    return f"""You are an expert insurance AI quality evaluator. Evaluate the accuracy and quality of the AI-generated response below.
-
-CUSTOMER EMAIL:
-{email_body}
-
-DETECTED INTENT / TASK TYPE: {intent}
-
-KNOWLEDGE BASE REFERENCES:
-{rag_context}
-
-AI-GENERATED RESPONSE TO EVALUATE:
-{response_text}
-
-TASK-SPECIFIC ACCURACY CRITERIA for "{intent}":
-{criteria_text}
-
-Score each dimension 0.0–1.0:
-- accuracy_score: Factual accuracy given the knowledge base
-- task_accuracy_score: Satisfies the task-specific criteria above
-- compliance_score: Follows insurance compliance (disclaimers, no unverified guarantees)
-- coherence_score: Clear, professional, well-structured
-- overall_quality_score: Holistic quality
-
-List any specific issues found.
-
-REQUIRED OUTPUT (JSON only, no extra text):
-{{
-    "accuracy_score": 0.0,
-    "task_accuracy_score": 0.0,
-    "compliance_score": 0.0,
-    "coherence_score": 0.0,
-    "overall_quality_score": 0.0,
-    "issues": [],
-    "reasoning": "brief explanation"
-}}"""
-
-
-def evaluate_response(
-    email_body: str,
-    response_text: str,
-    intent: str,
-    rag_documents: List[Dict[str, Any]],
-    primary_model_id: str
-) -> Dict[str, Any]:
-    """
-    Invoke a separate evaluator model to score the generated response.
-
-    Always uses a model different from the primary response model to provide
-    an independent quality signal per task type.
-    """
-    evaluator_id = EVALUATOR_MODEL_ID
-    # Guarantee evaluator != primary
-    if evaluator_id == primary_model_id:
-        evaluator_id = (
-            'anthropic.claude-3-haiku-20240307-v1:0'
-            if not primary_model_id.startswith('anthropic.')
-            else 'mistral.mistral-7b-instruct-v0:2'
-        )
-
-    print(f"Evaluating response with {evaluator_id} (primary was {primary_model_id})")
-
-    try:
-        prompt = build_evaluation_prompt(email_body, response_text, intent, rag_documents)
-        eval_start = datetime.utcnow()
-        raw = invoke_bedrock_model(evaluator_id, prompt)
-        eval_latency_ms = (datetime.utcnow() - eval_start).total_seconds() * 1000
-
-        text = raw.get('content', [{}])[0].get('text', '{}')
-        if '```json' in text:
-            text = text.split('```json')[1].split('```')[0].strip()
-        elif '```' in text:
-            text = text.split('```')[1].split('```')[0].strip()
-
-        eval_result = json.loads(text)
-        eval_result['evaluator_model'] = evaluator_id
-        eval_result['eval_latency_ms'] = round(eval_latency_ms, 2)
-        print(f"Evaluation complete — overall_quality={eval_result.get('overall_quality_score')}, "
-              f"task_accuracy={eval_result.get('task_accuracy_score')}")
-        return eval_result
-
-    except Exception as e:
-        print(f"Evaluation error: {e}")
-        return {
-            'accuracy_score': None,
-            'task_accuracy_score': None,
-            'compliance_score': None,
-            'coherence_score': None,
-            'overall_quality_score': None,
-            'issues': [str(e)],
-            'reasoning': 'Evaluation failed',
-            'evaluator_model': evaluator_id,
-            'eval_error': str(e)
-        }
-
-
-def store_evaluation_metrics(
-    task_type: str,
-    model_id: str,
-    latency_ms: float,
-    confidence_score: float,
-    evaluation: Dict[str, Any]
-) -> None:
-    """
-    Write Claude's evaluation scores for the primary model into MODEL_METRICS_TABLE_NAME.
-
-    Schema: PK=task_type, SK=model_id#timestamp  (matches classify_intent table layout)
-    """
-    if not model_metrics_table:
-        print("MODEL_METRICS_TABLE_NAME not set — skipping metrics storage")
-        return
-    try:
-        from decimal import Decimal
-        timestamp = datetime.utcnow().isoformat() + 'Z'
-        item = {
-            'task_type': task_type,
-            'model_timestamp': f"{model_id}#{timestamp}",
-            'model_id': model_id,
-            'model_name': model_id.split('.', 1)[-1],   # e.g. "mistral-7b-instruct-v0:2"
-            'latency_ms': Decimal(str(round(latency_ms, 2))),
-            'confidence_score': Decimal(str(round(confidence_score, 4))),
-            # Claude's evaluation scores
-            'eval_accuracy_score':      Decimal(str(evaluation['accuracy_score']))      if evaluation.get('accuracy_score')      is not None else None,
-            'eval_task_accuracy_score': Decimal(str(evaluation['task_accuracy_score'])) if evaluation.get('task_accuracy_score') is not None else None,
-            'eval_compliance_score':    Decimal(str(evaluation['compliance_score']))    if evaluation.get('compliance_score')    is not None else None,
-            'eval_coherence_score':     Decimal(str(evaluation['coherence_score']))     if evaluation.get('coherence_score')     is not None else None,
-            'eval_overall_quality':     Decimal(str(evaluation['overall_quality_score'])) if evaluation.get('overall_quality_score') is not None else None,
-            'evaluator_model': evaluation.get('evaluator_model', ''),
-            'eval_issues': evaluation.get('issues', []),
-            'eval_reasoning': (evaluation.get('reasoning') or '')[:500],
-            'success': not bool(evaluation.get('eval_error')),
-            'timestamp': timestamp,
-        }
-        # Remove None values (DynamoDB rejects them)
-        item = {k: v for k, v in item.items() if v is not None}
-        model_metrics_table.put_item(Item=item)
-        print(f"✓ Stored evaluation metrics for {model_id} (task={task_type})")
-    except Exception as e:
-        print(f"✗ Error storing evaluation metrics: {e}")
-
-
 def update_email_record(email_id: str, result: Dict[str, Any], confidence_level: str) -> None:
-    """Update email record in DynamoDB with response data and evaluation scores."""
+    """Update email record in DynamoDB with response data."""
     try:
-        evaluation = result.get('evaluation', {})
         email_table.update_item(
             Key={'email_id': email_id},
             UpdateExpression=(
                 'SET response_text = :text, confidence_score = :score, '
                 'confidence_level = :level, processing_status = :status, '
-                'action = :action, response_timestamp = :ts, '
-                'eval_accuracy = :ea, eval_task_accuracy = :eta, '
-                'eval_compliance = :ec, eval_overall = :eo, '
-                'evaluator_model = :em'
+                '#action_attr = :action, response_timestamp = :ts'
             ),
+            ExpressionAttributeNames={
+                '#action_attr': 'action',  # 'action' is a DynamoDB reserved keyword
+            },
             ExpressionAttributeValues={
                 ':text': result['response_text'],
                 ':score': str(result['confidence_score']),
@@ -688,11 +366,6 @@ def update_email_record(email_id: str, result: Dict[str, Any], confidence_level:
                 ':status': 'completed',
                 ':action': result['action'],
                 ':ts': result['timestamp'],
-                ':ea': str(evaluation.get('accuracy_score', '')),
-                ':eta': str(evaluation.get('task_accuracy_score', '')),
-                ':ec': str(evaluation.get('compliance_score', '')),
-                ':eo': str(evaluation.get('overall_quality_score', '')),
-                ':em': evaluation.get('evaluator_model', ''),
             }
         )
         print(f"Updated email record: {email_id}")
