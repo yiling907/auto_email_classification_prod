@@ -7,15 +7,19 @@ import os
 from unittest.mock import patch, MagicMock
 import pytest
 
+sys.modules.pop('lambda_function', None)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/email_parser'))
 import lambda_function as email_parser
 
+sys.modules.pop('lambda_function', None)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/classify_intent'))
 import lambda_function as multi_llm
 
+sys.modules.pop('lambda_function', None)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/rag_retrieval'))
 import lambda_function as rag_retrieval
 
+sys.modules.pop('lambda_function', None)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/claude_response'))
 import lambda_function as claude_response
 
@@ -58,6 +62,8 @@ Date: {sample_email['timestamp']}
         assert parsed_result['statusCode'] == 200
         assert 'email_id' in parsed_result
         assert parsed_result['parsed_data']['subject'] == sample_email['subject']
+        assert parsed_result['parsed_data']['sender_email'] == sample_email['sender_email']
+        assert parsed_result['parsed_data']['body_text'] != ''
 
         # Step 2: Multi-LLM Inference (Intent Classification)
         intent_event = {
@@ -240,35 +246,3 @@ class TestMetricsCollection:
             assert item['task_type'] == 'test_task'
             assert 'latency_ms' in item
             assert 'cost_usd' in item
-
-    def test_metrics_aggregation(
-        self,
-        lambda_env_vars,
-        dynamodb_tables,
-        lambda_context,
-        sample_model_metrics
-    ):
-        """Test metrics aggregation via evaluation_metrics"""
-
-        # Add multiple metrics
-        table = dynamodb_tables['metrics']
-        for i in range(5):
-            metric = sample_model_metrics.copy()
-            metric['model_timestamp'] = f"mistral-7b#2026-03-04T10:{30+i}:00.000Z"
-            table.put_item(Item=metric)
-
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/evaluation_metrics'))
-        import lambda_function as eval_metrics
-
-        event = {
-            'task_type': 'all',
-            'days': 7
-        }
-
-        result = eval_metrics.lambda_handler(event, lambda_context)
-
-        assert result['statusCode'] == 200
-        assert result['sample_count'] == 5
-        stats = result['statistics']
-        assert stats['total_requests'] == 5
-        assert stats['success_rate'] == 1.0

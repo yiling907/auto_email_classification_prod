@@ -8,7 +8,8 @@ from decimal import Decimal
 from unittest.mock import Mock, patch, MagicMock
 import pytest
 
-# Add lambda directory to path
+# Clear any cached lambda_function module from other test files
+sys.modules.pop('lambda_function', None)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/classify_intent'))
 import lambda_function
 

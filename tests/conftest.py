@@ -117,13 +117,20 @@ def s3_buckets():
 
 @pytest.fixture
 def sample_email():
-    """Sample email data for testing"""
+    """Sample email data for testing — field names match emails.jsonl schema."""
     return {
+        'sender_email': 'customer@example.com',
+        'sender_name': 'Test Customer',
+        'mailbox': 'support@demohealth.ie',
+        'subject': 'Question about my claim status',
+        'body_text': 'I submitted a claim last week for POL-IE-123456. What is the status?',
+        'body_html': '',
+        'received_at': '2026-03-04T10:30:00Z',
+        # Keep legacy aliases so integration test raw-email construction works
         'from_address': 'customer@example.com',
-        'to_address': 'support@insuremail.com',
-        'subject': 'Question about my claim',
-        'body': 'I submitted a claim last week for policy #12345. What is the status?',
-        'timestamp': '2026-03-04T10:30:00Z'
+        'to_address': 'support@demohealth.ie',
+        'body': 'I submitted a claim last week for POL-IE-123456. What is the status?',
+        'timestamp': '2026-03-04T10:30:00Z',
     }
 
 
