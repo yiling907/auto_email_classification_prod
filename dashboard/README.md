@@ -2,33 +2,6 @@
 
 Modern React-based dashboard for monitoring and managing the InsureMail AI email processing system.
 
-## Features
-
-### 📊 Dashboard Overview
-- Total emails processed
-- Average confidence score
-- Auto-response rate
-- Confidence distribution visualization
-- Recent emails list
-
-### 📧 Email Management
-- Browse all processed emails
-- Filter by confidence level
-- View detailed email trace
-- See AI-generated responses
-- Track processing status
-
-### 📈 Model Performance
-- Compare multiple LLM models
-- View latency, cost, and success rates
-- Interactive charts and metrics
-- Detailed statistics table
-
-### 🔍 RAG Effectiveness
-- Knowledge base statistics
-- Document type distribution
-- System status monitoring
-
 ## Technology Stack
 
 - **Frontend Framework**: React 18
@@ -37,6 +10,50 @@ Modern React-based dashboard for monitoring and managing the InsureMail AI email
 - **Charts**: Recharts
 - **HTTP Client**: Axios
 - **Styling**: Custom CSS
+
+## Features
+
+### 1. Dashboard Overview
+- Aggregate stats (total emails, average confidence, auto-response rate)
+- Confidence distribution chart
+- Model Settings board — toggle between inference models at runtime
+- Recent emails list
+
+### 2. Email Processing History
+- Browse all processed emails
+- Filter by confidence level, action, and processing status
+- View sender, intent, urgency, sentiment, and route team per email
+
+### 3. Email Detail
+- All 37 DynamoDB fields displayed in 7 sections
+- Editable LLM response textarea
+- Save Draft and Send buttons to update and dispatch responses
+
+### 4. Model Performance
+- 4 tabs: Overview (latency/cost charts), Classification Accuracy (per-field scores + radar), Response Quality (eval dimensions + radar), All Records table
+- Compare multiple LLM models side by side
+
+### 5. RAG Knowledge Base
+- 4 stat cards: total chunks, source files, avg chunks/file, status
+- Searchable file list table showing all ingested documents
+
+### 6. Evaluations
+- Bedrock evaluation job results
+- Claude-as-judge scores across quality dimensions
+
+## API Endpoints
+
+The dashboard consumes the following API endpoints:
+
+- `GET /api/dashboard/overview` — Dashboard statistics
+- `GET /api/emails` — List of emails (params: `confidence_level`, `action`, `processing_status`)
+- `GET /api/email/{id}` — Full email record (37 fields)
+- `POST /api/email/{id}` — Update `llm_response` field
+- `POST /api/email/{id}/send` — Trigger email sender Lambda
+- `GET /api/metrics/models` — Model performance metrics
+- `GET /api/metrics/rag` — RAG knowledge base statistics
+- `GET /api/settings` — Current model settings
+- `POST /api/settings` — Update model settings
 
 ## Getting Started
 
@@ -149,45 +166,9 @@ dashboard/frontend/
 │       ├── EmailsList.jsx    # Email list page
 │       ├── EmailDetail.jsx   # Email detail page
 │       ├── ModelMetrics.jsx  # Model comparison page
-│       └── RAGMetrics.jsx    # RAG statistics page
+│       ├── RAGMetrics.jsx    # RAG statistics page
+│       └── Evaluations.jsx   # Evaluations page
 └── dist/                  # Build output (gitignored)
-```
-
-## API Endpoints Used
-
-The dashboard consumes the following API endpoints:
-
-- `GET /api/dashboard/overview` - Dashboard statistics
-- `GET /api/emails` - List of emails
-- `GET /api/emails?confidence_level={level}` - Filtered emails
-- `GET /api/email/{emailId}` - Email details
-- `GET /api/metrics/models` - Model performance metrics
-- `GET /api/metrics/rag` - RAG effectiveness metrics
-
-## Customization
-
-### Adding New Pages
-
-1. Create component in `src/pages/`
-2. Add route in `src/App.jsx`
-3. Add navigation link in navbar
-
-### Modifying Styles
-
-- Global styles: `src/index.css`
-- App-wide styles: `src/App.css`
-- Component-specific: Inline or separate CSS file
-
-### Adding Charts
-
-Using Recharts library:
-
-```jsx
-import { BarChart, Bar, XAxis, YAxis } from 'recharts'
-
-<BarChart data={data}>
-  <Bar dataKey="value" fill="#667eea" />
-</BarChart>
 ```
 
 ## Troubleshooting
@@ -213,22 +194,6 @@ Common issues:
 - Node version mismatch (use Node 18+)
 - Missing dependencies (run `npm install`)
 - Syntax errors in code
-
-## Performance Optimization
-
-- React.memo for expensive components
-- Lazy loading for routes
-- Image optimization
-- Code splitting with Vite
-- CDN delivery (CloudFront)
-
-## Security
-
-- No sensitive data in frontend code
-- API authentication (add when needed)
-- HTTPS only in production
-- CSP headers recommended
-- Regular dependency updates
 
 ## License
 

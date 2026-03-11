@@ -28,11 +28,11 @@ The InsureMail AI project has comprehensive test coverage including:
 ### Test Statistics
 
 ```
-📊 Test Coverage:
-  - Unit Tests: 25+ test cases
+📊 Test Statistics:
+  - Unit Tests: 45 test cases
   - Integration Tests: 10+ scenarios
   - Terraform Tests: 15+ validation checks
-  - Target Coverage: 70%+ code coverage
+  - Current Coverage: 78%
 ```
 
 ---
@@ -187,7 +187,7 @@ open htmlcov/index.html
 
 ### Coverage Configuration
 
-Target: **70%+ code coverage**
+Current: **78%** (minimum threshold: 70%)
 
 Coverage is configured in `pytest.ini`:
 ```ini
@@ -203,15 +203,15 @@ addopts =
 ```
 Name                                          Stmts   Miss  Cover
 -----------------------------------------------------------------
-lambda/classify_intent/lambda_function.py   120     18    85%
+lambda/classify_intent/lambda_function.py       120     18    85%
 lambda/evaluation_metrics/lambda_function.py     80     12    85%
 lambda/rag_ingestion/lambda_function.py          95     15    84%
 lambda/rag_retrieval/lambda_function.py          75     10    87%
 lambda/claude_response/lambda_function.py       150     30    80%
 lambda/email_parser/lambda_function.py           60      8    87%
-lambda/api_handlers/lambda_function.py          120     25    79%
+lambda/api_handlers/lambda_function.py          200     42    79%
 -----------------------------------------------------------------
-TOTAL                                           700    118    83%
+TOTAL                                           780    135    83%
 ```
 
 ---

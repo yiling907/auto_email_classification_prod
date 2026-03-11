@@ -1,11 +1,11 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-# InsureMail AI - Knowledge Base Upload Script
+BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
-echo "========================================="
-echo "InsureMail AI - Knowledge Base Upload"
-echo "========================================="
+echo -e "${BLUE}══════════════════════════════════════${NC}"
+echo -e "${BLUE}   InsureMail AI — Knowledge Base Upload${NC}"
+echo -e "${BLUE}══════════════════════════════════════${NC}"
 echo ""
 
 # Get project root
@@ -13,11 +13,11 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Check if AWS CLI is configured
 if ! aws sts get-caller-identity &> /dev/null; then
-    echo "ERROR: AWS CLI is not configured or credentials are invalid"
+    echo -e "${RED}ERROR: AWS CLI is not configured or credentials are invalid${NC}"
     exit 1
 fi
 
-echo "✓ AWS CLI configured"
+echo -e "${GREEN}✓ AWS CLI configured${NC}"
 echo ""
 
 # Get bucket name from Terraform
@@ -26,7 +26,7 @@ cd "$PROJECT_ROOT/terraform"
 KB_BUCKET=$(terraform output -raw knowledge_base_bucket_name 2>/dev/null)
 
 if [ -z "$KB_BUCKET" ] || [ "$KB_BUCKET" = "" ]; then
-    echo "ERROR: Could not get knowledge base bucket name from Terraform"
+    echo -e "${RED}ERROR: Could not get knowledge base bucket name from Terraform${NC}"
     echo "Please run 'terraform apply' first"
     exit 1
 fi
@@ -34,20 +34,20 @@ fi
 echo "Knowledge Base Bucket: $KB_BUCKET"
 echo ""
 
-# Show current knowledge_base
-echo "Current knowledge base knowledge_base:"
+# Show current documents
+echo "Current documents:"
 aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive 2>/dev/null || echo "  (none yet)"
 echo ""
 
 # Upload options
-echo "========================================="
-echo "Upload Options"
-echo "========================================="
+echo -e "${BLUE}══════════════════════════════════════${NC}"
+echo -e "${BLUE}   Upload Options${NC}"
+echo -e "${BLUE}══════════════════════════════════════${NC}"
 echo ""
-echo "1) Upload test/sample knowledge_base (from tests/test_data/knowledge_base/)"
+echo "1) Upload documents (from tests/test_data/knowledge_base/)"
 echo "2) Upload custom document(s)"
-echo "3) List current knowledge_base"
-echo "4) Delete all knowledge_base"
+echo "3) List current documents"
+echo "4) Delete all documents"
 echo "5) Exit"
 echo ""
 read -p "Select option [1-5]: " OPTION
@@ -55,12 +55,12 @@ read -p "Select option [1-5]: " OPTION
 case $OPTION in
     1)
         echo ""
-        echo "Uploading test knowledge_base..."
+        echo "Uploading documents..."
         echo ""
 
         # Check if test data exists
         if [ ! -d "$PROJECT_ROOT/tests/test_data/knowledge_base" ]; then
-            echo "ERROR: Test data directory not found"
+            echo -e "${RED}ERROR: Test data directory not found${NC}"
             exit 1
         fi
 
@@ -70,12 +70,14 @@ case $OPTION in
             --exclude ".gitkeep"
 
         echo ""
-        echo "✓ Test knowledge_base uploaded"
+        echo -e "${GREEN}✓ Documents uploaded${NC}"
         echo ""
         echo "Uploaded files:"
         aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive
+
         echo ""
-        echo "Note: RAG ingestion Lambda will automatically process these knowledge_base"
+        aws lambda invoke --function-name insuremail-ai-dev-rag-ingestion --payload '{}' /tmp/rag_invoke_out.json >/dev/null
+        echo "RAG ingestion triggered"
         echo "Check CloudWatch Logs: /aws/lambda/insuremail-ai-dev-rag-ingestion"
         ;;
 
@@ -84,7 +86,7 @@ case $OPTION in
         read -p "Enter path to file or directory: " UPLOAD_PATH
 
         if [ ! -e "$UPLOAD_PATH" ]; then
-            echo "ERROR: File or directory not found: $UPLOAD_PATH"
+            echo -e "${RED}ERROR: File or directory not found: $UPLOAD_PATH${NC}"
             exit 1
         fi
 
@@ -100,52 +102,61 @@ case $OPTION in
         fi
 
         echo ""
-        echo "✓ Upload complete"
+        echo -e "${GREEN}✓ Upload complete${NC}"
         echo ""
         echo "Uploaded files:"
         aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive
+
+        echo ""
+        aws lambda invoke --function-name insuremail-ai-dev-rag-ingestion --payload '{}' /tmp/rag_invoke_out.json >/dev/null
+        echo "RAG ingestion triggered"
         ;;
 
     3)
         echo ""
-        echo "Current knowledge_base in knowledge base:"
+        echo "Current documents in knowledge base:"
         aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive
         echo ""
 
-        # Count knowledge_base
+        # Count documents
         DOC_COUNT=$(aws s3 ls "s3://$KB_BUCKET/knowledge_base/" --recursive | wc -l | xargs)
-        echo "Total knowledge_base: $DOC_COUNT"
+        echo "Total documents: $DOC_COUNT"
         echo ""
 
         # Check DynamoDB for processed embeddings
         TABLE_NAME=$(terraform output -raw embeddings_table_name 2>/dev/null)
-        if [ ! -z "$TABLE_NAME" ]; then
-            EMBEDDING_COUNT=$(aws dynamodb scan --table-name "$TABLE_NAME" --select "COUNT" --query "Count" --output text 2>/dev/null || echo "0")
+        if [ -n "$TABLE_NAME" ]; then
+            EMBEDDING_COUNT=$(aws dynamodb scan --table-name "$TABLE_NAME" --select COUNT --query "Count" --output text 2>/dev/null || echo "0")
             echo "Processed embeddings: $EMBEDDING_COUNT"
         fi
         ;;
 
     4)
         echo ""
-        echo "⚠ WARNING: This will delete ALL knowledge_base from the knowledge base!"
+        echo -e "${YELLOW}⚠ WARNING: This will delete ALL documents from the knowledge base!${NC}"
         read -p "Are you sure? (type 'yes' to confirm): " CONFIRM
 
         if [ "$CONFIRM" = "yes" ]; then
-            echo "Deleting all knowledge_base..."
+            echo "Deleting all documents..."
             aws s3 rm "s3://$KB_BUCKET/knowledge_base/" --recursive
-            echo "✓ All knowledge_base deleted"
+            echo -e "${GREEN}✓ All documents deleted${NC}"
 
             # Also clear DynamoDB embeddings
             read -p "Also delete processed embeddings from DynamoDB? (y/n): " DELETE_EMB
             if [ "$DELETE_EMB" = "y" ] || [ "$DELETE_EMB" = "Y" ]; then
                 TABLE_NAME=$(terraform output -raw embeddings_table_name 2>/dev/null)
-                if [ ! -z "$TABLE_NAME" ]; then
+                if [ -n "$TABLE_NAME" ]; then
                     echo "Clearing embeddings table..."
-                    # Note: This is a simple approach; for large tables use batch delete
-                    aws dynamodb scan --table-name "$TABLE_NAME" --attributes-to-get "doc_id" \
-                        --query "Items[].doc_id.S" --output text | \
-                        xargs -I {} aws dynamodb delete-item --table-name "$TABLE_NAME" --key "{\"doc_id\":{\"S\":\"{}\"}}"
-                    echo "✓ Embeddings cleared"
+                    python3 -c "
+import boto3, json
+table = boto3.resource('dynamodb').Table('$TABLE_NAME')
+items = table.scan(ProjectionExpression='doc_id')['Items']
+with table.batch_writer() as batch:
+    for item in items:
+        batch.delete_item(Key={'doc_id': item['doc_id']})
+print(f'Deleted {len(items)} embeddings')
+"
+                    echo -e "${GREEN}✓ Embeddings cleared${NC}"
                 fi
             fi
         else
@@ -159,17 +170,17 @@ case $OPTION in
         ;;
 
     *)
-        echo "Invalid option"
+        echo -e "${RED}Invalid option${NC}"
         exit 1
         ;;
 esac
 
 echo ""
-echo "========================================="
-echo "Next Steps"
-echo "========================================="
+echo -e "${BLUE}══════════════════════════════════════${NC}"
+echo -e "${BLUE}   Next Steps${NC}"
+echo -e "${BLUE}══════════════════════════════════════${NC}"
 echo ""
-echo "1. Wait ~30 seconds for Lambda to process knowledge_base"
+echo "1. Wait ~30 seconds for Lambda to process documents"
 echo "2. Check CloudWatch Logs:"
 echo "   aws logs tail /aws/lambda/insuremail-ai-dev-rag-ingestion --follow"
 echo ""
@@ -177,5 +188,5 @@ echo "3. Verify embeddings in DynamoDB:"
 echo "   aws dynamodb scan --table-name $(terraform output -raw embeddings_table_name) --select COUNT"
 echo ""
 echo "4. Test RAG retrieval:"
-echo "   Send a test email and check if relevant knowledge_base are retrieved"
+echo "   Send a test email and check if relevant documents are retrieved"
 echo ""

@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script to simulate complete email workflow for testing
 # Use this when you can't send emails via SES (e.g., Gmail to Gmail)
 
-set -e
+set -euo pipefail
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -28,11 +28,11 @@ echo -e "${GREEN}State Machine: ${STATE_MACHINE_ARN}${NC}"
 echo
 
 # Prompt for email details
-read -p "From email (default: yilinglei907@gmail.com): " FROM_EMAIL
-FROM_EMAIL=${FROM_EMAIL:-yilinglei907@gmail.com}
+read -p "From email (default: customer@example.com): " FROM_EMAIL
+FROM_EMAIL=${FROM_EMAIL:-customer@example.com}
 
-read -p "To email (default: shiyizhiya@gmail.com): " TO_EMAIL
-TO_EMAIL=${TO_EMAIL:-shiyizhiya@gmail.com}
+read -p "To email (default: support@yourdomain.com): " TO_EMAIL
+TO_EMAIL=${TO_EMAIL:-support@yourdomain.com}
 
 read -p "Subject (default: Question about my claim): " SUBJECT
 SUBJECT=${SUBJECT:-Question about my claim}

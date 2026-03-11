@@ -1,5 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
+
+KNOWN_BUCKET="insuremail-ai-dashboard"
+KNOWN_CF_DIST="E2ADYLCS9LNMWF"
 
 # InsureMail AI - Dashboard Deployment Script
 
@@ -49,6 +52,7 @@ deploy_to_existing_bucket() {
     echo ""
 
     read -p "Enter S3 bucket name: " BUCKET_NAME
+    BUCKET_NAME=${BUCKET_NAME:-$KNOWN_BUCKET}
 
     if [ -z "$BUCKET_NAME" ]; then
         echo "ERROR: Bucket name is required"
@@ -138,6 +142,13 @@ EOF
     fi
 
     echo "✓ Files uploaded"
+
+    echo ""
+    echo "Invalidating CloudFront cache (/index.html)..."
+    aws cloudfront create-invalidation \
+        --distribution-id "$KNOWN_CF_DIST" \
+        --paths "/index.html" \
+        --query 'Invalidation.Id' --output text 2>/dev/null || true
 
     # Get website URL
     WEBSITE_URL="http://$BUCKET_NAME.s3-website-$AWS_REGION.amazonaws.com"

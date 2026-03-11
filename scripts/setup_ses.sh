@@ -1,11 +1,13 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
+
+BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
 # InsureMail AI - SES Setup Helper Script
 
-echo "========================================="
-echo "InsureMail AI - SES Setup"
-echo "========================================="
+echo -e "${BLUE}══════════════════════════════════════${NC}"
+echo -e "${BLUE}   InsureMail AI — SES Setup${NC}"
+echo -e "${BLUE}══════════════════════════════════════${NC}"
 echo ""
 
 # Get project root
@@ -13,18 +15,18 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Check if AWS CLI is configured
 if ! aws sts get-caller-identity &> /dev/null; then
-    echo "ERROR: AWS CLI is not configured or credentials are invalid"
+    echo -e "${RED}ERROR: AWS CLI is not configured or credentials are invalid${NC}"
     exit 1
 fi
 
-echo "✓ AWS CLI configured"
+echo -e "${GREEN}✓ AWS CLI configured${NC}"
 echo ""
 
 # Prompt for sender email
 read -p "Enter sender email address (e.g., support@yourdomain.com): " SENDER_EMAIL
 
 if [ -z "$SENDER_EMAIL" ]; then
-    echo "ERROR: Sender email is required"
+    echo -e "${RED}ERROR: Sender email is required${NC}"
     exit 1
 fi
 
@@ -36,7 +38,7 @@ echo ""
 aws ses verify-email-identity --email-address "$SENDER_EMAIL" 2>/dev/null
 
 if [ $? -eq 0 ]; then
-    echo "✓ Verification email sent to $SENDER_EMAIL"
+    echo -e "${GREEN}✓ Verification email sent to $SENDER_EMAIL${NC}"
     echo ""
     echo "IMPORTANT: Check your inbox and click the verification link!"
     echo "You must verify the email before you can send emails."
@@ -61,7 +63,7 @@ while [ $WAITED -lt $MAX_WAIT ]; do
         --output text 2>/dev/null || echo "Pending")
 
     if [ "$STATUS" = "Success" ]; then
-        echo "✓ Email verified successfully!"
+        echo -e "${GREEN}✓ Email verified successfully!${NC}"
         VERIFIED=true
         break
     elif [ "$STATUS" = "Failed" ]; then
@@ -78,7 +80,7 @@ done
 echo ""
 
 if [ "$VERIFIED" = false ]; then
-    echo "⚠ Verification still pending. Continue anyway? (y/n)"
+    echo -e "${YELLOW}⚠ Verification still pending. Continue anyway? (y/n)${NC}"
     read -p "> " CONTINUE
     if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
         echo "Setup cancelled. Run this script again after email verification."
@@ -102,14 +104,14 @@ if [ -f "$TFVARS_FILE" ]; then
         if grep -q "sender_email" "$TFVARS_FILE"; then
             # Update existing
             sed -i.bak "s|sender_email.*|sender_email = \"$SENDER_EMAIL\"|" "$TFVARS_FILE"
-            echo "✓ Updated sender_email in terraform.tfvars"
+            echo -e "${GREEN}✓ Updated sender_email in terraform.tfvars${NC}"
         else
             # Add new
             echo "" >> "$TFVARS_FILE"
             echo "# SES Configuration" >> "$TFVARS_FILE"
             echo "sender_email = \"$SENDER_EMAIL\"" >> "$TFVARS_FILE"
             echo "sender_name = \"InsureMail AI Support\"" >> "$TFVARS_FILE"
-            echo "✓ Added sender_email to terraform.tfvars"
+            echo -e "${GREEN}✓ Added sender_email to terraform.tfvars${NC}"
         fi
     fi
 else
@@ -128,7 +130,7 @@ sender_name  = "InsureMail AI Support"
 # Optional: Specify which emails to receive (empty = all)
 ses_receipt_recipients = []
 EOF
-    echo "✓ Created terraform.tfvars with sender_email"
+    echo -e "${GREEN}✓ Created terraform.tfvars with sender_email${NC}"
 fi
 
 # Show SES status
@@ -147,7 +149,7 @@ echo "  - Sent in last 24 hours: $SENT_24"
 echo ""
 
 if [ $(echo "$MAX_24 < 1000" | bc) -eq 1 ]; then
-    echo "⚠ WARNING: SES is in SANDBOX mode"
+    echo -e "${YELLOW}⚠ WARNING: SES is in SANDBOX mode${NC}"
     echo ""
     echo "Sandbox limitations:"
     echo "  - Can only send to verified email addresses"
@@ -163,9 +165,9 @@ fi
 
 # Next steps
 echo ""
-echo "========================================="
-echo "✓ SES Setup Complete!"
-echo "========================================="
+echo -e "${BLUE}══════════════════════════════════════${NC}"
+echo -e "${GREEN}✓ SES Setup Complete!${NC}"
+echo -e "${BLUE}══════════════════════════════════════${NC}"
 echo ""
 echo "Sender email: $SENDER_EMAIL"
 echo ""
