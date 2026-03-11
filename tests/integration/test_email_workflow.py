@@ -115,38 +115,37 @@ Date: {sample_email['timestamp']}
             assert rag_result['statusCode'] == 200
             assert 'retrieved_documents' in rag_result
 
-        # Step 4: Response Generation
+        # Step 4: Response Generation + Evaluation
+        # Call 1: mistral drafts response; Call 2: llama evaluates across 8 dimensions
+        high_eval = json.dumps({
+            'faithfulness': 0.9, 'answer_relevance': 0.9, 'context_precision': 0.9,
+            'context_recall': 0.9, 'completeness': 0.9, 'helpfulness': 0.9,
+            'safety_compliance': 0.9, 'no_harmful_advice': 0.9,
+        })
+        response_side_effects = [
+            # Generation (mistral) — outputs format
+            {'body': MagicMock(read=lambda: json.dumps({'outputs': [{'text': json.dumps({
+                'response_text': 'Thank you for your inquiry about your claim.',
+                'reference_ids': ['policy_001'],
+            })}]}).encode('utf-8'))},
+            # Evaluation (llama) — generation format
+            {'body': MagicMock(read=lambda: json.dumps({
+                'generation': high_eval,
+                'prompt_token_count': 300, 'generation_token_count': 60,
+            }).encode('utf-8'))},
+        ]
+
         response_event = {
             'email_id': parsed_result['email_id'],
-            'email_body': sample_email['body'],
+            'email_body': sample_email['body_text'],
             'subject': sample_email['subject'],
-            'entities': {},
-            'intent': {'results': [{'output_text': 'claim_inquiry', 'success': True}]},
             'rag_documents': rag_result['retrieved_documents'],
-            'crm_validation': {'policy_exists': True},
-            'fraud_score': {'risk_level': 'low'}
+            'classification': {'customer_intent': 'claim_status'},
+            'crm_validation': {'policy_exists': True, 'customer_id': 'CUST-001'},
+            'fraud_score': {'risk_level': 'low', 'risk_score': 0.1},
         }
 
-        mock_claude_response = {
-            'body': MagicMock()
-        }
-        mock_claude_response['body'].read.return_value = json.dumps({
-            'outputs': [{
-                'text': json.dumps({
-                    'response_text': 'Thank you for your inquiry about your claim.',
-                    'confidence_score': 0.85,
-                    'reference_ids': ['policy_001'],
-                    'compliance_checks': {
-                        'contains_disclaimer': True,
-                        'factually_accurate': True,
-                        'references_policy': True
-                    },
-                    'reasoning': 'Based on policy documents'
-                })
-            }]
-        }).encode('utf-8')
-
-        with patch.object(claude_response.bedrock_runtime, 'invoke_model', return_value=mock_claude_response):
+        with patch.object(claude_response.bedrock_runtime, 'invoke_model', side_effect=response_side_effects):
             final_result = claude_response.lambda_handler(response_event, lambda_context)
 
             assert final_result['statusCode'] == 200
@@ -161,39 +160,39 @@ Date: {sample_email['timestamp']}
         lambda_context,
         sample_email
     ):
-        """Test workflow when confidence is low (should escalate)"""
+        """Test workflow when evaluation scores are low (should escalate)"""
+
+        low_eval = json.dumps({
+            'faithfulness': 0.2, 'answer_relevance': 0.2, 'context_precision': 0.2,
+            'context_recall': 0.2, 'completeness': 0.2, 'helpfulness': 0.2,
+            'safety_compliance': 0.2, 'no_harmful_advice': 0.2,
+        })
+        side_effects = [
+            {'body': MagicMock(read=lambda: json.dumps({'outputs': [{'text': json.dumps({
+                'response_text': 'We need more information.',
+                'reference_ids': [],
+            })}]}).encode('utf-8'))},
+            {'body': MagicMock(read=lambda: json.dumps({
+                'generation': low_eval,
+                'prompt_token_count': 200, 'generation_token_count': 40,
+            }).encode('utf-8'))},
+        ]
 
         response_event = {
-            'email_body': sample_email['body'],
+            'email_body': sample_email['body_text'],
             'subject': sample_email['subject'],
-            'entities': {},
-            'intent': {'results': [{'output_text': 'unknown', 'success': True}]},
             'rag_documents': [],
+            'classification': {'customer_intent': 'other'},
             'crm_validation': {},
-            'fraud_score': {'risk_level': 'high'}
+            'fraud_score': {'risk_level': 'high', 'risk_score': 0.85},
         }
 
-        mock_claude_response = {
-            'body': MagicMock()
-        }
-        mock_claude_response['body'].read.return_value = json.dumps({
-            'outputs': [{
-                'text': json.dumps({
-                    'response_text': 'We need more information.',
-                    'confidence_score': 0.3,  # Low confidence
-                    'reference_ids': [],
-                    'compliance_checks': {},
-                    'reasoning': 'Insufficient information'
-                })
-            }]
-        }).encode('utf-8')
-
-        with patch.object(claude_response.bedrock_runtime, 'invoke_model', return_value=mock_claude_response):
+        with patch.object(claude_response.bedrock_runtime, 'invoke_model', side_effect=side_effects):
             result = claude_response.lambda_handler(response_event, lambda_context)
 
             assert result['statusCode'] == 200
             assert result['confidence_score'] < 0.5
-            assert result['action'] == 'escalate'  # Should escalate, not auto-respond
+            assert result['action'] == 'escalate'
 
     def test_workflow_error_recovery(
         self,
@@ -203,21 +202,18 @@ Date: {sample_email['timestamp']}
     ):
         """Test that workflow handles errors gracefully"""
 
-        # Simulate Bedrock API failure
         with patch.object(claude_response.bedrock_runtime, 'invoke_model', side_effect=Exception('API Error')):
             response_event = {
-                'email_body': sample_email['body'],
+                'email_body': sample_email['body_text'],
                 'subject': sample_email['subject'],
-                'entities': {},
-                'intent': 'unknown',
                 'rag_documents': [],
+                'classification': {},
                 'crm_validation': {},
-                'fraud_score': {}
+                'fraud_score': {},
             }
 
             result = claude_response.lambda_handler(response_event, lambda_context)
 
-            # Should return error but not crash
             assert result['statusCode'] == 500
             assert 'error' in result
             assert result['action'] == 'escalate'

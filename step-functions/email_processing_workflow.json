@@ -70,10 +70,20 @@
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
-          "Next": "ValidateCRM",
+          "Next": "SetEmptyRAG",
           "ResultPath": "$.rag_error"
         }
       ]
+    },
+    "SetEmptyRAG": {
+      "Type": "Pass",
+      "Comment": "RAG retrieval failed — use empty doc list so pipeline continues",
+      "Parameters": {
+        "retrieved_documents": [],
+        "statusCode": 200
+      },
+      "ResultPath": "$.rag_results",
+      "Next": "ValidateCRM"
     },
     "ValidateCRM": {
       "Type": "Pass",
@@ -105,14 +115,20 @@
         "email_id.$": "$.parsed_email.email_id",
         "email_body.$": "$.parsed_email.parsed_data.body_text",
         "subject.$": "$.parsed_email.parsed_data.subject",
-        "entities.$": "$.analysis[1].entities",
-        "intent.$": "$.analysis[0].intent.classification.customer_intent",
+        "classification.$": "$.analysis[0].intent.classification",
         "rag_documents.$": "$.rag_results.retrieved_documents",
         "crm_validation.$": "$.crm_validation",
         "fraud_score.$": "$.fraud_score"
       },
       "ResultPath": "$.response",
-      "Next": "DetermineAction"
+      "Next": "DetermineAction",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "HandleError",
+          "ResultPath": "$.error"
+        }
+      ]
     },
     "DetermineAction": {
       "Type": "Choice",

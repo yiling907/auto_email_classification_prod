@@ -129,7 +129,7 @@ resource "aws_lambda_function" "claude_response" {
     variables = {
       EMAIL_TABLE_NAME         = var.email_table_name
       MODEL_METRICS_TABLE_NAME = var.model_metrics_table_name
-      EVALUATOR_MODEL_ID       = "anthropic.claude-3-haiku-20240307-v1:0"
+      ACTIVE_MODEL             = "mistral-7b"
     }
   }
 
