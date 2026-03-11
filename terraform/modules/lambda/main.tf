@@ -260,41 +260,6 @@ resource "aws_cloudwatch_log_group" "gmail_imap_poller" {
   tags              = var.tags
 }
 
-# REMOVED: Email Receiver Lambda (SES → SNS → Lambda)
-# Email receiving is now handled by Gmail IMAP poller
-# Uncomment below if you want to switch back to SES receiving:
-#
-# data "archive_file" "email_receiver" {
-#   type        = "zip"
-#   source_dir  = "${local.lambda_source_path}/email_receiver"
-#   output_path = "${path.module}/builds/email_receiver.zip"
-# }
-#
-# resource "aws_lambda_function" "email_receiver" {
-#   filename         = data.archive_file.email_receiver.output_path
-#   function_name    = "${local.resource_prefix}-email-receiver"
-#   role            = var.lambda_execution_role_arn
-#   handler         = "lambda_function.lambda_handler"
-#   runtime         = var.lambda_runtime
-#   timeout         = 60
-#   memory_size     = 512
-#   source_code_hash = data.archive_file.email_receiver.output_base64sha256
-#
-#   environment {
-#     variables = {
-#       STATE_MACHINE_ARN = var.state_machine_arn
-#       EMAIL_BUCKET_NAME = var.email_bucket_name
-#     }
-#   }
-#
-#   tags = merge(var.tags, { Name = "${local.resource_prefix}-email-receiver" })
-# }
-#
-# resource "aws_cloudwatch_log_group" "email_receiver" {
-#   name              = "/aws/lambda/${aws_lambda_function.email_receiver.function_name}"
-#   retention_in_days = var.log_retention_days
-#   tags              = var.tags
-# }
 
 # Data source to package Email Sender Lambda
 data "archive_file" "email_sender" {

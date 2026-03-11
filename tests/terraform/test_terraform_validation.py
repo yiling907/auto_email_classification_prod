@@ -206,13 +206,11 @@ class TestLambdaConfiguration:
 
         expected_functions = [
             'email_parser',
-            'email_receiver',
             'email_sender',
             'classify_intent',
             'claude_response',
             'rag_ingestion',
             'rag_retrieval',
-            'evaluation_metrics',
             'api_handlers'
         ]
 

@@ -28,9 +28,3 @@ variable "tags" {
   default     = {}
 }
 
-# REMOVED (no longer needed with IMAP receiving):
-# - ses_receipt_recipients (no SES receipt rules)
-# - email_bucket_name (not used by SES module)
-# - email_bucket_arn (not used by SES module)
-# - email_receiver_lambda_arn (Lambda removed)
-# - email_receiver_lambda_name (Lambda removed)
