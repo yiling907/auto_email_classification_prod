@@ -11,6 +11,7 @@ from decimal import Decimal
 
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
+s3_client = boto3.client('s3')
 
 # Environment variables
 EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
@@ -59,6 +60,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             response = get_model_metrics(event)
         elif path == '/api/metrics/rag':
             response = get_rag_metrics()
+        elif path == '/api/metrics/evaluations':
+            response = get_evaluations()
         elif path == '/api/settings' and method == 'GET':
             response = get_settings()
         elif path == '/api/settings' and method == 'POST':
@@ -305,6 +308,84 @@ def get_model_metrics(event: Dict[str, Any]) -> Dict[str, Any]:
 
     except Exception as e:
         print(f"Error in get_model_metrics: {str(e)}")
+        raise
+
+
+def get_evaluations() -> Dict[str, Any]:
+    """Return reference eval report + bedrock/claude eval records."""
+    try:
+        # Load reference eval report from S3
+        logs_bucket = os.environ.get('LOGS_BUCKET_NAME', 'insuremail-ai-dev-logs')
+        ref_eval = {}
+        try:
+            obj = s3_client.get_object(Bucket=logs_bucket, Key='eval_reports/reference_eval_latest.json')
+            ref_eval = json.loads(obj['Body'].read())
+        except Exception as e:
+            print(f"Could not load reference eval report: {e}")
+
+        # Load bedrock/claude eval records from model_metrics table
+        records = model_metrics_table.scan().get('Items', [])
+
+        bedrock_evals = []
+        claude_evals_by_model: Dict[str, Any] = {}
+
+        for r in records:
+            tt = r.get('task_type', '')
+            if tt in ('model_evaluation', 'rag_evaluation'):
+                bedrock_evals.append({
+                    'model_name':        r.get('model_name', 'unknown'),
+                    'eval_type':         tt,
+                    'eval_status':       r.get('eval_status', 'Completed'),
+                    'score_correctness':  float(r.get('score_correctness',  0) or 0),
+                    'score_completeness': float(r.get('score_completeness', 0) or 0),
+                    'score_helpfulness':  float(r.get('score_helpfulness',  0) or 0),
+                    'score_faithfulness': float(r.get('score_faithfulness', 0) or 0),
+                    'timestamp':         r.get('timestamp'),
+                })
+            elif tt == 'response_evaluation':
+                mn = r.get('model_name', 'unknown')
+                if mn not in claude_evals_by_model:
+                    claude_evals_by_model[mn] = {
+                        'model_name': mn, 'sample_count': 0,
+                        'score_sums': {}, 'by_task': {},
+                    }
+                entry = claude_evals_by_model[mn]
+                entry['sample_count'] += 1
+                for dim, val in (r.get('eval_scores') or {}).items():
+                    entry['score_sums'][dim] = entry['score_sums'].get(dim, 0) + float(val)
+                task = r.get('intent', 'unknown')
+                if task not in entry['by_task']:
+                    entry['by_task'][task] = {'count': 0, 'sums': {}}
+                entry['by_task'][task]['count'] += 1
+                for dim, val in (r.get('eval_scores') or {}).items():
+                    entry['by_task'][task]['sums'][dim] = entry['by_task'][task]['sums'].get(dim, 0) + float(val)
+
+        claude_evals = []
+        for mn, entry in claude_evals_by_model.items():
+            n = max(entry['sample_count'], 1)
+            avg_scores = {d: round(s / n, 4) for d, s in entry['score_sums'].items()}
+            by_task = {
+                task: {d: round(s / td['count'], 4) for d, s in td['sums'].items()}
+                for task, td in entry['by_task'].items()
+            }
+            claude_evals.append({
+                'model_name':   mn,
+                'sample_count': entry['sample_count'],
+                'avg_scores':   avg_scores,
+                'by_task':      by_task,
+            })
+
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({
+                'reference_eval': ref_eval,
+                'bedrock_evals':  bedrock_evals,
+                'claude_evals':   claude_evals,
+            }, cls=DecimalEncoder),
+        }
+    except Exception as e:
+        print(f"Error in get_evaluations: {e}")
         raise
 
 

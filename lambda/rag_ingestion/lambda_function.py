@@ -2,12 +2,14 @@
 RAG Ingestion Lambda Function
 Ingests documents from S3, chunks them, and generates embeddings
 """
+import hashlib
 import io
 import json
 import os
-import uuid
-from typing import Dict, Any, List
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from typing import Dict, Any, List, Tuple
 from urllib.parse import unquote_plus
 import boto3
 from botocore.exceptions import ClientError
@@ -27,29 +29,27 @@ dynamodb = boto3.resource('dynamodb')
 EMBEDDINGS_TABLE_NAME = os.environ['EMBEDDINGS_TABLE_NAME']
 TITAN_EMBEDDINGS_MODEL_ID = "amazon.titan-embed-text-v2:0"
 
+# Chunking config (per CLAUDE.md spec: 500 tokens / 50 overlap)
+CHUNK_SIZE = 500    # words
+OVERLAP = 50        # words
+MIN_CHUNK_WORDS = 20  # skip tiny/garbage chunks
+
+# Parallel Bedrock embedding calls
+EMBED_WORKERS = 8
+
 embeddings_table = dynamodb.Table(EMBEDDINGS_TABLE_NAME)
+
+# Sentence boundary: split after . ! ? followed by whitespace
+_SENTENCE_END = re.compile(r'(?<=[.!?])\s+')
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
-    Main Lambda handler for RAG ingestion
-
-    Args:
-        event: S3 event or direct invocation with bucket/key
-        context: Lambda context
-
-    Returns:
-        Dict with ingestion results
-    """
     try:
-        # Extract bucket and key from event
         if 'Records' in event:
-            # S3 event trigger
             record = event['Records'][0]
             bucket = record['s3']['bucket']['name']
             key = unquote_plus(record['s3']['object']['key'])
         else:
-            # Direct invocation
             bucket = event.get('bucket')
             key = event.get('key')
 
@@ -58,11 +58,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         print(f"Processing document: s3://{bucket}/{key}")
 
-        # Get document from S3
         response = s3_client.get_object(Bucket=bucket, Key=key)
         raw_bytes = response['Body'].read()
 
-        # Extract text based on file type
         if key.lower().endswith('.pdf'):
             if not PYPDF_AVAILABLE:
                 raise RuntimeError("pypdf is not installed; cannot process PDF files")
@@ -71,29 +69,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             content = raw_bytes.decode('utf-8')
 
-        # Determine document type
         doc_type = determine_doc_type(key)
-
-        # Chunk document
-        chunks = chunk_document(content, chunk_size=200, overlap=25)
+        chunks = chunk_document(content)
         print(f"Created {len(chunks)} chunks")
 
-        # Process each chunk
-        ingested_count = 0
-        for i, chunk in enumerate(chunks):
-            try:
-                # Generate embedding
-                embedding = generate_embedding(chunk)
+        # Generate all embeddings in parallel
+        embedded = embed_chunks_parallel(chunks, key, doc_type)
 
-                # Store in DynamoDB
-                doc_id = f"{key.replace('/', '_')}_{i}"
-                store_embedding(doc_id, chunk, embedding, doc_type, key, i)
-
-                ingested_count += 1
-
-            except Exception as e:
-                print(f"Error processing chunk {i}: {str(e)}")
-                continue
+        # Batch-write to DynamoDB (25 items per batch call)
+        ingested_count = batch_store_embeddings(embedded)
 
         return {
             'statusCode': 200,
@@ -105,22 +89,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     except ClientError as e:
         print(f"AWS Error: {str(e)}")
-        return {
-            'statusCode': 500,
-            'error': str(e)
-        }
+        return {'statusCode': 500, 'error': str(e)}
     except Exception as e:
         print(f"Error: {str(e)}")
-        return {
-            'statusCode': 500,
-            'error': str(e)
-        }
+        return {'statusCode': 500, 'error': str(e)}
 
 
 def determine_doc_type(key: str) -> str:
-    """Determine document type from S3 key"""
+    """Determine document type from S3 key."""
     key_lower = key.lower()
-
     if 'policy' in key_lower:
         return 'policy'
     elif 'claim' in key_lower:
@@ -135,120 +112,125 @@ def determine_doc_type(key: str) -> str:
         return 'general'
 
 
-def chunk_document(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
+def chunk_document(text: str) -> List[str]:
     """
-    Chunk document into overlapping segments
+    Sentence-aware chunking with deduplication and min-size filter.
 
-    Args:
-        text: Input text
-        chunk_size: Target chunk size in tokens (approximated by words)
-        overlap: Overlap size in tokens
-
-    Returns:
-        List of text chunks
+    Splits on sentence boundaries so chunks don't break mid-sentence.
+    Keeps a OVERLAP-word tail from the previous chunk to preserve context.
+    Deduplicates identical chunks that appear across multiple source files.
     """
-    # Split into words (rough token approximation)
-    words = text.split()
+    sentences = _SENTENCE_END.split(text.strip())
 
-    if len(words) <= chunk_size:
-        return [text]
+    chunks: List[str] = []
+    seen_hashes: set = set()
+    current_words: List[str] = []
 
-    chunks = []
-    start = 0
+    for sentence in sentences:
+        sentence_words = sentence.split()
+        if not sentence_words:
+            continue
 
-    while start < len(words):
-        end = start + chunk_size
-        chunk_words = words[start:end]
-        chunks.append(' '.join(chunk_words))
+        # Sentence is itself longer than the budget — hard-split it
+        while len(sentence_words) > CHUNK_SIZE:
+            space = CHUNK_SIZE - len(current_words)
+            current_words.extend(sentence_words[:space])
+            _maybe_add_chunk(' '.join(current_words), chunks, seen_hashes)
+            current_words = current_words[-OVERLAP:]
+            sentence_words = sentence_words[space:]
 
-        # Move to next chunk with overlap
-        start = end - overlap
-        if start >= len(words):
-            break
+        # Flush current buffer if this sentence would overflow
+        if current_words and len(current_words) + len(sentence_words) > CHUNK_SIZE:
+            _maybe_add_chunk(' '.join(current_words), chunks, seen_hashes)
+            current_words = current_words[-OVERLAP:]
+
+        current_words.extend(sentence_words)
+
+    if current_words:
+        _maybe_add_chunk(' '.join(current_words), chunks, seen_hashes)
 
     return chunks
 
 
-def generate_embedding(text: str) -> List[float]:
-    """
-    Generate embedding using Amazon Titan Embeddings
-
-    Args:
-        text: Input text
-
-    Returns:
-        List of floats representing the embedding
-    """
-    try:
-        # Truncate if too long
-        max_chars = 8000
-        if len(text) > max_chars:
-            text = text[:max_chars]
-
-        request_body = json.dumps({
-            "inputText": text,
-            "dimensions": 1024,
-            "normalize": True,
-        })
-
-        response = bedrock_runtime.invoke_model(
-            modelId=TITAN_EMBEDDINGS_MODEL_ID,
-            body=request_body,
-            contentType='application/json',
-            accept='application/json'
-        )
-
-        response_body = json.loads(response['body'].read())
-        embedding = response_body.get('embedding')
-
-        return embedding
-
-    except Exception as e:
-        print(f"Error generating embedding: {str(e)}")
-        raise
+def _maybe_add_chunk(text: str, chunks: List[str], seen_hashes: set) -> None:
+    """Add chunk only if it meets the minimum word count and is not a duplicate."""
+    if len(text.split()) < MIN_CHUNK_WORDS:
+        return
+    h = hashlib.md5(text.encode()).hexdigest()
+    if h in seen_hashes:
+        return
+    seen_hashes.add(h)
+    chunks.append(text)
 
 
-def store_embedding(
-    doc_id: str,
-    content: str,
-    embedding: List[float],
-    doc_type: str,
+def embed_chunks_parallel(
+    chunks: List[str],
     source_key: str,
-    chunk_index: int
-) -> None:
+    doc_type: str,
+) -> List[Tuple[str, str, List[float], str, str, int]]:
     """
-    Store embedding and metadata in DynamoDB
-
-    Args:
-        doc_id: Unique document ID
-        content: Chunk content
-        embedding: Embedding vector
-        doc_type: Document type
-        source_key: S3 key of source document
-        chunk_index: Index of chunk in document
+    Generate embeddings for all chunks concurrently.
+    Returns list of (doc_id, content, embedding, doc_type, source_key, chunk_index).
     """
-    try:
-        # Convert embedding list to JSON string for DynamoDB storage
-        # DynamoDB doesn't support lists of floats natively
-        embedding_json = json.dumps(embedding)
+    def embed_one(args: Tuple[int, str]):
+        i, chunk = args
+        doc_id = f"{source_key.replace('/', '_')}_{i}"
+        embedding = generate_embedding(chunk)
+        return (doc_id, chunk, embedding, doc_type, source_key, i)
 
-        item = {
-            'doc_id': doc_id,
-            'doc_type': doc_type,
-            'content': content[:1000],  # Store first 1000 chars
-            'embedding': embedding_json,  # Store as JSON string
-            'metadata': {
-                'source_key': source_key,
-                'chunk_index': chunk_index,
-                'content_length': len(content),
-                'embedding_dim': len(embedding)
-            },
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
+    results = []
+    with ThreadPoolExecutor(max_workers=EMBED_WORKERS) as executor:
+        futures = {executor.submit(embed_one, (i, chunk)): i for i, chunk in enumerate(chunks)}
+        for future in as_completed(futures):
+            i = futures[future]
+            try:
+                results.append(future.result())
+            except Exception as e:
+                print(f"Error embedding chunk {i}: {e}")
 
-        embeddings_table.put_item(Item=item)
-        print(f"✓ Stored embedding for {doc_id}")
+    return results
 
-    except Exception as e:
-        print(f"Error storing embedding: {str(e)}")
-        raise
+
+def generate_embedding(text: str) -> List[float]:
+    """Generate a 1024-dim normalized embedding via Amazon Titan Embeddings V2."""
+    if len(text) > 8000:
+        text = text[:8000]
+
+    response = bedrock_runtime.invoke_model(
+        modelId=TITAN_EMBEDDINGS_MODEL_ID,
+        body=json.dumps({"inputText": text, "dimensions": 1024, "normalize": True}),
+        contentType='application/json',
+        accept='application/json',
+    )
+    return json.loads(response['body'].read())['embedding']
+
+
+def batch_store_embeddings(
+    results: List[Tuple[str, str, List[float], str, str, int]]
+) -> int:
+    """
+    Write embeddings to DynamoDB using batch_writer (auto-batches in groups of 25).
+    Returns number of items written.
+    """
+    now = datetime.utcnow().isoformat() + 'Z'
+    ingested_count = 0
+
+    with embeddings_table.batch_writer() as batch:
+        for doc_id, content, embedding, doc_type, source_key, chunk_index in results:
+            batch.put_item(Item={
+                'doc_id': doc_id,
+                'doc_type': doc_type,
+                'content': content,
+                'embedding': json.dumps(embedding),
+                'metadata': {
+                    'source_key': source_key,
+                    'chunk_index': chunk_index,
+                    'content_length': len(content),
+                    'embedding_dim': len(embedding),
+                },
+                'timestamp': now,
+            })
+            ingested_count += 1
+
+    print(f"Batch-stored {ingested_count} embeddings")
+    return ingested_count

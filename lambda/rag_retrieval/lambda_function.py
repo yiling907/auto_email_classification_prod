@@ -1,242 +1,333 @@
 """
 RAG Retrieval Lambda Function
-Retrieves relevant knowledge base snippets using semantic similarity
+Hybrid retrieval: HyDE query expansion → vector + BM25 → RRF fusion → cross-encoder rerank
 """
 import json
+import math
 import os
 import re
-from typing import Dict, Any, List
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, Any, List, Tuple
+
 import boto3
 from botocore.exceptions import ClientError
 
-# Initialize AWS clients
+# ── AWS clients ───────────────────────────────────────────────────────────────
 bedrock_runtime = boto3.client('bedrock-runtime')
-dynamodb = boto3.resource('dynamodb')
+dynamodb        = boto3.resource('dynamodb')
 
-# Environment variables
-EMBEDDINGS_TABLE_NAME = os.environ['EMBEDDINGS_TABLE_NAME']
+# ── Config ────────────────────────────────────────────────────────────────────
+EMBEDDINGS_TABLE_NAME    = os.environ['EMBEDDINGS_TABLE_NAME']
 TITAN_EMBEDDINGS_MODEL_ID = "amazon.titan-embed-text-v2:0"
+HAIKU_MODEL_ID           = "anthropic.claude-3-haiku-20240307-v1:0"
 
-# Minimum similarity to include a doc in results
-SIMILARITY_THRESHOLD = 0.30
-
-_GREETING  = re.compile(r'^(dear\s+\S.*?[,\n]|hi\s*\S*.*?[,\n]|hello\s*\S*.*?[,\n])', re.I)
-_SIGN_OFF  = re.compile(r'(kind regards.*|best regards.*|yours sincerely.*|thank\s+you.*|thanks.*)$', re.I | re.S)
+SIMILARITY_THRESHOLD = 0.25   # lowered — RRF + reranker handle final filtering
+RRF_K                = 60     # reciprocal rank fusion constant
+RERANK_CANDIDATES    = 12     # how many fused candidates pass to the reranker
+RERANK_WORKERS       = 6      # parallel Haiku calls for cross-encoder
 
 embeddings_table = dynamodb.Table(EMBEDDINGS_TABLE_NAME)
 
+_GREETING = re.compile(r'^(dear\s+\S.*?[,\n]|hi\s*\S*.*?[,\n]|hello\s*\S*.*?[,\n])', re.I)
+_SIGN_OFF  = re.compile(r'(kind regards.*|best regards.*|yours sincerely.*|thank\s+you.*|thanks.*)$', re.I | re.S)
+
+
+# ── Lambda handler ────────────────────────────────────────────────────────────
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
-    Main Lambda handler for RAG retrieval
-
-    Args:
-        event: Contains email_text for embedding generation
-        context: Lambda context
-
-    Returns:
-        Dict with top-K relevant knowledge snippets
-    """
     try:
-        email_text = event.get('email_text') or event.get('body')
-
+        email_text = event.get('email_text') or event.get('body', '')
         if not email_text:
             raise ValueError("Missing email_text in event")
 
         intent = event.get('intent', '')
-        query  = preprocess_query(email_text, intent)
-        print(f"Retrieving knowledge — raw_len={len(email_text)} query_len={len(query)} intent={intent!r}")
+        top_k  = int(event.get('top_k', 5))
 
-        # Generate embedding for cleaned query
-        email_embedding = generate_embedding(query)
+        # Step 1 — clean the raw query
+        clean_query = _preprocess(email_text, intent)
+        print(f"Query: raw_len={len(email_text)} clean_len={len(clean_query)} intent={intent!r}")
 
-        # Retrieve top-K similar documents with hybrid scoring
-        top_k = event.get('top_k', 5)
-        similar_docs = retrieve_similar_documents(email_embedding, top_k, query)
+        # Step 2 — HyDE: embed a hypothetical answer, not the raw question
+        hyde_doc = _hyde_expand(clean_query)
+        print(f"HyDE doc (first 120 chars): {hyde_doc[:120]!r}")
+
+        # Step 3 — embed the HyDE document
+        query_embedding = _embed(hyde_doc)
+
+        # Step 4 — load all KB documents (paginated scan)
+        documents = _scan_all()
+        print(f"Loaded {len(documents)} documents from knowledge base")
+
+        if not documents:
+            return {'statusCode': 200, 'retrieved_documents': [], 'num_documents': 0}
+
+        # Step 5 — score: vector cosine + BM25
+        contents   = [doc.get('content', '') for doc in documents]
+        bm25       = BM25(contents)
+        vec_scores  = _vector_scores(query_embedding, documents)
+        bm25_scores = [bm25.score(clean_query, i) for i in range(len(documents))]
+
+        # Step 6 — RRF fusion
+        fused = _rrf_fuse(vec_scores, bm25_scores, k=RRF_K)
+
+        # Step 7 — pre-filter by similarity threshold, take top candidates
+        candidates = []
+        for idx, rrf_score in fused[:RERANK_CANDIDATES]:
+            sem = vec_scores[idx]
+            if sem < SIMILARITY_THRESHOLD:
+                continue
+            candidates.append({**documents[idx], '_rrf_score': rrf_score, '_vec_score': sem})
+
+        if not candidates:
+            print(f"No candidates above threshold={SIMILARITY_THRESHOLD}")
+            return {'statusCode': 200, 'retrieved_documents': [], 'num_documents': 0}
+
+        # Step 8 — cross-encoder rerank
+        ranked = _cross_encoder_rerank(clean_query, candidates)
+        top_docs = ranked[:top_k]
+
+        print(f"Retrieved {len(top_docs)} docs after rerank")
+        for d in top_docs:
+            print(f"  {d['doc_id']}: rerank={d['similarity_score']:.4f}")
 
         return {
-            'statusCode': 200,
-            'retrieved_documents': similar_docs,
-            'num_documents': len(similar_docs)
+            'statusCode':        200,
+            'retrieved_documents': top_docs,
+            'num_documents':     len(top_docs),
         }
 
     except ClientError as e:
-        print(f"AWS Error: {str(e)}")
-        return {
-            'statusCode': 500,
-            'error': str(e),
-            'retrieved_documents': []
-        }
+        print(f"AWS Error: {e}")
+        return {'statusCode': 500, 'error': str(e), 'retrieved_documents': []}
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return {
-            'statusCode': 500,
-            'error': str(e),
-            'retrieved_documents': []
+        print(f"Error: {e}")
+        return {'statusCode': 500, 'error': str(e), 'retrieved_documents': []}
+
+
+# ── HyDE ──────────────────────────────────────────────────────────────────────
+
+def _hyde_expand(query: str) -> str:
+    """
+    Generate a hypothetical document that would answer the query.
+    Embedding a 2-3 sentence factual answer lands in the same embedding-space
+    region as real KB documents — far better than embedding the short raw query.
+    """
+    prompt = (
+        "You are an Irish health insurance assistant for Laya Healthcare. "
+        "Write a 2–3 sentence factual answer to the following question exactly as "
+        "it would appear in official Laya Healthcare documentation. "
+        "Use precise insurance terminology. Do NOT mention that this is hypothetical.\n\n"
+        f"Question: {query}\n\nAnswer:"
+    )
+    try:
+        resp = bedrock_runtime.invoke_model(
+            modelId=HAIKU_MODEL_ID,
+            body=json.dumps({
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 150,
+                "temperature": 0,
+                "messages": [{"role": "user", "content": prompt}],
+            }),
+            contentType='application/json',
+            accept='application/json',
+        )
+        return json.loads(resp['body'].read())['content'][0]['text'].strip()
+    except Exception as e:
+        print(f"HyDE failed, falling back to raw query: {e}")
+        return query
+
+
+# ── Embedding ─────────────────────────────────────────────────────────────────
+
+def _embed(text: str) -> List[float]:
+    if len(text) > 8000:
+        text = text[:8000]
+    resp = bedrock_runtime.invoke_model(
+        modelId=TITAN_EMBEDDINGS_MODEL_ID,
+        body=json.dumps({"inputText": text, "dimensions": 1024, "normalize": True}),
+        contentType='application/json',
+        accept='application/json',
+    )
+    emb = json.loads(resp['body'].read())['embedding']
+    print(f"Embedded text (dim={len(emb)})")
+    return emb
+
+
+# ── DynamoDB scan (paginated) ─────────────────────────────────────────────────
+
+def _scan_all() -> List[Dict[str, Any]]:
+    docs, resp = [], embeddings_table.scan()
+    docs.extend(resp.get('Items', []))
+    while 'LastEvaluatedKey' in resp:
+        resp = embeddings_table.scan(ExclusiveStartKey=resp['LastEvaluatedKey'])
+        docs.extend(resp.get('Items', []))
+    return docs
+
+
+# ── Vector scoring ────────────────────────────────────────────────────────────
+
+def _vector_scores(query_vec: List[float], documents: List[Dict[str, Any]]) -> List[float]:
+    scores = []
+    for doc in documents:
+        raw = doc.get('embedding', '[]')
+        try:
+            vec = json.loads(raw) if isinstance(raw, str) else raw
+            scores.append(_cosine(query_vec, vec))
+        except Exception:
+            scores.append(0.0)
+    return scores
+
+
+def _cosine(a: List[float], b: List[float]) -> float:
+    if len(a) != len(b):
+        return 0.0
+    dot  = sum(x * y for x, y in zip(a, b))
+    mag_a = math.sqrt(sum(x * x for x in a))
+    mag_b = math.sqrt(sum(y * y for y in b))
+    return dot / (mag_a * mag_b) if mag_a and mag_b else 0.0
+
+
+# ── BM25 ──────────────────────────────────────────────────────────────────────
+
+class BM25:
+    """Lightweight BM25 implementation for keyword-based scoring."""
+    def __init__(self, corpus: List[str], k1: float = 1.5, b: float = 0.75):
+        self.k1, self.b = k1, b
+        self.tokenized  = [self._tok(d) for d in corpus]
+        n               = len(self.tokenized)
+        avgdl           = sum(len(d) for d in self.tokenized) / max(n, 1)
+        self.avgdl      = avgdl
+        df              = Counter(t for doc in self.tokenized for t in set(doc))
+        self.idf        = {
+            t: math.log((n - f + 0.5) / (f + 0.5) + 1)
+            for t, f in df.items()
         }
 
+    @staticmethod
+    def _tok(text: str) -> List[str]:
+        return re.findall(r'\b\w{2,}\b', text.lower())
 
-def generate_embedding(text: str) -> List[float]:
-    """
-    Generate embedding using Amazon Titan Embeddings
-
-    Args:
-        text: Input text
-
-    Returns:
-        List of floats representing the embedding
-    """
-    try:
-        # Truncate text if too long (Titan has input limits)
-        max_chars = 8000
-        if len(text) > max_chars:
-            text = text[:max_chars]
-
-        request_body = json.dumps({
-            "inputText": text,
-            "dimensions": 1024,
-            "normalize": True,
-        })
-
-        response = bedrock_runtime.invoke_model(
-            modelId=TITAN_EMBEDDINGS_MODEL_ID,
-            body=request_body,
-            contentType='application/json',
-            accept='application/json'
+    def score(self, query: str, doc_idx: int) -> float:
+        doc  = self.tokenized[doc_idx]
+        dl   = len(doc)
+        tf   = Counter(doc)
+        return sum(
+            self.idf.get(t, 0) *
+            (tf[t] * (self.k1 + 1)) /
+            (tf[t] + self.k1 * (1 - self.b + self.b * dl / self.avgdl))
+            for t in self._tok(query)
         )
 
-        response_body = json.loads(response['body'].read())
-        embedding = response_body.get('embedding')
 
-        print(f"Generated embedding with dimension: {len(embedding)}")
-        return embedding
+# ── RRF fusion ────────────────────────────────────────────────────────────────
 
-    except Exception as e:
-        print(f"Error generating embedding: {str(e)}")
-        raise
-
-
-def preprocess_query(email_text: str, intent: str = '') -> str:
+def _rrf_fuse(
+    vec_scores: List[float],
+    bm25_scores: List[float],
+    k: int = 60,
+) -> List[Tuple[int, float]]:
     """
-    Strip greeting/sign-off noise and prepend intent for sharper embeddings.
-    The intent prefix anchors the embedding toward the insurance subdomain.
+    Reciprocal Rank Fusion: combine vector and BM25 rank lists.
+    Returns list of (doc_index, rrf_score) sorted descending.
     """
+    n = len(vec_scores)
+    vec_order  = sorted(range(n), key=lambda i: vec_scores[i],  reverse=True)
+    bm25_order = sorted(range(n), key=lambda i: bm25_scores[i], reverse=True)
+
+    rrf: Dict[int, float] = {}
+    for rank, idx in enumerate(vec_order):
+        rrf[idx] = rrf.get(idx, 0.0) + 1.0 / (k + rank + 1)
+    for rank, idx in enumerate(bm25_order):
+        rrf[idx] = rrf.get(idx, 0.0) + 1.0 / (k + rank + 1)
+
+    return sorted(rrf.items(), key=lambda x: x[1], reverse=True)
+
+
+# ── Cross-encoder reranker ────────────────────────────────────────────────────
+
+def _cross_encoder_rerank(
+    query: str,
+    candidates: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Score each (query, document) pair jointly with Haiku.
+    Runs in parallel. Falls back to RRF score if Haiku call fails.
+    """
+    def score_one(doc: Dict[str, Any]) -> Dict[str, Any]:
+        prompt = (
+            "Rate how relevant this insurance knowledge base snippet is to the customer query.\n"
+            "Return ONLY valid JSON: {\"score\": <integer 0-10>}\n\n"
+            f"Query: {query}\n\n"
+            f"Snippet: {doc.get('content', '')[:400]}"
+        )
+        try:
+            resp = bedrock_runtime.invoke_model(
+                modelId=HAIKU_MODEL_ID,
+                body=json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 20,
+                    "temperature": 0,
+                    "messages": [{"role": "user", "content": prompt}],
+                }),
+                contentType='application/json',
+                accept='application/json',
+            )
+            raw  = json.loads(resp['body'].read())['content'][0]['text']
+            data = json.loads(_extract_json(raw))
+            rerank_score = max(0.0, min(10.0, float(data.get('score', 5)))) / 10.0
+        except Exception as e:
+            print(f"Reranker failed for {doc.get('doc_id')}: {e}")
+            rerank_score = doc.get('_rrf_score', 0.0) * 5   # fallback: scale RRF
+
+        # Final score: 50% reranker + 30% vector + 20% RRF
+        final = round(
+            0.5 * rerank_score +
+            0.3 * doc.get('_vec_score', 0.0) +
+            0.2 * min(doc.get('_rrf_score', 0.0) * 100, 1.0),
+            4,
+        )
+        return {
+            'doc_id':           doc.get('doc_id'),
+            'doc_type':         doc.get('doc_type', 'unknown'),
+            'content':          doc.get('content', ''),
+            'similarity_score': final,
+            'metadata':         doc.get('metadata', {}),
+        }
+
+    results = []
+    with ThreadPoolExecutor(max_workers=RERANK_WORKERS) as ex:
+        futures = {ex.submit(score_one, doc): doc for doc in candidates}
+        for future in as_completed(futures):
+            try:
+                results.append(future.result())
+            except Exception as e:
+                print(f"Rerank future error: {e}")
+
+    return sorted(results, key=lambda x: x['similarity_score'], reverse=True)
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _preprocess(email_text: str, intent: str = '') -> str:
     text = email_text.strip()
     text = _GREETING.sub('', text).strip()
     text = _SIGN_OFF.sub('', text).strip()
     if intent:
-        label = intent.replace('_', ' ')
-        text = f"Insurance query about {label}: {text}"
+        text = f"Insurance query about {intent.replace('_', ' ')}: {text}"
     return text[:8000]
 
 
-def keyword_score(query: str, document: str) -> float:
-    """
-    Term-overlap score: fraction of unique query terms (≥3 chars) found in doc.
-    Captures exact insurance terminology (e.g. 'excess', 'pre-authorisation')
-    that embeddings may conflate with semantically similar but wrong terms.
-    """
-    query_terms = set(re.findall(r'\b\w{3,}\b', query.lower()))
-    if not query_terms:
-        return 0.0
-    doc_terms = set(re.findall(r'\b\w{3,}\b', document.lower()))
-    return len(query_terms & doc_terms) / len(query_terms)
-
-
-def retrieve_similar_documents(
-    query_embedding: List[float],
-    top_k: int = 5,
-    query_text: str = '',
-) -> List[Dict[str, Any]]:
-    """
-    Hybrid retrieval: semantic (70%) + keyword (30%).
-    Fetches top_k*4 candidates by semantic score, filters by SIMILARITY_THRESHOLD,
-    re-ranks with the hybrid score, and returns the top_k results.
-    """
-    try:
-        response  = embeddings_table.scan()
-        documents = response.get('Items', [])
-
-        if not documents:
-            print("No documents found in knowledge base")
-            return []
-
-        candidate_limit = max(top_k * 4, 20)
-        scored_docs = []
-
-        for doc in documents:
-            if 'embedding' not in doc:
-                continue
-            try:
-                raw = doc['embedding']
-                doc_embedding = json.loads(raw) if isinstance(raw, str) else raw
-                sem_score = cosine_similarity(query_embedding, doc_embedding)
-                scored_docs.append((sem_score, doc))
-            except Exception as e:
-                print(f"Error processing document {doc.get('doc_id')}: {e}")
-
-        # Take top candidates by semantic score before hybrid re-rank
-        scored_docs.sort(key=lambda x: x[0], reverse=True)
-        candidates = scored_docs[:candidate_limit]
-
-        # Hybrid re-rank: 70% semantic + 30% keyword
-        results = []
-        for sem_score, doc in candidates:
-            if sem_score < SIMILARITY_THRESHOLD:
-                continue
-            kw = keyword_score(query_text, doc.get('content', '')) if query_text else 0.0
-            hybrid = round(0.7 * sem_score + 0.3 * kw, 4)
-            results.append({
-                'doc_id':           doc.get('doc_id'),
-                'doc_type':         doc.get('doc_type', 'unknown'),
-                'content':          doc.get('content', ''),
-                'similarity_score': hybrid,
-                'metadata':         doc.get('metadata', {}),
-            })
-
-        results.sort(key=lambda x: x['similarity_score'], reverse=True)
-        top_docs = results[:top_k]
-
-        print(f"Retrieved {len(top_docs)}/{len(candidates)} candidates (threshold={SIMILARITY_THRESHOLD})")
-        for doc in top_docs:
-            print(f"  - {doc['doc_id']}: {doc['similarity_score']:.4f}")
-
-        return top_docs
-
-    except Exception as e:
-        print(f"Error retrieving documents: {str(e)}")
-        return []
-
-
-def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
-    """
-    Calculate cosine similarity between two vectors
-
-    Args:
-        vec1: First vector
-        vec2: Second vector
-
-    Returns:
-        Cosine similarity score (0-1)
-    """
-    try:
-        # Ensure vectors are same length
-        if len(vec1) != len(vec2):
-            print(f"Warning: Vector dimension mismatch: {len(vec1)} vs {len(vec2)}")
-            return 0.0
-
-        # Calculate dot product
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
-
-        # Calculate magnitudes
-        magnitude1 = sum(a * a for a in vec1) ** 0.5
-        magnitude2 = sum(b * b for b in vec2) ** 0.5
-
-        if magnitude1 == 0 or magnitude2 == 0:
-            return 0.0
-
-        return dot_product / (magnitude1 * magnitude2)
-
-    except Exception as e:
-        print(f"Error calculating similarity: {str(e)}")
-        return 0.0
+def _extract_json(text: str) -> str:
+    start = text.find('{')
+    if start == -1:
+        return '{}'
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return '{}'

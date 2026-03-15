@@ -1,0 +1,112 @@
+[
+  {
+    "id": "eval_001",
+    "query": "How do I make a claim for a GP visit?",
+    "ground_truth": "Download the Laya App or log into Member Area to submit claims for everyday medical expenses including GP visits online 24/7.",
+    "expected_key_facts": ["Laya App", "Member Area", "24", "everyday medical expenses", "receipt"],
+    "context_source": "howtoclaim.txt",
+    "is_known_in_rag": true,
+    "intent": "claim_submission",
+    "difficulty": "easy",
+    "failure_modes_tested": ["retrieval_recall", "factual_accuracy"]
+  },
+  {
+    "id": "eval_002",
+    "query": "Does my plan cover pre-authorisation for surgery?",
+    "ground_truth": "Pre-authorisation is required for certain procedures. Members must contact Laya Healthcare before admission for planned inpatient treatment. Check your scheme rules and benefit table for specific requirements.",
+    "expected_key_facts": ["pre-authorisation", "before admission", "planned inpatient", "scheme rules"],
+    "context_source": "laya-allpmirules-053-0825.pdf",
+    "is_known_in_rag": true,
+    "intent": "pre_authorisation",
+    "difficulty": "medium",
+    "failure_modes_tested": ["retrieval_precision", "term_preservation"]
+  },
+  {
+    "id": "eval_003",
+    "query": "What are the GPline service hours?",
+    "ground_truth": "GPline is available 24 hours a day, 365 days a year.",
+    "expected_key_facts": ["24 hours", "365 days", "GPline"],
+    "context_source": "yourbenefits__gpline.txt",
+    "is_known_in_rag": true,
+    "intent": "coverage_query",
+    "difficulty": "easy",
+    "failure_modes_tested": ["exact_fact_recall", "no_hallucination"]
+  },
+  {
+    "id": "eval_004",
+    "query": "How do I add my newborn to my policy?",
+    "ground_truth": "Contact Laya Healthcare to add a dependent to your policy. A newborn can typically be added within a specified period after birth without serving a waiting period. Refer to your scheme rules for exact timeframes.",
+    "expected_key_facts": ["contact Laya", "dependent", "newborn", "waiting period", "scheme rules"],
+    "context_source": "laya-allpmirules-053-0825.pdf",
+    "is_known_in_rag": true,
+    "intent": "dependent_addition",
+    "difficulty": "medium",
+    "failure_modes_tested": ["multi_hop_retrieval", "policy_accuracy"]
+  },
+  {
+    "id": "eval_005",
+    "query": "Can I cancel my policy mid-year?",
+    "ground_truth": "Members may cancel their policy by contacting Laya Healthcare. Refund eligibility depends on scheme rules and the reason for cancellation.",
+    "expected_key_facts": ["cancel", "contact Laya", "refund", "scheme rules"],
+    "context_source": "laya-allpmirules-053-0825.pdf",
+    "is_known_in_rag": true,
+    "intent": "cancellation_request",
+    "difficulty": "medium",
+    "failure_modes_tested": ["policy_completeness", "no_fabricated_fees"]
+  },
+  {
+    "id": "eval_006",
+    "query": "What mental health services are included in my plan?",
+    "ground_truth": "Laya Healthcare provides mental wellbeing support including access to counselling and mental health consultations depending on your scheme.",
+    "expected_key_facts": ["mental wellbeing", "counselling", "scheme"],
+    "context_source": "yourbenefits__mentalwellbeing.txt",
+    "is_known_in_rag": true,
+    "intent": "coverage_query",
+    "difficulty": "medium",
+    "failure_modes_tested": ["benefit_specificity", "hallucination_risk"]
+  },
+  {
+    "id": "eval_007",
+    "query": "What is the waiting period for orthopaedic surgery?",
+    "ground_truth": "Waiting periods for orthopaedic surgery vary by scheme and whether the condition is pre-existing. Refer to your policy benefit table or scheme rules for exact waiting period details.",
+    "expected_key_facts": ["waiting period", "orthopaedic", "pre-existing", "benefit table"],
+    "context_source": "productsandservices__waitingperiods.txt",
+    "is_known_in_rag": true,
+    "intent": "coverage_query",
+    "difficulty": "hard",
+    "failure_modes_tested": ["conditional_fact_handling", "no_false_specifics"]
+  },
+  {
+    "id": "eval_008",
+    "query": "My claim was rejected — what can I do?",
+    "ground_truth": "If your claim was rejected, you can appeal the decision by contacting Laya Healthcare. Provide your claim reference number and supporting medical documentation.",
+    "expected_key_facts": ["appeal", "contact", "claim reference", "documentation"],
+    "context_source": "claims_guidelines.txt",
+    "is_known_in_rag": true,
+    "intent": "complaint",
+    "difficulty": "hard",
+    "failure_modes_tested": ["process_accuracy", "escalation_path"]
+  },
+  {
+    "id": "eval_009",
+    "query": "Does Laya cover IVF treatment?",
+    "ground_truth": "Laya Healthcare offers fertility benefit on selected schemes. Coverage for IVF depends on your specific plan. Check your scheme rules or benefit table for fertility benefit details.",
+    "expected_key_facts": ["fertility", "selected schemes", "IVF", "scheme"],
+    "context_source": "yourbenefits__fertility.txt",
+    "is_known_in_rag": true,
+    "intent": "coverage_query",
+    "difficulty": "hard",
+    "failure_modes_tested": ["sensitive_topic_handling", "conditional_coverage_accuracy"]
+  },
+  {
+    "id": "eval_010",
+    "query": "What is the capital of France?",
+    "ground_truth": "NOT_IN_SCOPE",
+    "expected_key_facts": [],
+    "context_source": null,
+    "is_known_in_rag": false,
+    "intent": "other",
+    "difficulty": "out_of_scope",
+    "failure_modes_tested": ["out_of_domain_refusal", "hallucination_guard"]
+  }
+]
