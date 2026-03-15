@@ -62,6 +62,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             response = get_rag_metrics()
         elif path == '/api/metrics/evaluations':
             response = get_evaluations()
+        elif path == '/api/assessment' and method == 'GET':
+            response = get_assessment()
+        elif path == '/api/assessment/run' and method == 'POST':
+            response = run_assessment()
         elif path == '/api/settings' and method == 'GET':
             response = get_settings()
         elif path == '/api/settings' and method == 'POST':
@@ -505,6 +509,61 @@ def send_email_response(email_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
         }
     except Exception as e:
         print(f"Error in send_email_response: {e}")
+        raise
+
+
+# ── E2E Assessment ───────────────────────────────────────────────────────────
+
+LOGS_BUCKET_NAME = os.environ.get('LOGS_BUCKET_NAME', 'insuremail-ai-dev-logs')
+ASSESSMENT_FUNCTION_NAME = os.environ.get('ASSESSMENT_FUNCTION_NAME', '')
+
+
+def get_assessment() -> Dict[str, Any]:
+    """Return the latest e2e assessment report from S3."""
+    try:
+        obj = s3_client.get_object(Bucket=LOGS_BUCKET_NAME, Key='assessment/latest.json')
+        report = json.loads(obj['Body'].read())
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps(report),
+        }
+    except s3_client.exceptions.NoSuchKey:
+        return {
+            'statusCode': 404,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'error': 'No assessment report found. Run scripts/run_e2e_assessment.py first.'}),
+        }
+    except Exception as e:
+        print(f"Error in get_assessment: {e}")
+        raise
+
+
+def run_assessment() -> Dict[str, Any]:
+    """Trigger the Step Function assessment Lambda asynchronously (fire-and-forget)."""
+    if not ASSESSMENT_FUNCTION_NAME:
+        return {
+            'statusCode': 202,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({
+                'status': 'not_configured',
+                'message': 'Set ASSESSMENT_FUNCTION_NAME env var to enable remote triggers. '
+                           'Run locally: python scripts/run_stepfn_assessment.py --sample 20',
+            }),
+        }
+    try:
+        LAMBDA_CLIENT.invoke(
+            FunctionName=ASSESSMENT_FUNCTION_NAME,
+            InvocationType='Event',
+            Payload=json.dumps({'sample': 20}).encode(),
+        )
+        return {
+            'statusCode': 202,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'status': 'triggered', 'function': ASSESSMENT_FUNCTION_NAME}),
+        }
+    except Exception as e:
+        print(f"Error in run_assessment: {e}")
         raise
 
 
