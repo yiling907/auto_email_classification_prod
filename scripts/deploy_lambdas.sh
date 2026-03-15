@@ -100,11 +100,27 @@ deploy_lambda() {
     fi
 
     local zip_path="/tmp/${short_name}.zip"
+    local build_dir="/tmp/${short_name}_build"
 
     log "Packaging $short_name → $fn_name"
 
-    # Build zip — include lambda_function.py and any sibling .py files
-    (cd "$src_dir" && zip -qr "$zip_path" . --exclude "*.pyc" --exclude "__pycache__/*" --exclude "*.dist-info/*")
+    # Prepare clean build dir
+    rm -rf "$build_dir"
+    mkdir -p "$build_dir"
+
+    # Install dependencies if requirements.txt exists
+    if [[ -f "$src_dir/requirements.txt" ]]; then
+        log "Installing dependencies from requirements.txt..."
+        pip3 install -q -r "$src_dir/requirements.txt" -t "$build_dir/"
+    fi
+
+    # Copy all source files into build dir
+    (cd "$src_dir" && cp -r . "$build_dir/")
+
+    # Build zip from build dir
+    (cd "$build_dir" && zip -qr "$zip_path" . --exclude "*.pyc" --exclude "__pycache__/*" --exclude "*.dist-info/*")
+
+    rm -rf "$build_dir"
 
     log "Uploading code..."
     aws lambda update-function-code \
