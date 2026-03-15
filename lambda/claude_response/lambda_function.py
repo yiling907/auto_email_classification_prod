@@ -278,7 +278,7 @@ def evaluate_response(
     latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
     eval_scores = _parse_eval_scores(raw_output)
-    confidence  = _calculate_confidence(eval_scores)
+    confidence  = _calculate_confidence(eval_scores, rag_documents)
     cost        = _calculate_cost(input_tokens, output_tokens, model_config)
     timestamp   = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
@@ -367,10 +367,19 @@ def _parse_eval_scores(raw: str) -> Dict[str, float]:
     return result
 
 
-def _calculate_confidence(scores: Dict[str, float]) -> float:
-    """Weighted average of evaluation scores → scalar confidence."""
-    total = sum(EVAL_WEIGHTS[k] * scores.get(k, 0.5) for k in EVAL_WEIGHTS)
-    return round(total, 4)
+def _calculate_confidence(scores: Dict[str, float], rag_documents: List[Dict[str, Any]]) -> float:
+    """
+    Blended confidence: 50% weighted LLM judge score + 50% avg RAG similarity score.
+    RAG score defaults to 0.0 when no documents are retrieved.
+    """
+    eval_score = sum(EVAL_WEIGHTS[k] * scores.get(k, 0.5) for k in EVAL_WEIGHTS)
+    rag_scores = [
+        float(doc['similarity_score'])
+        for doc in rag_documents
+        if 'similarity_score' in doc
+    ]
+    rag_score = sum(rag_scores) / len(rag_scores) if rag_scores else 0.0
+    return round(0.5 * eval_score + 0.5 * rag_score, 4)
 
 
 def _extract_json(text: str) -> str:
