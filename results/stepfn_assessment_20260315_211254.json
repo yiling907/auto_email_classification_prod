@@ -1,0 +1,161 @@
+{
+  "assessment_metadata": {
+    "source": "step_functions",
+    "run_id": "eb5a8c5686b9",
+    "generated_at": "2026-03-15T21:13:39.674967+00:00",
+    "n_emails": 2,
+    "n_succeeded": 2,
+    "n_failed_exec": 0,
+    "dry_run": false,
+    "elapsed_seconds": 45.6,
+    "state_machine_arn": "arn:aws:states:us-east-1:970850578809:stateMachine:insuremail-ai-dev-email-processing",
+    "email_bucket": "insuremail-ai-dev-emails",
+    "pass_threshold": 0.7,
+    "passed": false
+  },
+  "composite_score": 0.6667,
+  "dimensions": {
+    "intent_classification": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "per_class": {
+        "coverage_query": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 1
+        },
+        "pre_authorisation": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 1
+        }
+      },
+      "top_confused": [],
+      "n_samples": 2,
+      "n_correct": 2
+    },
+    "routing_accuracy": {
+      "routing_accuracy": 0.5,
+      "correct": 1,
+      "total": 2,
+      "per_team": {
+        "customer_support_team": 1.0,
+        "medical_review_team": 0.0
+      }
+    },
+    "entity_extraction": {
+      "policy_number": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "member_id": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "pii_flag": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "medical_flag": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      }
+    },
+    "rag_retrieval": {
+      "hit_rate": 0.5,
+      "mrr": 0.5,
+      "ndcg_at_5": 0.5,
+      "hits": 1,
+      "total": 2,
+      "avg_docs_retrieved": 1.5
+    },
+    "response_quality": {
+      "avg_rouge_l": null,
+      "rouge_l_coverage": 0.0,
+      "hedge_rate": 1.0,
+      "escalation_agreement": 1.0,
+      "escalation_pairs_evaluated": 2,
+      "n_with_response": 2
+    },
+    "confidence_calibration": {
+      "ece": 0.5708,
+      "mae_vs_band": 0.0,
+      "band_action_agreement": 1.0,
+      "routing_distribution": {
+        "human_review": 0.5,
+        "escalate": 0.5
+      },
+      "routing_counts": {
+        "human_review": 1,
+        "escalate": 1
+      },
+      "reliability_diagram": [
+        {
+          "bin_lower": 0.2,
+          "bin_upper": 0.3,
+          "avg_confidence": 0.25,
+          "avg_accuracy": 1.0,
+          "n": 1
+        },
+        {
+          "bin_lower": 0.6,
+          "bin_upper": 0.7,
+          "avg_confidence": 0.6084,
+          "avg_accuracy": 1.0,
+          "n": 1
+        }
+      ]
+    }
+  },
+  "per_email_results": [
+    {
+      "laya_email_id": "EML-000001",
+      "sfn_email_id": "27936eaa-d8e8-481e-baaf-91c0042de6dc",
+      "gold_intent": "coverage_query",
+      "gold_route_team": "customer_support_team",
+      "gold_requires_human": true,
+      "predicted_intent": "coverage_query",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "customer_support_team",
+      "confidence_score": 0.6084,
+      "action": "human_review",
+      "response_text": "Dear Sinead, \n\nThank you for contacting Laya Healthcare regarding your medical cover. Based on the information provided, we can confirm that prescription medication is covered under your current plan. However, to ensure accurate reimbursement, we recommend submitting a claim form along with the original receipt from Liffey Pharmacy. You can download the necessary claim form from our Member Area or through our App. The appointment date you've mentioned, 25 February 2026, is noted for reference. I",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-821846",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": true,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000002",
+      "sfn_email_id": "0f35b18e-3deb-428f-a2f3-3b305486e2d8",
+      "gold_intent": "pre_authorisation",
+      "gold_route_team": "medical_review_team",
+      "gold_requires_human": true,
+      "predicted_intent": "pre_authorisation",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "provider_support_team",
+      "confidence_score": 0.25,
+      "action": "escalate",
+      "response_text": "Dear Ciara,\n\nThank you for contacting us regarding your upcoming neck strain treatment at Mater Private. Based on the information provided, pre-authorisation is required for this procedure under your policy POL-IE-859489.\n\nTo facilitate the pre-authorisation process, please submit the following documents to us as soon as possible:\n\n1. A completed and signed Pre-authorisation Request Form (available on our website or from your consultant).\n2. A referral letter from your consultant, detailing the ",
+      "rag_hit_count": 0,
+      "extracted_policy": "POL-IE-859489",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": true,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    }
+  ]
+}
