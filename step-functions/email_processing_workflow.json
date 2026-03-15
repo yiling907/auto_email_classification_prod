@@ -63,7 +63,8 @@
       "Comment": "Retrieve relevant knowledge base documents",
       "Parameters": {
         "email_text.$": "$.parsed_email.parsed_data.body_text",
-        "top_k": 3
+        "intent.$": "$.analysis[0].intent.customer_intent",
+        "top_k": 5
       },
       "ResultPath": "$.rag_results",
       "Next": "ValidateCRM",

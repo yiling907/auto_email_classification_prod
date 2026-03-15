@@ -25,7 +25,7 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 EMBEDDINGS_TABLE_NAME = os.environ['EMBEDDINGS_TABLE_NAME']
-TITAN_EMBEDDINGS_MODEL_ID = "amazon.titan-embed-text-v1"
+TITAN_EMBEDDINGS_MODEL_ID = "amazon.titan-embed-text-v2:0"
 
 embeddings_table = dynamodb.Table(EMBEDDINGS_TABLE_NAME)
 
@@ -75,7 +75,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         doc_type = determine_doc_type(key)
 
         # Chunk document
-        chunks = chunk_document(content, chunk_size=500, overlap=50)
+        chunks = chunk_document(content, chunk_size=200, overlap=25)
         print(f"Created {len(chunks)} chunks")
 
         # Process each chunk
@@ -186,7 +186,9 @@ def generate_embedding(text: str) -> List[float]:
             text = text[:max_chars]
 
         request_body = json.dumps({
-            "inputText": text
+            "inputText": text,
+            "dimensions": 1024,
+            "normalize": True,
         })
 
         response = bedrock_runtime.invoke_model(

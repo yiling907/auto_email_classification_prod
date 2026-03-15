@@ -4,6 +4,7 @@ Retrieves relevant knowledge base snippets using semantic similarity
 """
 import json
 import os
+import re
 from typing import Dict, Any, List
 import boto3
 from botocore.exceptions import ClientError
@@ -14,7 +15,13 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 EMBEDDINGS_TABLE_NAME = os.environ['EMBEDDINGS_TABLE_NAME']
-TITAN_EMBEDDINGS_MODEL_ID = "amazon.titan-embed-text-v1"
+TITAN_EMBEDDINGS_MODEL_ID = "amazon.titan-embed-text-v2:0"
+
+# Minimum similarity to include a doc in results
+SIMILARITY_THRESHOLD = 0.30
+
+_GREETING  = re.compile(r'^(dear\s+\S.*?[,\n]|hi\s*\S*.*?[,\n]|hello\s*\S*.*?[,\n])', re.I)
+_SIGN_OFF  = re.compile(r'(kind regards.*|best regards.*|yours sincerely.*|thank\s+you.*|thanks.*)$', re.I | re.S)
 
 embeddings_table = dynamodb.Table(EMBEDDINGS_TABLE_NAME)
 
@@ -36,14 +43,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not email_text:
             raise ValueError("Missing email_text in event")
 
-        print(f"Retrieving knowledge for email text (length: {len(email_text)})")
+        intent = event.get('intent', '')
+        query  = preprocess_query(email_text, intent)
+        print(f"Retrieving knowledge — raw_len={len(email_text)} query_len={len(query)} intent={intent!r}")
 
-        # Generate embedding for email text
-        email_embedding = generate_embedding(email_text)
+        # Generate embedding for cleaned query
+        email_embedding = generate_embedding(query)
 
-        # Retrieve top-K similar documents
-        top_k = event.get('top_k', 3)
-        similar_docs = retrieve_similar_documents(email_embedding, top_k)
+        # Retrieve top-K similar documents with hybrid scoring
+        top_k = event.get('top_k', 5)
+        similar_docs = retrieve_similar_documents(email_embedding, top_k, query)
 
         return {
             'statusCode': 200,
@@ -84,7 +93,9 @@ def generate_embedding(text: str) -> List[float]:
             text = text[:max_chars]
 
         request_body = json.dumps({
-            "inputText": text
+            "inputText": text,
+            "dimensions": 1024,
+            "normalize": True,
         })
 
         response = bedrock_runtime.invoke_model(
@@ -105,58 +116,88 @@ def generate_embedding(text: str) -> List[float]:
         raise
 
 
-def retrieve_similar_documents(query_embedding: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
+def preprocess_query(email_text: str, intent: str = '') -> str:
     """
-    Retrieve similar documents using cosine similarity
+    Strip greeting/sign-off noise and prepend intent for sharper embeddings.
+    The intent prefix anchors the embedding toward the insurance subdomain.
+    """
+    text = email_text.strip()
+    text = _GREETING.sub('', text).strip()
+    text = _SIGN_OFF.sub('', text).strip()
+    if intent:
+        label = intent.replace('_', ' ')
+        text = f"Insurance query about {label}: {text}"
+    return text[:8000]
 
-    Args:
-        query_embedding: Query embedding vector
-        top_k: Number of top documents to retrieve
 
-    Returns:
-        List of similar documents with scores
+def keyword_score(query: str, document: str) -> float:
+    """
+    Term-overlap score: fraction of unique query terms (≥3 chars) found in doc.
+    Captures exact insurance terminology (e.g. 'excess', 'pre-authorisation')
+    that embeddings may conflate with semantically similar but wrong terms.
+    """
+    query_terms = set(re.findall(r'\b\w{3,}\b', query.lower()))
+    if not query_terms:
+        return 0.0
+    doc_terms = set(re.findall(r'\b\w{3,}\b', document.lower()))
+    return len(query_terms & doc_terms) / len(query_terms)
+
+
+def retrieve_similar_documents(
+    query_embedding: List[float],
+    top_k: int = 5,
+    query_text: str = '',
+) -> List[Dict[str, Any]]:
+    """
+    Hybrid retrieval: semantic (70%) + keyword (30%).
+    Fetches top_k*4 candidates by semantic score, filters by SIMILARITY_THRESHOLD,
+    re-ranks with the hybrid score, and returns the top_k results.
     """
     try:
-        # Scan all documents from DynamoDB
-        # Note: In production, use a proper vector database (Pinecone, Weaviate, etc.)
-        # or AWS OpenSearch for efficient similarity search
-        response = embeddings_table.scan()
+        response  = embeddings_table.scan()
         documents = response.get('Items', [])
 
         if not documents:
             print("No documents found in knowledge base")
             return []
 
-        # Calculate similarity scores
+        candidate_limit = max(top_k * 4, 20)
         scored_docs = []
+
         for doc in documents:
-            if 'embedding' in doc:
-                try:
-                    # Parse embedding from JSON string back to list of floats
-                    doc_embedding_str = doc['embedding']
-                    if isinstance(doc_embedding_str, str):
-                        doc_embedding = json.loads(doc_embedding_str)
-                    else:
-                        # Already a list (shouldn't happen with new code, but handle for backwards compat)
-                        doc_embedding = doc_embedding_str
+            if 'embedding' not in doc:
+                continue
+            try:
+                raw = doc['embedding']
+                doc_embedding = json.loads(raw) if isinstance(raw, str) else raw
+                sem_score = cosine_similarity(query_embedding, doc_embedding)
+                scored_docs.append((sem_score, doc))
+            except Exception as e:
+                print(f"Error processing document {doc.get('doc_id')}: {e}")
 
-                    similarity = cosine_similarity(query_embedding, doc_embedding)
-                    scored_docs.append({
-                        'doc_id': doc.get('doc_id'),
-                        'doc_type': doc.get('doc_type', 'unknown'),
-                        'content': doc.get('content', ''),
-                        'similarity_score': similarity,
-                        'metadata': doc.get('metadata', {})
-                    })
-                except Exception as e:
-                    print(f"Error processing document {doc.get('doc_id')}: {str(e)}")
-                    continue
+        # Take top candidates by semantic score before hybrid re-rank
+        scored_docs.sort(key=lambda x: x[0], reverse=True)
+        candidates = scored_docs[:candidate_limit]
 
-        # Sort by similarity and return top-K
-        scored_docs.sort(key=lambda x: x['similarity_score'], reverse=True)
-        top_docs = scored_docs[:top_k]
+        # Hybrid re-rank: 70% semantic + 30% keyword
+        results = []
+        for sem_score, doc in candidates:
+            if sem_score < SIMILARITY_THRESHOLD:
+                continue
+            kw = keyword_score(query_text, doc.get('content', '')) if query_text else 0.0
+            hybrid = round(0.7 * sem_score + 0.3 * kw, 4)
+            results.append({
+                'doc_id':           doc.get('doc_id'),
+                'doc_type':         doc.get('doc_type', 'unknown'),
+                'content':          doc.get('content', ''),
+                'similarity_score': hybrid,
+                'metadata':         doc.get('metadata', {}),
+            })
 
-        print(f"Retrieved {len(top_docs)} documents")
+        results.sort(key=lambda x: x['similarity_score'], reverse=True)
+        top_docs = results[:top_k]
+
+        print(f"Retrieved {len(top_docs)}/{len(candidates)} candidates (threshold={SIMILARITY_THRESHOLD})")
         for doc in top_docs:
             print(f"  - {doc['doc_id']}: {doc['similarity_score']:.4f}")
 
