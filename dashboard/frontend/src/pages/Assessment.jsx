@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -118,6 +119,7 @@ function Assessment({ apiUrl }) {
     }
   }
 
+  const navigate   = useNavigate()
   const meta       = data?.assessment_metadata || {}
   const dims       = data?.dimensions || {}
   const composite  = data?.composite_score ?? 0
@@ -315,7 +317,11 @@ function Assessment({ apiUrl }) {
                       const actionColor = r.action === 'auto_response' ? '#28a745'
                                         : r.action === 'human_review'  ? '#f39c12' : '#dc3545'
                       return (
-                        <tr key={r.laya_email_id}>
+                        <tr
+                          key={r.laya_email_id}
+                          onClick={() => r.sfn_email_id && navigate(`/email/${r.sfn_email_id}`)}
+                          style={{ cursor: r.sfn_email_id ? 'pointer' : 'default' }}
+                        >
                           <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
                             {r.laya_email_id?.slice(0, 12)}…
                           </td>

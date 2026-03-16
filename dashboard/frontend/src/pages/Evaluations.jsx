@@ -139,7 +139,7 @@ function ReferenceEval({ data, loading, error }) {
                 return (
                   <tr key={r.query_id}>
                     <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.query_id}</td>
-                    <td style={{ maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <td title={r.query} style={{ maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'help' }}>
                       {r.query}
                     </td>
                     <td>{PCT(r.key_fact_recall)}</td>
