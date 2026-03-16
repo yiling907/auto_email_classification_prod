@@ -61,6 +61,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 
+# ── TruLens (optional — only needed when --trulens flag is used) ───────────────
+try:
+    from trulens.providers.bedrock import Bedrock as TruLensBedrock
+    TRULENS_AVAILABLE = True
+except ImportError:
+    TRULENS_AVAILABLE = False
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 ROOT        = Path(__file__).resolve().parent.parent
@@ -82,6 +89,8 @@ EMAIL_TABLE_NAME   = os.environ.get("EMAIL_TABLE_NAME",      "insuremail-ai-dev-
 
 PASS_THRESHOLD      = 0.70
 EXEC_TIMEOUT_SEC    = 120     # max seconds to wait for one execution
+TRULENS_MODEL_ID    = "anthropic.claude-3-haiku-20240307-v1:0"
+TRULENS_WORKERS     = 5       # parallel TruLens scoring calls
 POLL_INTERVAL_SEC   = 3       # seconds between status polls
 S3_PREFIX           = "test-pipeline"   # S3 key prefix for uploaded emails
 
@@ -254,6 +263,11 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
     pii_detected     = bool(parsed.get("pii_present", False))
     medical_detected = bool(parsed.get("medical_terms_present", False))
 
+    # Build RAG context string for TruLens scoring (joined doc snippets)
+    rag_context_str = "\n\n".join(
+        d.get("content", "")[:600] for d in rag_docs[:5]
+    ) or "No documents retrieved."
+
     return {
         "laya_email_id":      laya_record["email_id"],
         "sfn_email_id":       out.get("parsed_email", {}).get("email_id", ""),
@@ -274,6 +288,10 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
         "medical_detected":   medical_detected,
         "exec_status":        exec_result["status"],
         "exec_error":         exec_result.get("error"),
+        # ── TruLens inputs (stripped before saving to report) ──────────────
+        "_question":     f"Subject: {laya_record.get('subject','')}\n{laya_record.get('body_text','')}",
+        "_rag_context":  rag_context_str,
+        "_full_response": response_text,
     }
 
 
@@ -500,9 +518,112 @@ def score_entity(results: List[Dict], gold_records: List[Dict]) -> Dict:
     }
 
 
+# ── TruLens RAG Triad scoring ─────────────────────────────────────────────────
+
+def _score_one_trulens(args: Tuple) -> Dict:
+    """Score a single email with TruLens RAG triad. Runs in a thread."""
+    provider, laya_id, question, context, response = args
+    scores: Dict[str, Any] = {"laya_email_id": laya_id}
+
+    def _safe(fn, **kwargs) -> float:
+        try:
+            result = fn(**kwargs)
+            # groundedness returns Tuple[float, Dict]; others return float
+            val = result[0] if isinstance(result, tuple) else result
+            return round(float(val), 4)
+        except Exception as exc:
+            print(f"    [TruLens] {fn.__name__} failed for {laya_id[:12]}: {exc}")
+            return None
+
+    scores["answer_relevance"]  = _safe(provider.relevance,
+                                        prompt=question, response=response)
+    scores["context_relevance"] = _safe(provider.context_relevance,
+                                        question=question, context=context)
+    scores["groundedness"]      = _safe(provider.groundedness_measure_with_cot_reasons,
+                                        source=context, statement=response)
+
+    valid = [v for v in [scores["answer_relevance"],
+                         scores["context_relevance"],
+                         scores["groundedness"]] if v is not None]
+    scores["triad_avg"] = round(sum(valid) / len(valid), 4) if valid else None
+    return scores
+
+
+def score_trulens_rag_triad(results: List[Dict]) -> Optional[Dict]:
+    """
+    Run TruLens RAG Triad evaluation on all emails that have a response.
+    Returns aggregate + per-email scores, or None if TruLens is unavailable.
+    """
+    if not TRULENS_AVAILABLE:
+        print("[TruLens] Package not installed. Run: pip install trulens-providers-bedrock")
+        return None
+
+    scoreable = [
+        r for r in results
+        if r.get("_full_response") and r.get("exec_status") == "SUCCEEDED"
+    ]
+    if not scoreable:
+        return None
+
+    print(f"\nRunning TruLens RAG Triad on {len(scoreable)} emails "
+          f"(model={TRULENS_MODEL_ID})...")
+
+    try:
+        provider = TruLensBedrock(model_id=TRULENS_MODEL_ID)
+    except Exception as exc:
+        print(f"[TruLens] Provider init failed: {exc}")
+        return None
+
+    tasks = [
+        (provider,
+         r["laya_email_id"],
+         r["_question"],
+         r["_rag_context"],
+         r["_full_response"])
+        for r in scoreable
+    ]
+
+    per_email: List[Dict] = []
+    n_done = 0
+    with ThreadPoolExecutor(max_workers=TRULENS_WORKERS) as pool:
+        futures = {pool.submit(_score_one_trulens, t): t for t in tasks}
+        for future in as_completed(futures):
+            row = future.result()
+            per_email.append(row)
+            n_done += 1
+            avg = row.get("triad_avg")
+            avg_str = f"{avg:.4f}" if avg is not None else "err"
+            print(f"  [{n_done:>3}/{len(scoreable)}] {row['laya_email_id'][:20]:<20} "
+                  f"AR={row.get('answer_relevance','?')}  "
+                  f"CR={row.get('context_relevance','?')}  "
+                  f"GR={row.get('groundedness','?')}  "
+                  f"avg={avg_str}")
+
+    def _avg_metric(key: str) -> Optional[float]:
+        vals = [r[key] for r in per_email if r.get(key) is not None]
+        return round(sum(vals) / len(vals), 4) if vals else None
+
+    agg = {
+        "avg_answer_relevance":  _avg_metric("answer_relevance"),
+        "avg_context_relevance": _avg_metric("context_relevance"),
+        "avg_groundedness":      _avg_metric("groundedness"),
+        "avg_triad":             _avg_metric("triad_avg"),
+        "n_evaluated":           len(scoreable),
+        "provider_model":        TRULENS_MODEL_ID,
+        "per_email":             per_email,
+    }
+    print(f"\n  TruLens summary — "
+          f"AnswerRelevance={agg['avg_answer_relevance']}  "
+          f"ContextRelevance={agg['avg_context_relevance']}  "
+          f"Groundedness={agg['avg_groundedness']}  "
+          f"Triad={agg['avg_triad']}")
+    return agg
+
+
 # ── Composite score ───────────────────────────────────────────────────────────
 
-def compute_composite(intent_m, routing_m, entity_m, rag_m, response_m, calib_m) -> float:
+def compute_composite(intent_m, routing_m, entity_m, rag_m, response_m, calib_m,
+                      trulens_m=None) -> float:
     scores = []
     scores.append(intent_m["accuracy"])
     scores.append(routing_m["routing_accuracy"])
@@ -512,42 +633,63 @@ def compute_composite(intent_m, routing_m, entity_m, rag_m, response_m, calib_m)
         scores.append(calib_m["band_action_agreement"])
     ece_score = max(0.0, 1.0 - calib_m["ece"] * 2)
     scores.append(ece_score)
+    # Include TruLens triad average when available
+    if trulens_m and trulens_m.get("avg_triad") is not None:
+        scores.append(trulens_m["avg_triad"])
     return round(sum(scores) / len(scores), 4) if scores else 0.0
 
 
 # ── Report ────────────────────────────────────────────────────────────────────
 
+def _strip_trulens_inputs(results: List[Dict]) -> List[Dict]:
+    """Remove _question/_rag_context/_full_response fields before saving."""
+    return [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]
+
+
 def build_report(emails, results, cases, intent_m, routing_m, entity_m,
-                 rag_m, response_m, calib_m, elapsed: float, run_id: str) -> Dict:
-    composite = compute_composite(intent_m, routing_m, entity_m, rag_m, response_m, calib_m)
+                 rag_m, response_m, calib_m, elapsed: float, run_id: str,
+                 trulens_m=None) -> Dict:
+    composite = compute_composite(intent_m, routing_m, entity_m, rag_m, response_m, calib_m,
+                                  trulens_m)
     passed    = composite >= PASS_THRESHOLD
     n_failed  = sum(1 for r in results if r["exec_status"] != "SUCCEEDED")
 
+    dimensions = {
+        "intent_classification":  intent_m,
+        "routing_accuracy":       routing_m,
+        "entity_extraction":      entity_m,
+        "rag_retrieval":          rag_m,
+        "response_quality":       response_m,
+        "confidence_calibration": calib_m,
+    }
+    if trulens_m:
+        # Store aggregate + per-email (without the raw text inputs)
+        trulens_stored = {k: v for k, v in trulens_m.items() if k != "per_email"}
+        trulens_stored["per_email"] = [
+            {k: v for k, v in r.items() if not k.startswith("_")}
+            for r in trulens_m.get("per_email", [])
+        ]
+        dimensions["trulens_rag_triad"] = trulens_stored
+
     return {
         "assessment_metadata": {
-            "source":         "step_functions",
-            "run_id":         run_id,
-            "generated_at":   datetime.now(timezone.utc).isoformat(),
-            "n_emails":       len(emails),
-            "n_succeeded":    len(results) - n_failed,
-            "n_failed_exec":  n_failed,
-            "dry_run":        False,
-            "elapsed_seconds": round(elapsed, 1),
+            "source":            "step_functions",
+            "run_id":            run_id,
+            "generated_at":      datetime.now(timezone.utc).isoformat(),
+            "n_emails":          len(emails),
+            "n_succeeded":       len(results) - n_failed,
+            "n_failed_exec":     n_failed,
+            "dry_run":           False,
+            "elapsed_seconds":   round(elapsed, 1),
             "state_machine_arn": STATE_MACHINE_ARN,
-            "email_bucket":   EMAIL_BUCKET,
-            "pass_threshold": PASS_THRESHOLD,
-            "passed":         passed,
+            "email_bucket":      EMAIL_BUCKET,
+            "pass_threshold":    PASS_THRESHOLD,
+            "passed":            passed,
+            "trulens_enabled":   trulens_m is not None,
         },
-        "composite_score": composite,
-        "dimensions": {
-            "intent_classification": intent_m,
-            "routing_accuracy":      routing_m,
-            "entity_extraction":     entity_m,
-            "rag_retrieval":         rag_m,
-            "response_quality":      response_m,
-            "confidence_calibration": calib_m,
-        },
-        "per_email_results": results[:200],    # cap stored rows to control report size
+        "composite_score":  composite,
+        "dimensions":       dimensions,
+        "per_email_results": _strip_trulens_inputs(results[:200]),
     }
 
 
@@ -607,8 +749,25 @@ def print_report(report: Dict):
         for pair in n_confused[:5]:
             print(f"    {pair['true']:<35} → {pair['predicted']:<35} (n={pair['count']})")
 
+    if "trulens_rag_triad" in dims:
+        t = dims["trulens_rag_triad"]
+        print(f"\n{'-'*72}")
+        print(f"  STAGE — TRULENS RAG TRIAD  (n={t.get('n_evaluated')} emails, model=haiku)")
+        print(f"{'-'*72}")
+        ar = t.get('avg_answer_relevance')
+        cr = t.get('avg_context_relevance')
+        gr = t.get('avg_groundedness')
+        av = t.get('avg_triad')
+        print(f"  Answer Relevance:   {ar:.4f}" if ar is not None else "  Answer Relevance:   N/A")
+        print(f"  Context Relevance:  {cr:.4f}" if cr is not None else "  Context Relevance:  N/A")
+        print(f"  Groundedness:       {gr:.4f}" if gr is not None else "  Groundedness:       N/A")
+        print(f"  Triad Average:      {av:.4f}" if av is not None else "  Triad Average:      N/A")
+
     print(f"\n{bar}")
+    trulens_note = "  (TruLens triad included in composite)\n" if "trulens_rag_triad" in dims else ""
     print(f"  RESULT: {'PASSED' if passed else 'FAILED'}  |  Composite={composite:.4f}  |  Threshold={PASS_THRESHOLD}")
+    if trulens_note:
+        print(trulens_note, end="")
     print(f"{bar}\n")
 
 
@@ -625,6 +784,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timeout",     type=int,  default=EXEC_TIMEOUT_SEC,
                    help="Per-execution timeout in seconds")
     p.add_argument("--output",      type=Path, default=None)
+    p.add_argument("--trulens",     action="store_true", default=False,
+                   help="Run TruLens RAG Triad evaluation after pipeline (adds latency)")
     return p.parse_args()
 
 
@@ -692,10 +853,20 @@ def main() -> int:
     response_m = score_response(succeeded)
     calib_m   = score_confidence(succeeded)
 
+    # ── TruLens RAG Triad (optional) ──────────────────────────────────────────
+    trulens_m = None
+    if args.trulens:
+        if not TRULENS_AVAILABLE:
+            print("[TruLens] trulens-providers-bedrock not installed. "
+                  "Run: pip install trulens-providers-bedrock", file=sys.stderr)
+        else:
+            trulens_m = score_trulens_rag_triad(succeeded)
+
     # ── Build and save report ─────────────────────────────────────────────────
     elapsed = time.monotonic() - t0
     report  = build_report(emails, succeeded, cases, intent_m, routing_m, entity_m,
-                           rag_m, response_m, calib_m, elapsed, run_id)
+                           rag_m, response_m, calib_m, elapsed, run_id,
+                           trulens_m=trulens_m)
 
     with open(args.output, "w", encoding="utf-8") as fh:
         json.dump(report, fh, indent=2, ensure_ascii=False)

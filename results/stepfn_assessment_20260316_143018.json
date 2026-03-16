@@ -1,0 +1,760 @@
+{
+  "assessment_metadata": {
+    "source": "step_functions",
+    "run_id": "a39032b06792",
+    "generated_at": "2026-03-16T14:35:42.005976+00:00",
+    "n_emails": 20,
+    "n_succeeded": 20,
+    "n_failed_exec": 0,
+    "dry_run": false,
+    "elapsed_seconds": 323.1,
+    "state_machine_arn": "arn:aws:states:us-east-1:970850578809:stateMachine:insuremail-ai-dev-email-processing",
+    "email_bucket": "insuremail-ai-dev-emails",
+    "pass_threshold": 0.7,
+    "passed": true,
+    "trulens_enabled": true
+  },
+  "composite_score": 0.7751,
+  "dimensions": {
+    "intent_classification": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0,
+      "per_class": {
+        "payment_issue": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 4
+        },
+        "pre_authorisation": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 1
+        },
+        "document_followup": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 1
+        },
+        "claim_submission": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 5
+        },
+        "coverage_query": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 2
+        },
+        "claim_status": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 3
+        },
+        "id_verification": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 1
+        },
+        "renewal_query": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 1
+        },
+        "policy_change": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 2
+        }
+      },
+      "top_confused": [],
+      "n_samples": 20,
+      "n_correct": 20
+    },
+    "routing_accuracy": {
+      "routing_accuracy": 0.75,
+      "correct": 15,
+      "total": 20,
+      "per_team": {
+        "finance_support_team": 1.0,
+        "medical_review_team": 0.0,
+        "operations_team": 0.0,
+        "claims_team": 1.0,
+        "customer_support_team": 0.5,
+        "renewals_team": 1.0,
+        "policy_admin_team": 0.5
+      }
+    },
+    "entity_extraction": {
+      "policy_number": {
+        "precision": 0.9231,
+        "recall": 0.6316,
+        "f1": 0.75
+      },
+      "member_id": {
+        "precision": 1.0,
+        "recall": 0.2778,
+        "f1": 0.4348
+      },
+      "pii_flag": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "medical_flag": {
+        "precision": 1.0,
+        "recall": 0.5833,
+        "f1": 0.7368
+      }
+    },
+    "rag_retrieval": {
+      "hit_rate": 0.95,
+      "mrr": 0.95,
+      "ndcg_at_5": 0.95,
+      "hits": 19,
+      "total": 20,
+      "avg_docs_retrieved": 2.85
+    },
+    "response_quality": {
+      "avg_rouge_l": null,
+      "rouge_l_coverage": 0.0,
+      "hedge_rate": 1.0,
+      "escalation_agreement": 0.8333,
+      "escalation_pairs_evaluated": 6,
+      "n_with_response": 20
+    },
+    "confidence_calibration": {
+      "ece": 0.3085,
+      "mae_vs_band": 0.0,
+      "band_action_agreement": 0.8333,
+      "routing_distribution": {
+        "human_review": 0.7,
+        "escalate": 0.05,
+        "auto_response": 0.25
+      },
+      "routing_counts": {
+        "human_review": 14,
+        "escalate": 1,
+        "auto_response": 5
+      },
+      "reliability_diagram": [
+        {
+          "bin_lower": 0.4,
+          "bin_upper": 0.5,
+          "avg_confidence": 0.4719,
+          "avg_accuracy": 1.0,
+          "n": 1
+        },
+        {
+          "bin_lower": 0.5,
+          "bin_upper": 0.6,
+          "avg_confidence": 0.558,
+          "avg_accuracy": 1.0,
+          "n": 5
+        },
+        {
+          "bin_lower": 0.6,
+          "bin_upper": 0.7,
+          "avg_confidence": 0.6224,
+          "avg_accuracy": 1.0,
+          "n": 3
+        },
+        {
+          "bin_lower": 0.7,
+          "bin_upper": 0.8,
+          "avg_confidence": 0.7506,
+          "avg_accuracy": 1.0,
+          "n": 6
+        },
+        {
+          "bin_lower": 0.8,
+          "bin_upper": 0.9,
+          "avg_confidence": 0.8394,
+          "avg_accuracy": 1.0,
+          "n": 5
+        }
+      ]
+    },
+    "trulens_rag_triad": {
+      "avg_answer_relevance": 1.0,
+      "avg_context_relevance": 0.6167,
+      "avg_groundedness": 0.6415,
+      "avg_triad": 0.7596,
+      "n_evaluated": 20,
+      "provider_model": "anthropic.claude-3-haiku-20240307-v1:0",
+      "per_email": [
+        {
+          "laya_email_id": "EML-000002",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.0,
+          "groundedness": null,
+          "triad_avg": 0.5
+        },
+        {
+          "laya_email_id": "EML-000003",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": null,
+          "triad_avg": 0.8334
+        },
+        {
+          "laya_email_id": "EML-000004",
+          "answer_relevance": 1.0,
+          "context_relevance": 1.0,
+          "groundedness": null,
+          "triad_avg": 1.0
+        },
+        {
+          "laya_email_id": "EML-000005",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 0.0,
+          "triad_avg": 0.5556
+        },
+        {
+          "laya_email_id": "EML-000006",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 0.6,
+          "triad_avg": 0.7556
+        },
+        {
+          "laya_email_id": "EML-000001",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 1.0,
+          "triad_avg": 0.8889
+        },
+        {
+          "laya_email_id": "EML-000007",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.3333,
+          "groundedness": 0.0,
+          "triad_avg": 0.4444
+        },
+        {
+          "laya_email_id": "EML-000008",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 1.0,
+          "triad_avg": 0.8889
+        },
+        {
+          "laya_email_id": "EML-000009",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.3333,
+          "groundedness": 0.6667,
+          "triad_avg": 0.6667
+        },
+        {
+          "laya_email_id": "EML-000010",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 1.0,
+          "triad_avg": 0.8889
+        },
+        {
+          "laya_email_id": "EML-000011",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 0.6667,
+          "triad_avg": 0.7778
+        },
+        {
+          "laya_email_id": "EML-000012",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 1.0,
+          "triad_avg": 0.8889
+        },
+        {
+          "laya_email_id": "EML-000016",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 0.5,
+          "triad_avg": 0.7222
+        },
+        {
+          "laya_email_id": "EML-000017",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.3333,
+          "groundedness": 1.0,
+          "triad_avg": 0.7778
+        },
+        {
+          "laya_email_id": "EML-000018",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 0.6667,
+          "triad_avg": 0.7778
+        },
+        {
+          "laya_email_id": "EML-000014",
+          "answer_relevance": 1.0,
+          "context_relevance": 1.0,
+          "groundedness": 0.8333,
+          "triad_avg": 0.9444
+        },
+        {
+          "laya_email_id": "EML-000013",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 0.4167,
+          "triad_avg": 0.6945
+        },
+        {
+          "laya_email_id": "EML-000015",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 0.5556,
+          "triad_avg": 0.7408
+        },
+        {
+          "laya_email_id": "EML-000020",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 0.4,
+          "triad_avg": 0.6889
+        },
+        {
+          "laya_email_id": "EML-000019",
+          "answer_relevance": 1.0,
+          "context_relevance": 0.6667,
+          "groundedness": 0.6,
+          "triad_avg": 0.7556
+        }
+      ]
+    }
+  },
+  "per_email_results": [
+    {
+      "laya_email_id": "EML-000004",
+      "sfn_email_id": "fdf22035-5eb9-40b5-90ef-e8246a2d88fb",
+      "gold_intent": "payment_issue",
+      "gold_route_team": "finance_support_team",
+      "gold_requires_human": false,
+      "predicted_intent": "payment_issue",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "neutral",
+      "predicted_route": "finance_support_team",
+      "confidence_score": 0.581,
+      "action": "human_review",
+      "response_text": "Dear Conor,\n\nThank you for contacting Laya Healthcare regarding your payment issue. We apologize for any inconvenience caused.\n\nTo help resolve this issue, please follow the steps below to check your payment method in your Member Area:\n\n1. Log in to your Member Area at https://www.layahealthcare.ie/memberarea/howtousememberarea\n2. Navigate to the 'Manage your policy' section and select 'Update payment methods'.\n3. Review your current payment method and update it if necessary.\n\nIf you encounter a",
+      "rag_hit_count": 3,
+      "extracted_policy": "",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000002",
+      "sfn_email_id": "8aa2e451-a246-4dc2-835c-b615f286e4e8",
+      "gold_intent": "pre_authorisation",
+      "gold_route_team": "medical_review_team",
+      "gold_requires_human": true,
+      "predicted_intent": "pre_authorisation",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "provider_support_team",
+      "confidence_score": 0.4719,
+      "action": "escalate",
+      "response_text": "Dear Ciara,\n\nThank you for contacting us regarding your upcoming neck strain treatment at Mater Private. Based on the information provided, pre-authorisation is required for this procedure under your policy POL-IE-859489.\n\nTo facilitate the pre-authorisation process, please submit the following documents to us as soon as possible:\n\n1. A completed and signed Pre-authorisation Request Form (available on our website or from your consultant).\n2. A referral letter from your consultant, detailing the ",
+      "rag_hit_count": 0,
+      "extracted_policy": "POL-IE-859489",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": true,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000003",
+      "sfn_email_id": "1d38d6fa-23be-471b-901b-bb76e8b4e0ed",
+      "gold_intent": "payment_issue",
+      "gold_route_team": "finance_support_team",
+      "gold_requires_human": false,
+      "predicted_intent": "payment_issue",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "neutral",
+      "predicted_route": "finance_support_team",
+      "confidence_score": 0.5339,
+      "action": "human_review",
+      "response_text": "Dear Roisin,\n\nThank you for bringing your billing issue to our attention. We apologize for any inconvenience caused.\n\nTo cancel your policy and receive a full refund, please follow the instructions provided in the 'How to use your Member Area' document. You can access this document by logging into your secure Member Area or by visiting our website. Once you have cancelled your policy, please allow up to 14 business days for the refund to be processed.\n\nShould you have any questions or concerns r",
+      "rag_hit_count": 3,
+      "extracted_policy": "",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000005",
+      "sfn_email_id": "f26cfde0-ff91-4bea-bf5f-9b28d5c94219",
+      "gold_intent": "document_followup",
+      "gold_route_team": "operations_team",
+      "gold_requires_human": false,
+      "predicted_intent": "document_followup",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "customer_support_team",
+      "confidence_score": 0.8577,
+      "action": "auto_response",
+      "response_text": "Dear Lorcan,\n\nThank you for providing the additional documents for case CASE-771463. We will review them as soon as possible and keep you updated on the progress. In the meantime, if you have any questions or need further assistance, please don't hesitate to contact us at [support_email].\n\nYour policy number is POL-IE-805483.\n\nBest regards,\nYour Laya Healthcare Team",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-805483",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000006",
+      "sfn_email_id": "f4e5f65b-13d5-43c4-942d-4e83c276434d",
+      "gold_intent": "claim_submission",
+      "gold_route_team": "claims_team",
+      "gold_requires_human": false,
+      "predicted_intent": "claim_submission",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "claims_team",
+      "confidence_score": 0.6234,
+      "action": "human_review",
+      "response_text": "Dear Aoife,\n\nThank you for submitting your claim for the dermatology consultation on 22 July 2025 at Beacon Medical Centre. We have received your invoice and receipt with the amount paid of EUR 778.74. Your Member ID is MEM-000965.\n\nTo process your claim, please follow the steps outlined in our 'How to Claim for Medical Expenses' guide available on our website. You can download the relevant claim form from the 'Download a Claim Form' section on our website.\n\nOnce completed, please return the cla",
+      "rag_hit_count": 3,
+      "extracted_policy": "",
+      "extracted_member": "MEM-000965",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000001",
+      "sfn_email_id": "04c920a0-20d4-4ad8-aef6-679b3450aea8",
+      "gold_intent": "coverage_query",
+      "gold_route_team": "customer_support_team",
+      "gold_requires_human": true,
+      "predicted_intent": "coverage_query",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "customer_support_team",
+      "confidence_score": 0.7407,
+      "action": "human_review",
+      "response_text": "Dear Sinead, \n\nThank you for contacting Laya Healthcare regarding your query about pain relief medication coverage under your current policy. To check your cover, please log in to your Member Area or download the Laya App. Once logged in, you can submit a claim for the medication receipt from Liffey Pharmacy. The system will automatically process your claim and provide you with the outcome. If you have any questions or need assistance, please don't hesitate to contact our Customer Service team a",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-821846",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": true,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000009",
+      "sfn_email_id": "8d96477a-de13-45fe-b68c-650e0993e164",
+      "gold_intent": "claim_status",
+      "gold_route_team": "claims_team",
+      "gold_requires_human": true,
+      "predicted_intent": "claim_status",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "claims_team",
+      "confidence_score": 0.7716,
+      "action": "human_review",
+      "response_text": "Dear Ryan, \n\nThank you for contacting Laya Healthcare regarding the status of your claim CLM-950666. We appreciate your patience as we process your claim. You can check the current status of your claim in real-time by logging into your Member Area at https://www.layahealthcare.ie/memberarea. Once logged in, please navigate to the 'Claims' tab and select 'View Claims'. Your claim, CLM-950666, will be listed with its current status. If you have any further questions or concerns, please do not hesi",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-938403",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": true,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000007",
+      "sfn_email_id": "5b828ee5-b4f4-4fff-ae80-c171219bb6ff",
+      "gold_intent": "payment_issue",
+      "gold_route_team": "finance_support_team",
+      "gold_requires_human": true,
+      "predicted_intent": "payment_issue",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "neutral",
+      "predicted_route": "finance_support_team",
+      "confidence_score": 0.558,
+      "action": "human_review",
+      "response_text": "Dear Eoin,\n\nThank you for contacting us regarding the billing issue on your account. We apologize for any inconvenience this may have caused you.\n\nTo help us resolve this issue, could you please provide us with the following information:\n- Your policy number\n- The last four digits of the card used for your direct debit\n- The date of your last payment\n\nYou can find this information in your secure Member Area under the 'My Policy' section. If you are unable to access your Member Area, please conta",
+      "rag_hit_count": 3,
+      "extracted_policy": "",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000010",
+      "sfn_email_id": "e39f3b99-a1b3-4f8e-922b-bcdb6fffb8ea",
+      "gold_intent": "claim_submission",
+      "gold_route_team": "claims_team",
+      "gold_requires_human": false,
+      "predicted_intent": "claim_submission",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "claims_team",
+      "confidence_score": 0.8414,
+      "action": "auto_response",
+      "response_text": "Dear Conor,\n\nThank you for contacting Laya Healthcare regarding your claim for an antibiotic prescription on 31 May 2025 at Liffey Pharmacy. To process your claim, please follow these steps:\n\n1. Download the Laya App or go online to your Member Area.\n2. Submit a claim for your antibiotic prescription using the App or Member Area.\n3. Attach a clear photo of the prescription receipt.\n\nOnce your claim has been processed, you will receive an email notification with details of the claim outcome. If y",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-689107",
+      "extracted_member": "MEM-000132",
+      "pii_detected": false,
+      "medical_detected": true,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000011",
+      "sfn_email_id": "93cc3739-cb17-44ec-bf38-500827bf8d65",
+      "gold_intent": "id_verification",
+      "gold_route_team": "operations_team",
+      "gold_requires_human": true,
+      "predicted_intent": "id_verification",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "customer_support_team",
+      "confidence_score": 0.7717,
+      "action": "human_review",
+      "response_text": "Dear Eoin,\n\nThank you for submitting your identification documents to verify your account details. Your policy number POL-IE-872399 has been identified in our system, and we are currently processing your verification request.\n\nPlease note that it may take up to 5 business days for the verification process to be completed. Once your documents have been reviewed and verified, you will receive a confirmation email.\n\nIn the meantime, you can manage your policy and check your cover online through the",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-872399",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000008",
+      "sfn_email_id": "d6f41c52-b5a2-4413-a148-9906adec9183",
+      "gold_intent": "claim_submission",
+      "gold_route_team": "claims_team",
+      "gold_requires_human": false,
+      "predicted_intent": "claim_submission",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "claims_team",
+      "confidence_score": 0.8251,
+      "action": "auto_response",
+      "response_text": "Dear Maeve,\n\nThank you for submitting your claim for neck strain treatment on 11 May 2025 at City Sports Injury Clinic. We have received your invoice and receipt with the amount paid of EUR 360.16. To process your claim, we kindly ask you to download the Laya App or submit a claim through your Member Area. This will allow you to take a photo of your receipt and submit it for processing. If you require any assistance with this process, please do not hesitate to contact our customer service team a",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-223694",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": true,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000013",
+      "sfn_email_id": "86499de5-9ab7-431c-8e19-007db6c3a681",
+      "gold_intent": "claim_submission",
+      "gold_route_team": "claims_team",
+      "gold_requires_human": false,
+      "predicted_intent": "claim_submission",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "claims_team",
+      "confidence_score": 0.6122,
+      "action": "human_review",
+      "response_text": "Dear Sean,\n\nThank you for submitting your claim for the root canal consultation on 06 February 2026 at Cork Dental Centre. We have received your invoice and receipt with the amount paid of EUR 651.53. Your policy number is POL-IE-222621 and your Member ID is MEM-000529. To ensure a smooth processing of your claim, please follow these steps:\n\n1. Log in to your Member Area at https://www.layahealthcare.ie/memberarea/\n2. Click on the 'Make a Claim' tab and select 'Dental' as the type of claim.\n3. E",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-222621",
+      "extracted_member": "MEM-000529",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000012",
+      "sfn_email_id": "c5bd7789-d51c-4034-906e-b9a30e8a2120",
+      "gold_intent": "coverage_query",
+      "gold_route_team": "customer_support_team",
+      "gold_requires_human": true,
+      "predicted_intent": "coverage_query",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "neutral",
+      "predicted_route": "medical_review_team",
+      "confidence_score": 0.8397,
+      "action": "auto_response",
+      "response_text": "Dear Padraig,\n\nThank you for contacting Laya Healthcare regarding your upcoming cardiology review appointment at Beacon Medical Centre on 17 April 2025. Based on the information provided in your email and the details of your policy number POL-IE-761685, we can confirm that Heartbeat Cardiac Screening is covered under your current plan.\n\nIf you have any further questions or concerns, please do not hesitate to contact our Customer Service team at 1800 54 64 74 or email us at customerservice@layahe",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-761685",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000016",
+      "sfn_email_id": "d20d59d3-654e-45d8-b3cc-820fc723f2d7",
+      "gold_intent": "claim_submission",
+      "gold_route_team": "claims_team",
+      "gold_requires_human": false,
+      "predicted_intent": "claim_submission",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "claims_team",
+      "confidence_score": 0.6317,
+      "action": "human_review",
+      "response_text": "Dear Jack,\n\nThank you for submitting your claim for the MRI contrast fee on 08 February 2025 at Mater Imaging. We have received your claim and the attached supporting documents. Your policy number is POL-IE-239449 and your Member ID is MEM-000153.\n\nTo ensure a smooth processing of your claim, please note that you can submit your claims for everyday medical expenses through the Laya App or online at any point during the year - 24 hours a day, 7 days a week. This can be done by downloading the Lay",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-239449",
+      "extracted_member": "MEM-000153",
+      "pii_detected": false,
+      "medical_detected": true,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000014",
+      "sfn_email_id": "789ef9fd-34da-4d4a-bd21-0e965032b4c6",
+      "gold_intent": "claim_status",
+      "gold_route_team": "claims_team",
+      "gold_requires_human": false,
+      "predicted_intent": "claim_status",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "claims_team",
+      "confidence_score": 0.7311,
+      "action": "human_review",
+      "response_text": "Dear Cian, \n\nThank you for contacting Laya Healthcare regarding the status of your claim CLM-598077. You can check the current status of your claim by logging into your Member Area at https://www.layahealthcare.ie/memberarea/.\n\nOnce logged in, you will be able to view the status of your claim under the 'Claims' tab. If you have any difficulty accessing or using your Member Area, please contact our Customer Service Team on 1800 200 500 for assistance.\n\nIf you do not have internet access, please c",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-238205",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": true,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000017",
+      "sfn_email_id": "8e6a0c02-d5ee-49be-aa78-6b11a75a3e2a",
+      "gold_intent": "payment_issue",
+      "gold_route_team": "finance_support_team",
+      "gold_requires_human": false,
+      "predicted_intent": "payment_issue",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "neutral",
+      "predicted_route": "finance_support_team",
+      "confidence_score": 0.5311,
+      "action": "human_review",
+      "response_text": "Dear Noah,\n\nThank you for contacting us regarding your billing issue. Based on our records, you have the option to cancel your policy on renewal and receive a full refund of any payments made, as long as no claims have been made on this renewed policy.\n\nTo cancel your policy, please follow the instructions provided in our Knowledge Base: [knowledge_base_memberarea__howtousememberarea.txt_3]\n\nIf you have any further questions or concerns, please do not hesitate to contact us.\n\nBest regards,\nYour ",
+      "rag_hit_count": 3,
+      "extracted_policy": "",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000018",
+      "sfn_email_id": "6ce4b63c-e3c9-44f8-9019-ee54719a4e43",
+      "gold_intent": "renewal_query",
+      "gold_route_team": "renewals_team",
+      "gold_requires_human": false,
+      "predicted_intent": "renewal_query",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "neutral",
+      "predicted_route": "renewals_team",
+      "confidence_score": 0.7684,
+      "action": "human_review",
+      "response_text": "Dear Liam,\n\nThank you for contacting Laya Healthcare regarding your renewal notice. We understand that the premium has increased compared to last year, and you are considering switching to a different plan.\n\nWe would be happy to help you explore your options. However, it is important to note that if you have held private health insurance within the past 13 weeks and the level of cover was higher or is the same as that of your new policy with us, you may be subject to waiting periods for certain ",
+      "rag_hit_count": 3,
+      "extracted_policy": "",
+      "extracted_member": "MEM-000048",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000015",
+      "sfn_email_id": "90bf9ed0-08b4-4573-84d1-e161fb24034b",
+      "gold_intent": "claim_status",
+      "gold_route_team": "claims_team",
+      "gold_requires_human": false,
+      "predicted_intent": "claim_status",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "claims_team",
+      "confidence_score": 0.7199,
+      "action": "human_review",
+      "response_text": "Dear Saoirse, \n\nThank you for contacting Laya Healthcare regarding the status of your recent claim for back pain follow-up. Your claim reference number is CLM-678850, and your policy number is POL-IE-658710. \n\nTo check the current status of your claim, please log in to your Member Area at https://www.layahealthcare.ie/memberarea/ and navigate to the 'My Claims' section. Here, you will find detailed information about the progress of your claim. If you require any further assistance, please do not",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-658710",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000019",
+      "sfn_email_id": "4898113a-6bfd-4fde-a4f6-75324a49cc4d",
+      "gold_intent": "policy_change",
+      "gold_route_team": "policy_admin_team",
+      "gold_requires_human": false,
+      "predicted_intent": "policy_change",
+      "predicted_urgency": "medium",
+      "predicted_sentiment": "positive",
+      "predicted_route": "policy_admin_team",
+      "confidence_score": 0.5859,
+      "action": "human_review",
+      "response_text": "Dear Ryan,\n\nThank you for contacting Laya Healthcare regarding the incorrect name on your policy. To update your contact details, please log in to your Member Area and follow the steps below:\n1. Click on the 'Manage your policy' tab.\n2. Select 'Update personal details'.\n3. Enter your new details and click 'Save'.\nIf you encounter any issues, please do not hesitate to contact our Customer Service team at [customer_service_email] or call us at [customer_service_phone].\n\nBest regards,\nLaya Healthca",
+      "rag_hit_count": 3,
+      "extracted_policy": "POL-IE-103353",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    },
+    {
+      "laya_email_id": "EML-000020",
+      "sfn_email_id": "852b2db1-fb71-4687-9b6c-39e1fa60dfe3",
+      "gold_intent": "policy_change",
+      "gold_route_team": "policy_admin_team",
+      "gold_requires_human": false,
+      "predicted_intent": "policy_change",
+      "predicted_urgency": "low",
+      "predicted_sentiment": "positive",
+      "predicted_route": "customer_support_team",
+      "confidence_score": 0.8333,
+      "action": "auto_response",
+      "response_text": "Dear Emma,\n\nThank you for contacting Laya Healthcare regarding the update of your contact details. To make this change, please log in to your secure Member Area and follow the steps below:\n1. Click on the 'Manage your policy' tab.\n2. Select 'Update your details'.\n3. Enter your new address, '27 Willow Park, Limerick', in the appropriate fields.\n4. Click 'Save Changes'.\nIf you encounter any difficulties, please do not hesitate to contact us on 1800 200 500 or via the contact us page on our website",
+      "rag_hit_count": 3,
+      "extracted_policy": "",
+      "extracted_member": "",
+      "pii_detected": false,
+      "medical_detected": false,
+      "exec_status": "SUCCEEDED",
+      "exec_error": null
+    }
+  ]
+}

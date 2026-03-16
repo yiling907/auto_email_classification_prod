@@ -122,6 +122,9 @@ function Assessment({ apiUrl }) {
   const navigate   = useNavigate()
   const meta       = data?.assessment_metadata || {}
   const dims       = data?.dimensions || {}
+  const sfnIdMap   = Object.fromEntries(
+    (data?.per_email_results || []).map(r => [r.laya_email_id, r.sfn_email_id])
+  )
   const composite  = data?.composite_score ?? 0
   const passed     = meta.passed
   const findings   = data?.code_quality_assessment?.findings || []
@@ -359,6 +362,83 @@ function Assessment({ apiUrl }) {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* ── TruLens RAG Triad ────────────────────────────────────── */}
+          {dims.trulens_rag_triad && (
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <h3 className="card-title" style={{ margin: 0 }}>TruLens RAG Triad</h3>
+                <span style={{
+                  padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem',
+                  fontWeight: 600, background: '#e8f4f8', color: '#0c5460',
+                }}>
+                  {dims.trulens_rag_triad.n_evaluated} emails · Claude Haiku
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+                {[
+                  { label: 'Answer Relevance',  key: 'avg_answer_relevance',  desc: 'Does the response address the question?' },
+                  { label: 'Context Relevance', key: 'avg_context_relevance', desc: 'Is the retrieved context relevant?' },
+                  { label: 'Groundedness',      key: 'avg_groundedness',      desc: 'Is the response grounded in the context?' },
+                  { label: 'Triad Average',     key: 'avg_triad',             desc: 'Average of the three RAG triad scores' },
+                ].map(({ label, key, desc }) => {
+                  const val = dims.trulens_rag_triad[key]
+                  const pct = val != null ? val * 100 : null
+                  const color = pct == null ? '#999' : pct >= 75 ? '#28a745' : pct >= 50 ? '#f39c12' : '#dc3545'
+                  return (
+                    <div key={key} className="card" style={{ padding: '1rem', textAlign: 'center' }}
+                         title={desc}>
+                      <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.4rem' }}>{label}</div>
+                      <div style={{ fontSize: '1.75rem', fontWeight: 800, color }}>
+                        {pct != null ? `${pct.toFixed(1)}%` : '—'}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {dims.trulens_rag_triad.per_email?.length > 0 && (
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Email ID</th>
+                        <th>Answer Relevance</th>
+                        <th>Context Relevance</th>
+                        <th>Groundedness</th>
+                        <th>Triad Avg</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dims.trulens_rag_triad.per_email.map(r => {
+                        const scoreCell = (v) => {
+                          if (v == null) return <td style={{ color: '#999' }}>—</td>
+                          const pct = (v * 100).toFixed(1)
+                          const color = v >= 0.75 ? '#28a745' : v >= 0.5 ? '#f39c12' : '#dc3545'
+                          return <td style={{ color, fontWeight: 600 }}>{pct}%</td>
+                        }
+                        const sfnId = sfnIdMap[r.laya_email_id]
+                        return (
+                          <tr
+                            key={r.laya_email_id}
+                            onClick={() => sfnId && navigate(`/email/${sfnId}`)}
+                            style={{ cursor: sfnId ? 'pointer' : 'default' }}
+                          >
+                            <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                              {r.laya_email_id?.slice(0, 12)}…
+                            </td>
+                            {scoreCell(r.answer_relevance)}
+                            {scoreCell(r.context_relevance)}
+                            {scoreCell(r.groundedness)}
+                            {scoreCell(r.triad_avg)}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
