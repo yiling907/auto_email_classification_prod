@@ -410,7 +410,8 @@ def extract_results(output: Dict[str, Any]) -> Dict[str, Any]:
     rag_docs     = rag_results.get("retrieved_documents", [])
 
     # ── CRM validation (crm_validation Lambda) ────────────────────────────────
-    crm_context  = output.get("crm_context", {})
+    # ResultPath in the state machine is "$.crm_validation"
+    crm_context  = output.get("crm_validation", {})
 
     # ── Response (claude_response Lambda) ─────────────────────────────────────
     response     = output.get("response", {})

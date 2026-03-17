@@ -32,6 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
+from decimal import Decimal
 
 # Optional heavy-weight imports — handled gracefully when unavailable in Lambda
 try:
@@ -80,6 +81,19 @@ _RE_MEMBER = re.compile(r'\bMEM-\d{6}\b',    re.IGNORECASE)
 _RE_PPSN   = re.compile(r'\b\d{7}[A-Z]{1,2}\b')
 
 
+# ── DynamoDB type helpers ─────────────────────────────────────────────────────
+
+def _dynamo_safe(obj: Any) -> Any:
+    """Recursively convert float → Decimal for DynamoDB compatibility."""
+    if isinstance(obj, float):
+        return Decimal(str(obj))
+    if isinstance(obj, dict):
+        return {k: _dynamo_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_dynamo_safe(i) for i in obj]
+    return obj
+
+
 # ── Lambda handler ─────────────────────────────────────────────────────────────
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -126,7 +140,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'processing_status': 'parsed',
         })
 
-        email_table.put_item(Item=parsed_data)
+        email_table.put_item(Item=_dynamo_safe(parsed_data))
         print(f"Stored email {email_id} in DynamoDB")
 
         return {

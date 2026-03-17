@@ -340,11 +340,12 @@ def _execute_query(field: str, value: str) -> Optional[Dict[str, Any]]:
             resp = customers_table.get_item(Key={"customer_id": value})
             return resp.get("Item")
 
-        # Scan with a parameterised filter for other identifier fields
-        resp = customers_table.scan(
-            FilterExpression=Attr(field).eq(value),
-            Limit=1,
-        )
+        # Scan with a parameterised filter for other identifier fields.
+        # NOTE: Do NOT use Limit here — DynamoDB Limit caps items *read*, not
+        # items *matched*, so Limit=1 would miss any record not at the very
+        # start of the table.  The customers table is small (~1000 rows) so a
+        # full scan with FilterExpression is fast and correct.
+        resp = customers_table.scan(FilterExpression=Attr(field).eq(value))
         items = resp.get("Items", [])
         return items[0] if items else None
 
