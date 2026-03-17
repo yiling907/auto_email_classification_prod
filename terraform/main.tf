@@ -42,6 +42,7 @@ module "iam" {
   email_table_arn       = module.storage.email_table_arn
   model_metrics_table_arn = module.storage.model_metrics_table_arn
   embeddings_table_arn  = module.storage.embeddings_table_arn
+  customers_table_arn   = module.storage.customers_table_arn
   tags                  = local.common_tags
 }
 
@@ -58,6 +59,7 @@ module "lambda" {
   email_table_name          = module.storage.email_table_name
   model_metrics_table_name  = module.storage.model_metrics_table_name
   embeddings_table_name     = module.storage.embeddings_table_name
+  customers_table_name      = module.storage.customers_table_name
   log_retention_days        = var.log_retention_days
   state_machine_arn         = module.step_functions.state_machine_arn
   sender_email              = var.sender_email
@@ -83,7 +85,8 @@ module "step_functions" {
   rag_retrieval_lambda_arn        = module.lambda.rag_retrieval_arn
   claude_response_lambda_arn      = module.lambda.claude_response_arn
   classify_intent_lambda_arn  = module.lambda.classify_intent_arn
-  email_sender_lambda_arn         = module.lambda.email_sender_arn
+  email_sender_lambda_arn     = module.lambda.email_sender_arn
+  crm_validation_lambda_arn   = module.lambda.crm_validation_arn
   tags                            = local.common_tags
 }
 

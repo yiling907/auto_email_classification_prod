@@ -191,12 +191,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         email_id          = email_id,
     )
 
-    # Merge CRM result into pipeline state (other keys pass through unchanged)
-    return {
-        **event,
-        "crm_context": crm_context,
-        "crm_found":   crm_context["crm_found"],
-    }
+    # Return ONLY the CRM output — Step Functions stores this at the ResultPath
+    # configured in the state machine ($.crm_validation) and handles merging.
+    # Do NOT return the full event here; that would cause ResultPath duplication.
+    return crm_context
 
 
 # ══════════════════════════════════════════════════════════════════════════════

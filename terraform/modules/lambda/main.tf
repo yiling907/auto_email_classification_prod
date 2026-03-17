@@ -261,6 +261,39 @@ resource "aws_cloudwatch_log_group" "gmail_imap_poller" {
 }
 
 
+# CRM Validation Lambda
+data "archive_file" "crm_validation" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_path}/crm_validation"
+  output_path = "${path.module}/builds/crm_validation.zip"
+}
+
+resource "aws_lambda_function" "crm_validation" {
+  filename         = data.archive_file.crm_validation.output_path
+  function_name    = "${local.resource_prefix}-crm-validation"
+  role             = var.lambda_execution_role_arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = var.lambda_runtime
+  timeout          = 60
+  memory_size      = 512
+  source_code_hash = data.archive_file.crm_validation.output_base64sha256
+
+  environment {
+    variables = {
+      CUSTOMERS_TABLE_NAME = var.customers_table_name
+      TEXT2SQL_MODEL_ID    = "mistral.mistral-7b-instruct-v0:2"
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-crm-validation" })
+}
+
+resource "aws_cloudwatch_log_group" "crm_validation" {
+  name              = "/aws/lambda/${aws_lambda_function.crm_validation.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
 # Data source to package Email Sender Lambda
 data "archive_file" "email_sender" {
   type        = "zip"

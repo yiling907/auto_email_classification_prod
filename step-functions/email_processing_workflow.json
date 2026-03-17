@@ -42,11 +42,12 @@
           "States": {
             "ExtractEntities": {
               "Type": "Pass",
-              "Comment": "Extract entities (simplified for demo)",
+              "Comment": "Pass through real entities extracted by email_parser Lambda",
               "Parameters": {
-                "policy_number": "DEMO-12345",
-                "member_name": "Demo User",
-                "claim_amount": 5000
+                "policy_number.$": "$.parsed_email.parsed_data.policy_number",
+                "member_id.$": "$.parsed_email.parsed_data.member_id",
+                "sender_email.$": "$.parsed_email.parsed_data.sender_email",
+                "pii_present.$": "$.parsed_email.parsed_data.pii_present"
               },
               "ResultPath": "$.entities",
               "End": true
@@ -63,7 +64,7 @@
       "Comment": "Retrieve relevant knowledge base documents",
       "Parameters": {
         "email_text.$": "$.parsed_email.parsed_data.body_text",
-        "intent.$": "$.analysis[0].intent.customer_intent",
+        "intent.$": "$.analysis[0].intent.classification.customer_intent",
         "top_k": 5
       },
       "ResultPath": "$.rag_results",
@@ -87,12 +88,41 @@
       "Next": "ValidateCRM"
     },
     "ValidateCRM": {
-      "Type": "Pass",
-      "Comment": "Mock CRM validation (check if policy exists)",
+      "Type": "Task",
+      "Resource": "${crm_validation_lambda_arn}",
+      "Comment": "CRM validation: Text-to-SQL (Mistral 7B) → DynamoDB customer lookup → policy eligibility check",
       "Parameters": {
-        "policy_exists": true,
-        "customer_id": "CUST-001",
-        "validation_status": "success"
+        "email_id.$": "$.parsed_email.email_id",
+        "intent.$": "$.analysis[0].intent.classification.customer_intent",
+        "email_body.$": "$.parsed_email.parsed_data.body_text",
+        "extracted_entities": {
+          "policy_number.$": "$.parsed_email.parsed_data.policy_number",
+          "member_id.$": "$.parsed_email.parsed_data.member_id",
+          "customer_id.$": "$.parsed_email.parsed_data.customer_id"
+        }
+      },
+      "ResultPath": "$.crm_validation",
+      "Next": "AssessFraudRisk",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "SetEmptyCRM",
+          "ResultPath": "$.crm_error"
+        }
+      ]
+    },
+    "SetEmptyCRM": {
+      "Type": "Pass",
+      "Comment": "CRM lookup failed — continue pipeline with empty CRM context",
+      "Parameters": {
+        "crm_found": false,
+        "customer": null,
+        "policy": null,
+        "validation": {
+          "policy_exists": false,
+          "eligible_for_intent": false,
+          "ineligibility_reason": "CRM lookup failed"
+        }
       },
       "ResultPath": "$.crm_validation",
       "Next": "AssessFraudRisk"

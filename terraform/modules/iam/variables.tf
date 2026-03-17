@@ -43,6 +43,11 @@ variable "embeddings_table_arn" {
   type        = string
 }
 
+variable "customers_table_arn" {
+  description = "ARN of the customers DynamoDB table"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

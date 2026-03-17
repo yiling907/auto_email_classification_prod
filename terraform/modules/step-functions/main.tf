@@ -9,11 +9,12 @@ locals {
   state_machine_definition = templatefile(
     "${path.root}/../step-functions/email_processing_workflow.json",
     {
-      email_parser_lambda_arn        = var.email_parser_lambda_arn
-      rag_retrieval_lambda_arn       = var.rag_retrieval_lambda_arn
-      claude_response_lambda_arn     = var.claude_response_lambda_arn
+      email_parser_lambda_arn    = var.email_parser_lambda_arn
+      rag_retrieval_lambda_arn   = var.rag_retrieval_lambda_arn
+      claude_response_lambda_arn = var.claude_response_lambda_arn
       classify_intent_lambda_arn = var.classify_intent_lambda_arn
-      email_sender_lambda_arn        = var.email_sender_lambda_arn
+      email_sender_lambda_arn    = var.email_sender_lambda_arn
+      crm_validation_lambda_arn  = var.crm_validation_lambda_arn
     }
   )
 }

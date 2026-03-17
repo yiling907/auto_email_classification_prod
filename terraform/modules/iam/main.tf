@@ -87,7 +87,9 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
           var.model_metrics_table_arn,
           "${var.model_metrics_table_arn}/index/*",
           var.embeddings_table_arn,
-          "${var.embeddings_table_arn}/index/*"
+          "${var.embeddings_table_arn}/index/*",
+          var.customers_table_arn,
+          "${var.customers_table_arn}/index/*"
         ]
       }
     ]

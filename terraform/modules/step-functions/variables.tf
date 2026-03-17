@@ -38,6 +38,11 @@ variable "email_sender_lambda_arn" {
   type        = string
 }
 
+variable "crm_validation_lambda_arn" {
+  description = "ARN of the CRM validation Lambda function"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

@@ -43,6 +43,11 @@ variable "embeddings_table_name" {
   type        = string
 }
 
+variable "customers_table_name" {
+  description = "Name of the customers DynamoDB table"
+  type        = string
+}
+
 variable "log_retention_days" {
   description = "CloudWatch log retention in days"
   type        = number

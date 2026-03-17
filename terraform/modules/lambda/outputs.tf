@@ -79,6 +79,16 @@ output "email_sender_name" {
   value       = aws_lambda_function.email_sender.function_name
 }
 
+output "crm_validation_arn" {
+  description = "ARN of the CRM validation Lambda function"
+  value       = aws_lambda_function.crm_validation.arn
+}
+
+output "crm_validation_name" {
+  description = "Name of the CRM validation Lambda function"
+  value       = aws_lambda_function.crm_validation.function_name
+}
+
 output "email_parser_lambda_permission_id" {
   description = "ID of the S3 permission for email parser Lambda"
   value       = aws_lambda_permission.allow_s3_email_parser.id
