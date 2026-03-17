@@ -196,6 +196,28 @@ resource "aws_dynamodb_table" "model_metrics" {
   tags = merge(var.tags, { Name = "${local.resource_prefix}-model-metrics" })
 }
 
+# DynamoDB table for customer records
+resource "aws_dynamodb_table" "customers" {
+  name         = "${local.resource_prefix}-customers"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "customer_id"
+
+  attribute {
+    name = "customer_id"
+    type = "S"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-customers" })
+}
+
 # DynamoDB table for knowledge base embeddings
 resource "aws_dynamodb_table" "embeddings" {
   name         = "${local.resource_prefix}-embeddings"

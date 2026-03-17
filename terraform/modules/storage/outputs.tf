@@ -50,6 +50,16 @@ output "model_metrics_table_arn" {
   value       = aws_dynamodb_table.model_metrics.arn
 }
 
+output "customers_table_name" {
+  description = "Name of the customers DynamoDB table"
+  value       = aws_dynamodb_table.customers.name
+}
+
+output "customers_table_arn" {
+  description = "ARN of the customers DynamoDB table"
+  value       = aws_dynamodb_table.customers.arn
+}
+
 output "embeddings_table_name" {
   description = "Name of the embeddings DynamoDB table"
   value       = aws_dynamodb_table.embeddings.name
