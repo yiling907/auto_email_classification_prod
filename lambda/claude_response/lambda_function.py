@@ -68,6 +68,17 @@ CUSTOMER INTENT: {intent}
 CRM VALIDATION
 {crm_validation}
 
+IMPORTANT CRM RULES — you MUST follow these before drafting:
+- If crm_found is false: do NOT provide any policy details, claim instructions, or
+  account-specific information. Instead, ask the customer to provide their member ID
+  or policy number so their identity can be verified, and assure them you will follow
+  up once verified.
+- If crm_found is true but eligible_for_intent is false: acknowledge the request but
+  explain the specific ineligibility reason (e.g. policy expired) and guide them on
+  next steps (e.g. renewal).
+- If crm_found is true and eligible_for_intent is true: respond fully using the
+  customer's verified plan details.
+
 FRAUD ASSESSMENT
 {fraud_score}
 
