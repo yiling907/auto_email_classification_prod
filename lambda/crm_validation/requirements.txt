@@ -1,0 +1,3 @@
+# boto3 is pre-installed in the Lambda runtime — no extra packages required.
+# Add any additional dependencies here if needed in the future.
+boto3>=1.34
