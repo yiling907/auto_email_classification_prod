@@ -8,7 +8,7 @@ labels from the Laya synthetic dataset.
 
 Unlike run_e2e_assessment.py (which simulates locally using gold labels),
 this script exercises every real Lambda end-to-end:
-  email_parser → classify_intent → rag_retrieval → claude_response
+  email_parser → classify_intent → rag_retrieval → crm_validation → claude_response
 
 For each test email the script:
   1. Builds a raw RFC 2822 .eml string from the dataset record
@@ -256,6 +256,12 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
     rag_docs      = out.get("rag_results", {}).get("retrieved_documents", [])
     rag_hit_count = len(rag_docs)
 
+    # ── CRM validation (from crm_validation Lambda, ResultPath=$.crm_validation)
+    crm           = out.get("crm_validation", {})
+    crm_found     = bool(crm.get("crm_found", False))
+    crm_policy    = crm.get("policy") or {}
+    crm_validation_block = crm.get("validation") or {}
+
     # ── parsed email entities (from email_parser Lambda) ───────────────────
     parsed = out.get("parsed_email", {}).get("parsed_data", {})
     extracted_policy = parsed.get("policy_number", "")
@@ -282,6 +288,12 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
         "action":             action,
         "response_text":      response_text[:500],   # truncate for report size
         "rag_hit_count":      rag_hit_count,
+        # ── CRM validation
+        "crm_found":          crm_found,
+        "crm_policy_status":  crm_policy.get("policy_status", ""),
+        "crm_plan_name":      crm_policy.get("plan_name", ""),
+        "crm_eligible":       crm_validation_block.get("eligible_for_intent"),
+        # ── Entity extraction
         "extracted_policy":   extracted_policy,
         "extracted_member":   extracted_member,
         "pii_detected":       pii_detected,
@@ -318,6 +330,10 @@ def run_one(run_id: str, laya_record: Dict) -> Dict:
             "action":           "escalate",
             "response_text":    "",
             "rag_hit_count":    0,
+            "crm_found":        False,
+            "crm_policy_status":"",
+            "crm_plan_name":    "",
+            "crm_eligible":     None,
             "extracted_policy": "",
             "extracted_member": "",
             "pii_detected":     False,
@@ -488,6 +504,30 @@ def score_response(results: List[Dict]) -> Dict:
     }
 
 
+def score_crm(results: List[Dict]) -> Dict:
+    """CRM lookup hit rate and policy status distribution across the sample."""
+    total     = len(results)
+    hits      = sum(1 for r in results if r.get("crm_found"))
+    eligible  = sum(1 for r in results if r.get("crm_eligible") is True)
+    hit_rate  = hits / total if total else 0.0
+
+    status_counts: Counter = Counter(
+        r.get("crm_policy_status", "") for r in results if r.get("crm_found")
+    )
+    plan_counts: Counter = Counter(
+        r.get("crm_plan_name", "") for r in results if r.get("crm_found")
+    )
+
+    return {
+        "hit_rate":        round(hit_rate, 4),
+        "hits":            hits,
+        "total":           total,
+        "eligible":        eligible,
+        "status_counts":   dict(status_counts),
+        "plan_counts":     dict(plan_counts),
+    }
+
+
 def score_entity(results: List[Dict], gold_records: List[Dict]) -> Dict:
     gold_has_policy = [bool(r.get("policy_number")) for r in gold_records]
     pred_has_policy = [bool(r.get("extracted_policy")) for r in results]
@@ -622,13 +662,14 @@ def score_trulens_rag_triad(results: List[Dict]) -> Optional[Dict]:
 
 # ── Composite score ───────────────────────────────────────────────────────────
 
-def compute_composite(intent_m, routing_m, entity_m, rag_m, response_m, calib_m,
+def compute_composite(intent_m, routing_m, entity_m, rag_m, crm_m, response_m, calib_m,
                       trulens_m=None) -> float:
     scores = []
     scores.append(intent_m["accuracy"])
     scores.append(routing_m["routing_accuracy"])
     scores.append(entity_m["policy_number"]["f1"])
     scores.append(rag_m["hit_rate"])
+    scores.append(crm_m["hit_rate"])
     if calib_m["band_action_agreement"] is not None:
         scores.append(calib_m["band_action_agreement"])
     ece_score = max(0.0, 1.0 - calib_m["ece"] * 2)
@@ -647,10 +688,10 @@ def _strip_trulens_inputs(results: List[Dict]) -> List[Dict]:
 
 
 def build_report(emails, results, cases, intent_m, routing_m, entity_m,
-                 rag_m, response_m, calib_m, elapsed: float, run_id: str,
+                 rag_m, crm_m, response_m, calib_m, elapsed: float, run_id: str,
                  trulens_m=None) -> Dict:
-    composite = compute_composite(intent_m, routing_m, entity_m, rag_m, response_m, calib_m,
-                                  trulens_m)
+    composite = compute_composite(intent_m, routing_m, entity_m, rag_m, crm_m,
+                                  response_m, calib_m, trulens_m)
     passed    = composite >= PASS_THRESHOLD
     n_failed  = sum(1 for r in results if r["exec_status"] != "SUCCEEDED")
 
@@ -659,6 +700,7 @@ def build_report(emails, results, cases, intent_m, routing_m, entity_m,
         "routing_accuracy":       routing_m,
         "entity_extraction":      entity_m,
         "rag_retrieval":          rag_m,
+        "crm_validation":         crm_m,
         "response_quality":       response_m,
         "confidence_calibration": calib_m,
     }
@@ -724,6 +766,10 @@ def print_report(report: Dict):
         ("RAG RETRIEVAL",         "rag_retrieval",
          lambda d: [f"  Hit rate: {d['hit_rate']:.4f}  ({d['hits']}/{d['total']})",
                     f"  Avg docs retrieved: {d['avg_docs_retrieved']:.1f}"]),
+        ("CRM VALIDATION",        "crm_validation",
+         lambda d: [f"  CRM hit rate:  {d['hit_rate']:.4f}  ({d['hits']}/{d['total']})",
+                    f"  Eligible:      {d['eligible']}",
+                    *[f"    {k:<12} {v}" for k, v in d["status_counts"].items()]]),
         ("RESPONSE QUALITY",      "response_quality",
          lambda d: [f"  Hedge rate:             {d['hedge_rate']:.4f}",
                     f"  Escalation agreement:   "
@@ -850,6 +896,7 @@ def main() -> int:
     routing_m = score_routing(succeeded)
     entity_m  = score_entity(succeeded, gold_records)
     rag_m     = score_rag(succeeded, cases)
+    crm_m     = score_crm(succeeded)
     response_m = score_response(succeeded)
     calib_m   = score_confidence(succeeded)
 
@@ -865,7 +912,7 @@ def main() -> int:
     # ── Build and save report ─────────────────────────────────────────────────
     elapsed = time.monotonic() - t0
     report  = build_report(emails, succeeded, cases, intent_m, routing_m, entity_m,
-                           rag_m, response_m, calib_m, elapsed, run_id,
+                           rag_m, crm_m, response_m, calib_m, elapsed, run_id,
                            trulens_m=trulens_m)
 
     with open(args.output, "w", encoding="utf-8") as fh:
