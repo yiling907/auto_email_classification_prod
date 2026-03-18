@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>InsureMail AI — Technical Deep Dive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow-x: hidden; background: #111; }
+    html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+
+    .slide {
+      width: 100vw; height: 100vh; height: 100dvh;
+      overflow: hidden; scroll-snap-align: start;
+      display: flex; flex-direction: column; position: relative;
+      background: linear-gradient(135deg, #111 0%, #1a1a1a 50%, #111 100%);
+    }
+    .slide-content {
+      flex: 1; display: flex; flex-direction: column;
+      justify-content: center; max-height: 100%; overflow: hidden;
+      padding: var(--slide-padding);
+    }
+
+    :root {
+      --accent:   #FF5722;
+      --accent-2: #667eea;
+      --accent-3: #00d4aa;
+      --accent-4: #f6ad55;
+      --text:     #ffffff;
+      --muted:    rgba(255,255,255,0.5);
+      --border:   rgba(255,255,255,0.08);
+      --card-bg:  rgba(255,255,255,0.04);
+      --code-bg:  rgba(0,0,0,0.5);
+
+      --title-size: clamp(2rem,   5.5vw, 4.5rem);
+      --h2-size:    clamp(1.3rem, 3vw,   2.4rem);
+      --h3-size:    clamp(0.95rem,2vw,   1.5rem);
+      --body-size:  clamp(0.72rem,1.3vw, 1rem);
+      --small-size: clamp(0.62rem,1vw,   0.82rem);
+      --code-size:  clamp(0.6rem, 0.95vw, 0.78rem);
+
+      --slide-padding: clamp(1.5rem, 4vw, 4.5rem);
+      --gap:           clamp(0.6rem, 1.5vw, 1.4rem);
+      --gap-sm:        clamp(0.3rem, 0.8vw, 0.7rem);
+    }
+
+    /* ── Typography ── */
+    .t-display { font-family:'Archivo Black',sans-serif; font-size:var(--title-size); line-height:1.0; color:var(--text); letter-spacing:-0.02em; }
+    .t-h2      { font-family:'Archivo Black',sans-serif; font-size:var(--h2-size);   line-height:1.1; color:var(--text); }
+    .t-h3      { font-family:'Space Grotesk',sans-serif; font-size:var(--h3-size);   font-weight:600; color:var(--text); }
+    .t-body    { font-family:'Space Grotesk',sans-serif; font-size:var(--body-size); color:var(--muted); line-height:1.55; }
+    .t-small   { font-family:'Space Grotesk',sans-serif; font-size:var(--small-size);color:var(--muted); }
+    .t-code    { font-family:'JetBrains Mono',monospace; font-size:var(--code-size); }
+    .t-accent  { color:var(--accent);   }
+    .t-accent2 { color:var(--accent-2); }
+    .t-accent3 { color:var(--accent-3); }
+    .t-accent4 { color:var(--accent-4); }
+    .t-white   { color:#fff; }
+
+    /* ── Tag chips ── */
+    .tag {
+      display:inline-block; padding:0.2em 0.7em; border-radius:3px;
+      font-family:'Space Grotesk',sans-serif; font-size:var(--small-size);
+      font-weight:600; text-transform:uppercase; letter-spacing:0.06em;
+      background:var(--accent); color:#111;
+    }
+    .tag-2 { background:var(--accent-2); }
+    .tag-3 { background:var(--accent-3); }
+    .tag-4 { background:var(--accent-4); color:#111; }
+    .tag-outline { background:transparent; border:1px solid var(--accent); color:var(--accent); }
+
+    /* ── Divider ── */
+    .div { width:clamp(30px,5vw,60px); height:3px; background:var(--accent); border-radius:2px; margin:var(--gap-sm) 0; }
+    .div-2 { background:var(--accent-2); }
+    .div-3 { background:var(--accent-3); }
+
+    /* ── Cards ── */
+    .card {
+      background:var(--card-bg); border:1px solid var(--border);
+      border-radius:6px; padding:clamp(0.7rem,1.8vw,1.4rem);
+    }
+    .card-l1 { border-left:3px solid var(--accent); }
+    .card-l2 { border-left:3px solid var(--accent-2); }
+    .card-l3 { border-left:3px solid var(--accent-3); }
+    .card-l4 { border-left:3px solid var(--accent-4); }
+    .clabel {
+      font-family:'Space Grotesk',sans-serif; font-size:var(--small-size);
+      font-weight:700; text-transform:uppercase; letter-spacing:0.07em;
+      color:var(--accent); margin-bottom:0.35em;
+    }
+    .clabel-2 { color:var(--accent-2); }
+    .clabel-3 { color:var(--accent-3); }
+    .clabel-4 { color:var(--accent-4); }
+    .cval {
+      font-family:'Archivo Black',sans-serif;
+      font-size:clamp(1.2rem,2.8vw,2rem); color:#fff; line-height:1;
+    }
+    .cdesc { font-family:'Space Grotesk',sans-serif; font-size:var(--small-size); color:var(--muted); margin-top:0.25em; }
+
+    /* ── Code block ── */
+    .code-block {
+      background:var(--code-bg); border:1px solid rgba(255,255,255,0.07);
+      border-radius:6px; padding:clamp(0.6rem,1.5vw,1.1rem);
+      font-family:'JetBrains Mono',monospace; font-size:var(--code-size);
+      color:#e2e8f0; line-height:1.6; overflow:hidden;
+      white-space:pre; max-height:28vh;
+    }
+    .kw  { color:#f6ad55; }   /* keyword */
+    .str { color:#68d391; }   /* string */
+    .num { color:#76e4f7; }   /* number */
+    .cmt { color:#718096; }   /* comment */
+    .fn  { color:#b794f4; }   /* function */
+    .cls { color:#FC8181; }   /* class/type */
+
+    /* ── Bullet list ── */
+    .blist { list-style:none; display:flex; flex-direction:column; gap:var(--gap-sm); }
+    .blist li {
+      display:flex; align-items:flex-start; gap:0.6em;
+      font-family:'Space Grotesk',sans-serif;
+      font-size:var(--body-size); color:var(--muted); line-height:1.45;
+    }
+    .blist li::before { content:'→'; color:var(--accent); flex-shrink:0; margin-top:0.05em; }
+    .blist li strong { color:#fff; font-weight:600; }
+    .blist.b2 li::before { color:var(--accent-2); }
+    .blist.b3 li::before { color:var(--accent-3); }
+
+    /* ── Grids ── */
+    .g2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
+    .g3 { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--gap); }
+    .g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--gap-sm); }
+    .g1-2 { display:grid; grid-template-columns:1fr 2fr; gap:var(--gap); align-items:start; }
+    .g2-1 { display:grid; grid-template-columns:2fr 1fr; gap:var(--gap); align-items:start; }
+
+    /* ── Pipeline ── */
+    .pipe { display:flex; align-items:stretch; gap:0; }
+    .pstep {
+      flex:1; background:var(--card-bg); border:1px solid var(--border);
+      padding:clamp(0.5rem,1.5vw,1rem) clamp(0.4rem,1vw,0.7rem);
+      text-align:center; position:relative;
+    }
+    .pstep.hi { border-color:var(--accent); background:rgba(255,87,34,0.1); }
+    .pstep.hi2 { border-color:var(--accent-2); background:rgba(102,126,234,0.1); }
+    .pstep:not(:last-child)::after {
+      content:'→'; position:absolute; right:-0.7em; top:50%; transform:translateY(-50%);
+      color:var(--muted); font-size:var(--body-size); z-index:1;
+      background:var(--code-bg); padding:0 0.15em;
+    }
+    .pnum  { font-family:'Archivo Black',sans-serif; font-size:var(--small-size); color:var(--accent); display:block; }
+    .pname { font-family:'Space Grotesk',sans-serif; font-size:var(--small-size); font-weight:700; color:#fff; display:block; margin:0.15em 0; }
+    .psub  { font-family:'Space Grotesk',sans-serif; font-size:calc(var(--small-size)*0.9); color:var(--muted); display:block; }
+
+    /* ── Score bar ── */
+    .sbar { display:flex; align-items:center; gap:0.8rem; }
+    .sbar-label { font-family:'Space Grotesk',sans-serif; font-size:var(--body-size); color:var(--muted); width:clamp(130px,17vw,200px); flex-shrink:0; }
+    .sbar-track { flex:1; height:5px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; }
+    .sbar-fill  { height:100%; border-radius:3px; }
+    .sbar-val   { font-family:'Space Grotesk',sans-serif; font-size:var(--body-size); font-weight:700; width:3.5em; text-align:right; flex-shrink:0; color:#fff; }
+
+    /* ── Weight row ── */
+    .wrow {
+      display:flex; align-items:center; gap:0.7rem;
+      font-family:'Space Grotesk',sans-serif; font-size:var(--body-size);
+      border-bottom:1px solid var(--border); padding:clamp(0.25rem,0.6vh,0.45rem) 0;
+    }
+    .wrow:last-child { border-bottom:none; }
+    .wrow-name { flex:1; color:var(--muted); }
+    .wrow-name strong { color:#fff; }
+    .wrow-weight { font-family:'JetBrains Mono',monospace; font-size:var(--code-size); color:var(--accent); font-weight:700; width:3em; text-align:right; flex-shrink:0; }
+    .wrow-bar { width:clamp(60px,10vw,100px); height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; flex-shrink:0; }
+    .wrow-bar-fill { height:100%; border-radius:2px; background:var(--accent); }
+
+    /* ── Formula box ── */
+    .formula {
+      background:rgba(255,87,34,0.08); border:1px solid rgba(255,87,34,0.2);
+      border-radius:6px; padding:clamp(0.6rem,1.5vw,1.1rem);
+      font-family:'JetBrains Mono',monospace; font-size:var(--code-size);
+      color:#fff; line-height:1.9;
+    }
+    .formula.f2 { background:rgba(102,126,234,0.08); border-color:rgba(102,126,234,0.2); }
+    .formula.f3 { background:rgba(0,212,170,0.08); border-color:rgba(0,212,170,0.2); }
+
+    /* ── Slide num + nav ── */
+    .slide-num { position:absolute; top:clamp(1rem,2.5vw,1.8rem); left:clamp(1.5rem,3vw,3rem); font-family:'Archivo Black',sans-serif; font-size:clamp(0.9rem,1.8vw,1.3rem); color:var(--accent); opacity:0.55; }
+    .nav-bar { position:absolute; top:clamp(1rem,2.5vw,1.8rem); right:clamp(1.5rem,3vw,3rem); display:flex; gap:0.6rem; align-items:center; z-index:10; }
+    .nav-dot { width:5px; height:5px; border-radius:50%; background:var(--border); cursor:pointer; transition:background 0.3s,transform 0.3s; }
+    .nav-dot.active { background:var(--accent); transform:scale(1.5); }
+
+    /* ── Progress ── */
+    #progress { position:fixed; bottom:0; left:0; height:2px; background:var(--accent); transition:width 0.3s; z-index:100; }
+
+    /* ── Animations ── */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+    .a1 { animation:fadeUp 0.5s ease both 0.08s; }
+    .a2 { animation:fadeUp 0.5s ease both 0.2s; }
+    .a3 { animation:fadeUp 0.5s ease both 0.33s; }
+    .a4 { animation:fadeUp 0.5s ease both 0.46s; }
+    .a5 { animation:fadeUp 0.5s ease both 0.59s; }
+    .slide:not(.active) .a1,.slide:not(.active) .a2,.slide:not(.active) .a3,
+    .slide:not(.active) .a4,.slide:not(.active) .a5 { animation:none !important; }
+
+    @media (max-height:700px) {
+      :root { --slide-padding:clamp(1rem,3vw,2.5rem); --title-size:clamp(1.5rem,4.5vw,3rem); --h2-size:clamp(1.1rem,2.5vw,1.8rem); --body-size:clamp(0.68rem,1.2vw,0.9rem); }
+    }
+  </style>
+</head>
+<body>
+<div id="progress"></div>
+
+<!-- ═══════════════════════════════════════════════════
+     DOMAIN 1 OF 4 — BUSINESS IMPACT
+     ═══════════════════════════════════════════════════ -->
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 01 · TITLE + HOOK
+     ───────────────────────────────────────────────── -->
+<section class="slide active" id="s1">
+  <div class="slide-num">01</div>
+  <div class="nav-bar" id="nav"></div>
+  <div style="position:absolute;right:-8vw;top:-5vh;width:55vw;height:110vh;background:linear-gradient(135deg,rgba(102,126,234,0.07),rgba(255,87,34,0.05));border-radius:50%;pointer-events:none;"></div>
+  <div class="slide-content">
+    <div style="max-width:min(85vw,860px);">
+      <div class="a1" style="margin-bottom:var(--gap);display:flex;gap:0.6rem;flex-wrap:wrap;">
+        <span class="tag">Business Impact</span>
+        <span class="tag tag-2">Hackathon 2026</span>
+      </div>
+      <h1 class="t-display a2">InsureMail<span class="t-accent"> AI</span></h1>
+      <div class="div a3"></div>
+      <p class="t-h3 a3" style="font-weight:400;color:rgba(255,255,255,0.7);margin-top:var(--gap-sm);max-width:640px;">
+        Turning an insurance inbox liability into a <span style="color:var(--accent-3);">fully automated, cost-efficient triage engine</span>
+      </p>
+
+      <div class="a4" style="margin-top:var(--gap);display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap);">
+        <div style="border-left:2px solid var(--accent-3);padding-left:0.8em;">
+          <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.6rem,4vw,3rem);color:var(--accent-3);line-height:1;">$0.006</div>
+          <div class="t-small">per email processed</div>
+        </div>
+        <div style="border-left:2px solid var(--accent-2);padding-left:0.8em;">
+          <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.6rem,4vw,3rem);color:var(--accent-2);line-height:1;">&lt;3s</div>
+          <div class="t-small">triage vs 2–5 min manual</div>
+        </div>
+        <div style="border-left:2px solid var(--accent);padding-left:0.8em;">
+          <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.6rem,4vw,3rem);color:var(--accent);line-height:1;">100%</div>
+          <div class="t-small">intent accuracy on live test</div>
+        </div>
+        <div style="border-left:2px solid var(--accent-4);padding-left:0.8em;">
+          <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.6rem,4vw,3rem);color:var(--accent-4);line-height:1;">24/7</div>
+          <div class="t-small">availability, zero agents</div>
+        </div>
+      </div>
+
+      <p class="a5 t-small" style="margin-top:var(--gap);">↓ scroll or ↑↓ arrow keys to navigate</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 02 · THE PROBLEM
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s2-problem">
+  <div class="slide-num">02</div>
+  <div class="slide-content">
+    <div style="max-width:min(94vw,1100px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);"><span class="tag">The Problem</span></div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Insurance inbox = operational liability at scale</h2>
+
+      <div class="g2 a3">
+
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+          <div class="card card-l1">
+            <div class="clabel">Volume &amp; Speed</div>
+            <p class="t-body">Large insurers receive <strong style="color:#fff;">10,000–50,000 emails/day</strong>. Human agents triage each in <strong style="color:#fff;">2–5 minutes</strong>. At scale, this is a full operations centre just to read mail.</p>
+          </div>
+          <div class="card card-l4">
+            <div class="clabel clabel-4">Routing Accuracy</div>
+            <p class="t-body">Manual routing averages <strong style="color:#fff;">~85% accuracy</strong>. 15% misrouted emails create re-work, SLA breaches, and frustrated customers who have to repeat themselves.</p>
+          </div>
+          <div class="card" style="border-left:3px solid #e53e3e;">
+            <div class="clabel" style="color:#e53e3e;">PII Risk</div>
+            <p class="t-body">Emails contain <strong style="color:#fff;">policy numbers, IRNs, dates of birth, bank details</strong>. Unprocessed inboxes sitting in a shared mailbox are a GDPR liability waiting to happen.</p>
+          </div>
+          <div class="card card-l2">
+            <div class="clabel clabel-2">Peak-hour Bottleneck</div>
+            <p class="t-body">Monday 9–11am: claims surge after weekends. Human teams hit capacity. <strong style="color:#fff;">Response SLAs breach. Complaint volumes spike.</strong> No elastic solution exists in a manual process.</p>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+          <div class="card card-l2">
+            <div class="clabel clabel-2">True Cost of Manual Triage</div>
+            <div style="display:flex;flex-direction:column;gap:0.35em;margin-top:0.5em;">
+              <div class="wrow"><span class="wrow-name">Agent fully-loaded hourly cost</span><span class="wrow-weight" style="color:var(--muted);width:auto;">~$40 / hr</span></div>
+              <div class="wrow"><span class="wrow-name">Average time per email (triage + route)</span><span class="wrow-weight" style="color:var(--muted);width:auto;">3 min</span></div>
+              <div class="wrow"><span class="wrow-name">Agent cost per email</span><span class="wrow-weight" style="color:#e53e3e;width:auto;">~$2.00</span></div>
+              <div class="wrow"><span class="wrow-name">At 10,000 emails/day</span><span class="wrow-weight" style="color:#e53e3e;width:auto;">$20,000/day</span></div>
+              <div class="wrow"><span class="wrow-name">At 10,000 emails/day</span><span class="wrow-weight" style="color:#e53e3e;width:auto;">$7.3M/year</span></div>
+              <div class="wrow" style="border-top:1px solid rgba(255,255,255,0.12);padding-top:0.45em;margin-top:0.1em;">
+                <span class="wrow-name"><strong style="color:#fff;">InsureMail AI at same volume</strong></span>
+                <span class="wrow-weight" style="color:var(--accent-3);font-size:1.05em;width:auto;">$21,900/year</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-l3">
+            <div class="clabel clabel-3">Opportunity Cost</div>
+            <ul class="blist b3" style="gap:0.25em;margin-top:0.3em;">
+              <li>Agents spending 60% of time triaging instead of resolving</li>
+              <li>High-value complaints buried under routine queries</li>
+              <li>No consistent sentiment or urgency flagging</li>
+              <li>Zero visibility into intent trends or volume patterns</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 03 · BUSINESS VALUE — BEFORE vs AFTER
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s3-value">
+  <div class="slide-num">03</div>
+  <div class="slide-content">
+    <div style="max-width:min(94vw,1100px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);"><span class="tag tag-3">Business Value</span></div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Before InsureMail AI <span class="t-accent">→</span> After</h2>
+
+      <div class="g2 a3" style="margin-bottom:var(--gap);">
+
+        <!-- Before column -->
+        <div>
+          <div class="t-small" style="color:#e53e3e;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5em;">Before — Manual Process</div>
+          <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+            <div class="card" style="border-left:3px solid #e53e3e;">
+              <div class="clabel" style="color:#e53e3e;">Response Time</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.7rem);color:#e53e3e;margin:0.15em 0;">2–5 minutes</div>
+              <p class="t-small">business hours only · no weekend coverage</p>
+            </div>
+            <div class="card" style="border-left:3px solid #e53e3e;">
+              <div class="clabel" style="color:#e53e3e;">Routing Accuracy</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.7rem);color:#e53e3e;margin:0.15em 0;">~85%</div>
+              <p class="t-small">15% misrouted → SLA breach + re-work</p>
+            </div>
+            <div class="card" style="border-left:3px solid #e53e3e;">
+              <div class="clabel" style="color:#e53e3e;">Cost per Email</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.7rem);color:#e53e3e;margin:0.15em 0;">~$2.00</div>
+              <p class="t-small">fully-loaded agent cost · scales linearly</p>
+            </div>
+            <div class="card" style="border-left:3px solid #e53e3e;">
+              <div class="clabel" style="color:#e53e3e;">PII &amp; Compliance</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.7rem);color:#e53e3e;margin:0.15em 0;">Manual</div>
+              <p class="t-small">shared mailbox · inconsistent redaction · GDPR risk</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- After column -->
+        <div>
+          <div class="t-small" style="color:var(--accent-3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5em;">After — InsureMail AI</div>
+          <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+            <div class="card card-l3">
+              <div class="clabel clabel-3">Response Time</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.7rem);color:var(--accent-3);margin:0.15em 0;">&lt;3 seconds</div>
+              <p class="t-small">Step Functions + Bedrock · 24/7 · auto-scales at peak</p>
+            </div>
+            <div class="card card-l3">
+              <div class="clabel clabel-3">Routing Accuracy</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.7rem);color:var(--accent-3);margin:0.15em 0;">100%</div>
+              <p class="t-small">Claude 3 Sonnet · 17 intent classes · 12 teams · live tested</p>
+            </div>
+            <div class="card card-l3">
+              <div class="clabel clabel-3">Cost per Email</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.7rem);color:var(--accent-3);margin:0.15em 0;">$0.006</div>
+              <p class="t-small">Sonnet · Haiku · Mistral 7B · Titan V2 · PAY_PER_REQUEST · 99.7% cheaper</p>
+            </div>
+            <div class="card card-l3">
+              <div class="clabel clabel-3">PII &amp; Compliance</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.7rem);color:var(--accent-3);margin:0.15em 0;">Auto-redacted</div>
+              <p class="t-small">regex + NER before any Bedrock call · data never leaves VPC</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROI bar -->
+      <div class="a4 card card-l3" style="display:flex;align-items:center;justify-content:space-around;flex-wrap:wrap;gap:var(--gap);padding:clamp(0.6rem,1.5vw,1rem) clamp(1rem,2vw,1.5rem);">
+        <div style="text-align:center;"><div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.9rem);color:var(--accent-3);">99.7%</div><div class="t-small">cost reduction</div></div>
+        <div style="width:1px;height:2.5em;background:var(--border);"></div>
+        <div style="text-align:center;"><div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.9rem);color:var(--accent-2);">60×</div><div class="t-small">faster triage</div></div>
+        <div style="width:1px;height:2.5em;background:var(--border);"></div>
+        <div style="text-align:center;"><div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.9rem);color:var(--accent-4);">$7.3M → $22K</div><div class="t-small">annual cost at 10K emails/day</div></div>
+        <div style="width:1px;height:2.5em;background:var(--border);"></div>
+        <div style="text-align:center;"><div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.5vw,1.9rem);color:var(--accent);">0</div><div class="t-small">PII incidents</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     DOMAIN 2 OF 4 — SYSTEM DESIGN
+     ═══════════════════════════════════════════════════ -->
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 04 · ARCHITECTURE OVERVIEW
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s4-arch">
+  <div class="slide-num">04</div>
+  <div class="slide-content" style="padding:clamp(0.7rem,1.8vw,2rem);">
+    <div style="width:100%;max-width:min(98vw,1280px);">
+
+      <div class="a1" style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.5rem;">
+        <span class="tag tag-2">System Design · 1 of 3</span>
+        <h2 class="t-h2" style="font-size:clamp(0.95rem,2vw,1.6rem);">Architecture Overview — 10 Lambdas · 6-step pipeline · Serverless</h2>
+      </div>
+
+      <!-- ① INGESTION -->
+      <div class="a2" style="margin-bottom:0.4rem;">
+        <div style="font-size:var(--small-size);font-family:'Space Grotesk',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:0.25rem;">① Ingestion</div>
+        <div style="display:flex;align-items:center;gap:0.5rem;background:rgba(255,87,34,0.07);border:1px solid rgba(255,87,34,0.2);border-radius:6px;padding:0.4rem 0.8rem;flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#3D8624"/><ellipse cx="20" cy="14" rx="10" ry="3.5" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="14" x2="10" y2="28" stroke="white" stroke-width="1.8"/><line x1="30" y1="14" x2="30" y2="28" stroke="white" stroke-width="1.8"/><path d="M10 28 Q20 34 30 28" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="21" x2="30" y2="21" stroke="white" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">S3 Emails</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">.eml files</span></div>
+          <span style="color:rgba(255,255,255,0.35);font-size:0.9rem;align-self:center;flex-shrink:0;">&#8250;</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#E7157B"/><circle cx="14" cy="13" r="4" fill="white"/><circle cx="26" cy="20" r="4" fill="white"/><circle cx="14" cy="27" r="4" fill="white"/><line x1="17" y1="15" x2="23" y2="18" stroke="white" stroke-width="1.8"/><line x1="23" y1="22" x2="17" y2="25" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Step Functions</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">state machine</span></div>
+          <span style="color:rgba(255,255,255,0.3);font-size:0.7rem;margin-left:0.3rem;align-self:center;">← triggered by S3 event notification</span>
+        </div>
+      </div>
+
+      <!-- ② CORE PIPELINE -->
+      <div class="a3" style="margin-bottom:0.4rem;">
+        <div style="font-size:var(--small-size);font-family:'Space Grotesk',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent-2);margin-bottom:0.25rem;">② Core Pipeline — orchestrated by Step Functions</div>
+        <div style="display:flex;align-items:stretch;gap:0;background:rgba(102,126,234,0.07);border:1px solid rgba(102,126,234,0.2);border-radius:6px;overflow:hidden;">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:0.4rem 0.3rem;border-right:1px solid rgba(255,255,255,0.07);">
+            <div style="font-size:0.52rem;font-family:'Space Grotesk',sans-serif;color:var(--accent);font-weight:700;margin-bottom:0.2rem;">①</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">email_parser</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">PII redact · 14 doc types</span></div>
+          </div>
+          <div style="display:flex;align-items:center;padding:0 0.1rem;color:rgba(255,255,255,0.2);font-size:0.7rem;">›</div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:0.4rem 0.3rem;border-right:1px solid rgba(255,255,255,0.07);background:rgba(255,87,34,0.06);">
+            <div style="font-size:0.52rem;font-family:'Space Grotesk',sans-serif;color:var(--accent);font-weight:700;margin-bottom:0.2rem;">②</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">classify_intent</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">17 intents · 12 teams</span></div>
+            <div style="margin-top:0.25rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="17" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">CLAUDE 3</text><text x="20" y="27" text-anchor="middle" fill="white" font-size="7.5" font-family="'Space Grotesk',sans-serif" font-weight="700">SONNET</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Sonnet</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">primary LLM</span></div></div>
+          </div>
+          <div style="display:flex;align-items:center;padding:0 0.1rem;color:rgba(255,255,255,0.2);font-size:0.7rem;">›</div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:0.4rem 0.3rem;border-right:1px solid rgba(255,255,255,0.07);background:rgba(102,126,234,0.07);">
+            <div style="font-size:0.52rem;font-family:'Space Grotesk',sans-serif;color:var(--accent-2);font-weight:700;margin-bottom:0.2rem;">③</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">rag_retrieval</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">HyDE·BM25·RRF</span></div>
+            <div style="margin-top:0.25rem;display:flex;gap:0.25rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="17" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">CLAUDE 3</text><text x="20" y="27" text-anchor="middle" fill="white" font-size="8" font-family="'Space Grotesk',sans-serif" font-weight="700">HAIKU</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Haiku</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">HyDE+rerank</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="18" text-anchor="middle" fill="white" font-size="8" font-family="'Space Grotesk',sans-serif" font-weight="700">TITAN</text><text x="20" y="28" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" opacity="0.8">EMBED V2</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Titan</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">embeddings</span></div></div>
+          </div>
+
+          <div style="display:flex;align-items:center;padding:0 0.1rem;color:rgba(255,255,255,0.2);font-size:0.7rem;">›</div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:0.4rem 0.3rem;border-right:1px solid rgba(255,255,255,0.07);background:rgba(246,173,85,0.07);">
+            <div style="font-size:0.52rem;font-family:'Space Grotesk',sans-serif;color:var(--accent-4);font-weight:700;margin-bottom:0.2rem;">④</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">crm_validation</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">Text-to-SQL · CRM</span></div>
+            <div style="margin-top:0.25rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="17" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">MISTRAL</text><text x="20" y="27" text-anchor="middle" fill="white" font-size="10" font-family="'Space Grotesk',sans-serif" font-weight="700">7B</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Mistral 7B</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">query plan</span></div></div>
+          </div>
+          <div style="display:flex;align-items:center;padding:0 0.1rem;color:rgba(255,255,255,0.2);font-size:0.7rem;">›</div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:0.4rem 0.3rem;border-right:1px solid rgba(255,255,255,0.07);background:rgba(255,87,34,0.06);">
+            <div style="font-size:0.52rem;font-family:'Space Grotesk',sans-serif;color:var(--accent);font-weight:700;margin-bottom:0.2rem;">⑤</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">claude_response</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">8-dim judge</span></div>
+            <div style="margin-top:0.25rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="17" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">MISTRAL</text><text x="20" y="27" text-anchor="middle" fill="white" font-size="10" font-family="'Space Grotesk',sans-serif" font-weight="700">7B</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Mistral 7B</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">response gen</span></div></div>
+          </div>
+          <div style="display:flex;align-items:center;padding:0 0.1rem;color:rgba(255,255,255,0.2);font-size:0.7rem;">›</div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:0.4rem 0.3rem;">
+            <div style="font-size:0.52rem;font-family:'Space Grotesk',sans-serif;color:var(--accent-3);font-weight:700;margin-bottom:0.2rem;">⑥</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">email_sender</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">auto·review·escalate</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ③ STORAGE + RAG KB -->
+      <div class="a4" style="margin-bottom:0.4rem;">
+        <div style="display:flex;gap:0.4rem;">
+          <div style="flex:1;">
+            <div style="font-size:var(--small-size);font-family:'Space Grotesk',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent-3);margin-bottom:0.25rem;">③ Storage</div>
+            <div style="display:flex;align-items:center;gap:0.5rem;background:rgba(0,212,170,0.07);border:1px solid rgba(0,212,170,0.2);border-radius:6px;padding:0.4rem 0.7rem;flex-wrap:wrap;">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">DynamoDB</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">email_processing</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">DynamoDB</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">model_metrics</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">DynamoDB</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">kb_embeddings</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">DynamoDB</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">customers</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#3D8624"/><ellipse cx="20" cy="14" rx="10" ry="3.5" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="14" x2="10" y2="28" stroke="white" stroke-width="1.8"/><line x1="30" y1="14" x2="30" y2="28" stroke="white" stroke-width="1.8"/><path d="M10 28 Q20 34 30 28" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="21" x2="30" y2="21" stroke="white" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">S3</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">knowledge_base</span></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#3D8624"/><ellipse cx="20" cy="14" rx="10" ry="3.5" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="14" x2="10" y2="28" stroke="white" stroke-width="1.8"/><line x1="30" y1="14" x2="30" y2="28" stroke="white" stroke-width="1.8"/><path d="M10 28 Q20 34 30 28" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="21" x2="30" y2="21" stroke="white" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">S3</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">assessment results</span></div>
+            </div>
+          </div>
+          <div style="flex:0 0 auto;">
+            <div style="font-size:var(--small-size);font-family:'Space Grotesk',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent-4);margin-bottom:0.25rem;">RAG KB Ingestion</div>
+            <div style="display:flex;align-items:center;gap:0.5rem;background:rgba(246,173,85,0.07);border:1px solid rgba(246,173,85,0.2);border-radius:6px;padding:0.4rem 0.7rem;">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#3D8624"/><ellipse cx="20" cy="14" rx="10" ry="3.5" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="14" x2="10" y2="28" stroke="white" stroke-width="1.8"/><line x1="30" y1="14" x2="30" y2="28" stroke="white" stroke-width="1.8"/><path d="M10 28 Q20 34 30 28" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="21" x2="30" y2="21" stroke="white" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">S3 KB</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">PDF/TXT upload</span></div>
+              <span style="color:rgba(255,255,255,0.35);font-size:0.9rem;align-self:center;flex-shrink:0;">&#8250;</span>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">rag_ingestion</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">chunk·dedup·embed</span></div>
+              <span style="color:rgba(255,255,255,0.35);font-size:0.9rem;align-self:center;flex-shrink:0;">&#8250;</span>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="18" text-anchor="middle" fill="white" font-size="8" font-family="'Space Grotesk',sans-serif" font-weight="700">TITAN</text><text x="20" y="28" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" opacity="0.8">EMBED V2</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Titan</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">1024-dim vec</span></div>
+              <span style="color:rgba(255,255,255,0.35);font-size:0.9rem;align-self:center;flex-shrink:0;">&#8250;</span>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">DynamoDB</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">kb_embeddings</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ④ OBSERVABILITY -->
+      <div class="a5">
+        <div style="font-size:var(--small-size);font-family:'Space Grotesk',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent-2);margin-bottom:0.25rem;">④ Observability + Dashboard</div>
+        <div style="display:flex;align-items:center;gap:0.5rem;background:rgba(102,126,234,0.07);border:1px solid rgba(102,126,234,0.2);border-radius:6px;padding:0.4rem 0.8rem;flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF4F00"/><circle cx="20" cy="20" r="10" fill="none" stroke="white" stroke-width="1.8"/><circle cx="20" cy="20" r="3.5" fill="white"/><line x1="20" y1="9" x2="20" y2="12.5" stroke="white" stroke-width="1.5"/><line x1="20" y1="27.5" x2="20" y2="31" stroke="white" stroke-width="1.5"/><line x1="9" y1="20" x2="12.5" y2="20" stroke="white" stroke-width="1.5"/><line x1="27.5" y1="20" x2="31" y2="20" stroke="white" stroke-width="1.5"/><line x1="20" y1="16.5" x2="20" y2="20" stroke="white" stroke-width="2" stroke-linecap="round"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">CloudWatch</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">logs · metrics · alerts</span></div>
+          <span style="color:rgba(255,255,255,0.35);font-size:0.9rem;align-self:center;flex-shrink:0;">&#8250;</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#8C4FFF"/><path d="M10 20 L16 13 L16 27 Z" fill="white" opacity="0.7"/><path d="M30 20 L24 13 L24 27 Z" fill="white" opacity="0.7"/><text x="20" y="24" text-anchor="middle" fill="white" font-size="8" font-family="'JetBrains Mono',monospace" font-weight="700">API</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">API Gateway</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">REST /api/*</span></div>
+          <span style="color:rgba(255,255,255,0.35);font-size:0.9rem;align-self:center;flex-shrink:0;">&#8250;</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">api_handlers</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">Lambda</span></div>
+          <span style="color:rgba(255,255,255,0.35);font-size:0.9rem;align-self:center;flex-shrink:0;">&#8250;</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#8C4FFF"/><circle cx="20" cy="20" r="11" fill="none" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="5.5" ry="11" fill="none" stroke="white" stroke-width="1.5"/><line x1="9" y1="20" x2="31" y2="20" stroke="white" stroke-width="1.5"/><line x1="11" y1="14" x2="29" y2="14" stroke="white" stroke-width="1" opacity="0.7"/><line x1="11" y1="26" x2="29" y2="26" stroke="white" stroke-width="1" opacity="0.7"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">CloudFront</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">CDN</span></div>
+          <span style="color:rgba(255,255,255,0.35);font-size:0.9rem;align-self:center;flex-shrink:0;">&#8250;</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#00D8FF"/><circle cx="20" cy="20" r="3" fill="#222"/><ellipse cx="20" cy="20" rx="12" ry="4.5" fill="none" stroke="#222" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="12" ry="4.5" fill="none" stroke="#222" stroke-width="1.8" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="12" ry="4.5" fill="none" stroke="#222" stroke-width="1.8" transform="rotate(120 20 20)"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">React</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">Dashboard</span></div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:0.4rem;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#DD344C"/><path d="M20 9 L32 14 L32 23 Q32 31 20 35 Q8 31 8 23 L8 14 Z" fill="none" stroke="white" stroke-width="1.8"/><circle cx="20" cy="20" r="4" fill="white"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Cognito</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">Auth</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#7B42BC"/><path d="M20 8 L30 14 L30 26 L20 32 L10 26 L10 14 Z" fill="none" stroke="white" stroke-width="1.8"/><text x="20" y="24" text-anchor="middle" fill="white" font-size="11" font-family="'Space Grotesk',sans-serif" font-weight="700">TF</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Terraform</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">IaC · all resources</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 05 · CORE PIPELINE — LAMBDA + BEDROCK
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s5-pipeline">
+  <div class="slide-num">05</div>
+  <div class="slide-content">
+    <div style="max-width:min(94vw,1100px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);">
+        <span class="tag tag-2">System Design · 2 of 3</span>
+      </div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Core Pipeline — 6 Lambdas · Step Functions orchestration</h2>
+
+      <div style="display:flex;flex-direction:column;gap:var(--gap-sm);" class="a3">
+
+        <!-- Step 1 -->
+        <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--gap);background:var(--card-bg);border:1px solid var(--border);border-left:3px solid var(--accent-3);border-radius:6px;padding:clamp(0.4rem,1vw,0.7rem) clamp(0.7rem,1.5vw,1.1rem);">
+          <div style="display:flex;align-items:center;gap:0.7rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">email_parser</span></div><div><div class="clabel clabel-3" style="margin-bottom:0;">① email_parser</div><div class="t-small">Python 3.11 · triggered by Step Functions</div></div></div>
+          <ul class="blist b3" style="gap:0.15em;"><li>Parse raw <span class="t-code">.eml</span> → extract headers, body, attachments</li><li>Regex + NER PII redaction (names, policy IDs, IRNs, DOBs)</li><li>Write structured record → <strong>DynamoDB email_processing</strong></li></ul>
+          <div style="text-align:right;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">DynamoDB</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">email_processing</span></div></div>
+        </div>
+
+        <!-- Step 2 -->
+        <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--gap);background:var(--card-bg);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;padding:clamp(0.4rem,1vw,0.7rem) clamp(0.7rem,1.5vw,1.1rem);">
+          <div style="display:flex;align-items:center;gap:0.7rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">classify_intent</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="17" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">CLAUDE 3</text><text x="20" y="27" text-anchor="middle" fill="white" font-size="7.5" font-family="'Space Grotesk',sans-serif" font-weight="700">SONNET</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Sonnet</span></div><div><div class="clabel" style="margin-bottom:0;">② classify_intent</div><div class="t-small">Claude 3 Sonnet · JSON output</div></div></div>
+          <ul class="blist" style="gap:0.15em;"><li><strong>17 intent classes</strong> → <strong>12 routing teams</strong> via INTENT_TO_ROUTE map</li><li>Returns: intent · route_team · urgency · sentiment · priority · requires_human_review</li><li>Confidence score ≥ 0.8 → auto · 0.5–0.8 → review · &lt; 0.5 → escalate</li></ul>
+          <div style="text-align:right;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><rect x="7" y="26" width="26" height="6" rx="2" fill="white" opacity="0.95"/><rect x="9" y="18" width="22" height="6" rx="2" fill="white" opacity="0.75"/><rect x="12" y="11" width="16" height="6" rx="2" fill="white" opacity="0.55"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Bedrock</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">anthropic.claude-3-sonnet</span></div></div>
+        </div>
+
+        <!-- Step 3 -->
+        <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--gap);background:var(--card-bg);border:1px solid var(--border);border-left:3px solid var(--accent-2);border-radius:6px;padding:clamp(0.4rem,1vw,0.7rem) clamp(0.7rem,1.5vw,1.1rem);">
+          <div style="display:flex;align-items:center;gap:0.7rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">rag_retrieval</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="17" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">CLAUDE 3</text><text x="20" y="27" text-anchor="middle" fill="white" font-size="8" font-family="'Space Grotesk',sans-serif" font-weight="700">HAIKU</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Haiku</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="18" text-anchor="middle" fill="white" font-size="8" font-family="'Space Grotesk',sans-serif" font-weight="700">TITAN</text><text x="20" y="28" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" opacity="0.8">EMBED V2</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Titan</span></div><div><div class="clabel clabel-2" style="margin-bottom:0;">③ rag_retrieval</div><div class="t-small">Hybrid RAG · HyDE + BM25 + RRF + Rerank</div></div></div>
+          <ul class="blist b2" style="gap:0.15em;"><li><strong>HyDE</strong>: Haiku generates hypothetical answer → Titan embeds → cosine search</li><li><strong>BM25</strong> keyword retrieval → merged via <strong>RRF</strong> → top-12 candidates</li><li>Cross-encoder neural rerank → top-3 chunks → sent to claude_response</li></ul>
+          <div style="text-align:right;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">DynamoDB</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">kb_embeddings</span></div></div>
+        </div>
+
+
+        <!-- Step 4 — CRM Validation (NEW) -->
+        <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--gap);background:var(--card-bg);border:1px solid var(--border);border-left:3px solid var(--accent-4);border-radius:6px;padding:clamp(0.4rem,1vw,0.7rem) clamp(0.7rem,1.5vw,1.1rem);">
+          <div style="display:flex;align-items:center;gap:0.7rem;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="17" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">MISTRAL</text><text x="20" y="27" text-anchor="middle" fill="white" font-size="10" font-family="'Space Grotesk',sans-serif" font-weight="700">7B</text></svg><div><div class="clabel clabel-4" style="margin-bottom:0;">④ crm_validation</div><div class="t-small">Text-to-SQL · Mistral 7B · DynamoDB lookup</div></div></div>
+          <ul class="blist" style="gap:0.15em;"><li><strong>Query planning</strong>: Mistral 7B generates structured DynamoDB query plan (GetItem / Scan + FilterExpression)</li><li>Looks up customer by <span class="t-code">customer_id</span>, <span class="t-code">policy_number</span>, <span class="t-code">member_id</span>, or email address</li><li>Validates: policy active status · coverage type · renewal date · intent eligibility</li><li>Returns <span class="t-code">crm_context</span>: customer name · policy · plan · eligible flag</li></ul>
+          <div style="text-align:right;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">DynamoDB</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">customers</span></div></div>
+        </div>
+        <!-- Step 5 (was 4) -->
+        <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--gap);background:var(--card-bg);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;padding:clamp(0.4rem,1vw,0.7rem) clamp(0.7rem,1.5vw,1.1rem);">
+          <div style="display:flex;align-items:center;gap:0.7rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">claude_response</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="17" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">MISTRAL</text><text x="20" y="27" text-anchor="middle" fill="white" font-size="7.5" font-family="'Space Grotesk',sans-serif" font-weight="700">7B</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Mistral 7B</span></div><div><div class="clabel" style="margin-bottom:0;">⑤ claude_response</div><div class="t-small">Mistral 7B · 8-dimensional judge</div></div></div>
+          <ul class="blist" style="gap:0.15em;"><li>Generate grounded reply using RAG context + intent + customer history</li><li><strong>8-dim quality judge</strong>: accuracy · completeness · tone · compliance · PII · hedge · citation · relevance</li><li>Primary: <strong>Mistral-7B</strong> · Fallback: Sonnet → Llama-3.1-8B if throttled</li></ul>
+          <div style="text-align:right;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><rect x="7" y="26" width="26" height="6" rx="2" fill="white" opacity="0.95"/><rect x="9" y="18" width="22" height="6" rx="2" fill="white" opacity="0.75"/><rect x="12" y="11" width="16" height="6" rx="2" fill="white" opacity="0.55"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">Bedrock</span><span style="font-family:'Space Grotesk',sans-serif;font-size:0.52rem;color:rgba(255,255,255,0.45);line-height:1.1;max-width:58px;">mistral.mistral-7b</span></div></div>
+        </div>
+
+        <!-- Step 5 -->
+        <div style="display:grid;grid-template-columns:auto 1fr;align-items:center;gap:var(--gap);background:var(--card-bg);border:1px solid var(--border);border-left:3px solid var(--accent-3);border-radius:6px;padding:clamp(0.4rem,1vw,0.7rem) clamp(0.7rem,1.5vw,1.1rem);">
+          <div style="display:flex;align-items:center;gap:0.7rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;">email_sender</span></div><div><div class="clabel clabel-3" style="margin-bottom:0;">⑥ email_sender</div><div class="t-small">3-tier confidence routing</div></div></div>
+          <div style="display:flex;gap:var(--gap);">
+            <div class="card card-l3" style="flex:1;padding:0.4rem 0.6rem;"><div class="clabel clabel-3" style="font-size:0.55rem;">≥ 0.8 confidence</div><div class="t-small t-white" style="font-weight:700;">AUTO SEND</div><div class="t-small">reply dispatched immediately</div></div>
+            <div class="card card-l4" style="flex:1;padding:0.4rem 0.6rem;"><div class="clabel clabel-4" style="font-size:0.55rem;">0.5 – 0.8 confidence</div><div class="t-small t-white" style="font-weight:700;">HUMAN REVIEW</div><div class="t-small">draft queued for agent approval</div></div>
+            <div class="card" style="flex:1;padding:0.4rem 0.6rem;border-left:3px solid #e53e3e;"><div class="clabel" style="font-size:0.55rem;color:#e53e3e;">&lt; 0.5 confidence</div><div class="t-small t-white" style="font-weight:700;">ESCALATE</div><div class="t-small">routed to specialist team</div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 06 · STORAGE + INFRASTRUCTURE
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s6-infra">
+  <div class="slide-num">06</div>
+  <div class="slide-content">
+    <div style="max-width:min(94vw,1100px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);">
+        <span class="tag tag-2">System Design · 3 of 3</span>
+      </div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Storage · Observability · Infrastructure as Code</h2>
+
+      <div class="g2 a3">
+
+        <!-- Left: Storage -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+          <div class="t-small" style="color:var(--accent-3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">DynamoDB Tables</div>
+
+          <div class="card card-l3">
+            <div style="display:flex;align-items:center;gap:0.7rem;margin-bottom:0.3em;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div><div class="clabel clabel-3" style="margin-bottom:0;">email_processing</div><div class="t-small">PK: email_id (UUID)</div></div></div>
+            <div class="code-block" style="max-height:6vh;">PK: email_id (UUID)
+fields: intent · route_team · confidence
+        urgency · sentiment · response_draft
+billing: PAY_PER_REQUEST</div>
+          </div>
+
+          <div class="card card-l2">
+            <div style="display:flex;align-items:center;gap:0.7rem;margin-bottom:0.3em;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div><div class="clabel clabel-2" style="margin-bottom:0;">model_metrics</div><div class="t-small">PK: task_type · SK: model_id#timestamp</div></div></div>
+            <div class="code-block" style="max-height:6vh;">PK: task_type  SK: model_id#timestamp
+fields: latency_ms · tokens_used
+        confidence · accuracy
+billing: PAY_PER_REQUEST</div>
+          </div>
+
+          <div class="card card-l4">
+            <div style="display:flex;align-items:center;gap:0.7rem;margin-bottom:0.3em;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div><div class="clabel clabel-4" style="margin-bottom:0;">kb_embeddings</div><div class="t-small">PK: doc_id · 1024-dim Titan vector</div></div></div>
+            <div class="code-block" style="max-height:6vh;">PK: doc_id
+fields: chunk_text · embedding[1024]
+        source_doc · chunk_index · md5_hash
+billing: PAY_PER_REQUEST</div>
+          </div>
+
+
+          <div class="card card-l4" style="margin-top:var(--gap-sm) !important;">
+            <div style="display:flex;align-items:center;gap:0.7rem;margin-bottom:0.3em;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#2E73B8"/><ellipse cx="20" cy="11" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/><line x1="9" y1="11" x2="9" y2="29" stroke="white" stroke-width="1.8"/><line x1="31" y1="11" x2="31" y2="29" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="2,2"/><ellipse cx="20" cy="29" rx="11" ry="4" fill="none" stroke="white" stroke-width="1.8"/></svg><div><div class="clabel clabel-4" style="margin-bottom:0;">customers</div><div class="t-small">PK: customer_id · policy + CRM data</div></div></div>
+            <div class="code-block" style="max-height:6vh;">PK: customer_id
+fields: name · email · policy_number · member_id
+        plan_type · status · coverage · renewal_date
+billing: PAY_PER_REQUEST  rows: ~1,000</div>
+          </div>
+
+          <div class="t-small" style="color:var(--accent-3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.2em;">S3 Buckets</div>
+          <div style="display:flex;gap:0.4rem;">
+            <div class="card card-l3" style="flex:1;padding:0.4rem 0.6rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#3D8624"/><ellipse cx="20" cy="14" rx="10" ry="3.5" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="14" x2="10" y2="28" stroke="white" stroke-width="1.8"/><line x1="30" y1="14" x2="30" y2="28" stroke="white" stroke-width="1.8"/><path d="M10 28 Q20 34 30 28" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="21" x2="30" y2="21" stroke="white" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div class="t-small t-white" style="font-weight:700;margin-top:0.2em;">emails</div><div class="t-small">.eml raw files</div></div>
+            <div class="card card-l3" style="flex:1;padding:0.4rem 0.6rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#3D8624"/><ellipse cx="20" cy="14" rx="10" ry="3.5" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="14" x2="10" y2="28" stroke="white" stroke-width="1.8"/><line x1="30" y1="14" x2="30" y2="28" stroke="white" stroke-width="1.8"/><path d="M10 28 Q20 34 30 28" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="21" x2="30" y2="21" stroke="white" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div class="t-small t-white" style="font-weight:700;margin-top:0.2em;">knowledge_base</div><div class="t-small">PDF · TXT policies</div></div>
+            <div class="card card-l3" style="flex:1;padding:0.4rem 0.6rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#3D8624"/><ellipse cx="20" cy="14" rx="10" ry="3.5" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="14" x2="10" y2="28" stroke="white" stroke-width="1.8"/><line x1="30" y1="14" x2="30" y2="28" stroke="white" stroke-width="1.8"/><path d="M10 28 Q20 34 30 28" fill="none" stroke="white" stroke-width="1.8"/><line x1="10" y1="21" x2="30" y2="21" stroke="white" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div class="t-small t-white" style="font-weight:700;margin-top:0.2em;">assessment</div><div class="t-small">eval results JSON</div></div>
+            <div class="card card-l2" style="flex:1;padding:0.4rem 0.6rem;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#8C4FFF"/><circle cx="20" cy="20" r="11" fill="none" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="5.5" ry="11" fill="none" stroke="white" stroke-width="1.5"/><line x1="9" y1="20" x2="31" y2="20" stroke="white" stroke-width="1.5"/><line x1="11" y1="14" x2="29" y2="14" stroke="white" stroke-width="1" opacity="0.7"/><line x1="11" y1="26" x2="29" y2="26" stroke="white" stroke-width="1" opacity="0.7"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div class="t-small t-white" style="font-weight:700;margin-top:0.2em;">frontend</div><div class="t-small">React + CloudFront</div></div>
+          </div>
+        </div>
+
+        <!-- Right: Observability + IaC -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+          <div class="t-small" style="color:var(--accent-2);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Observability</div>
+
+          <div class="card card-l2">
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.35em;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF4F00"/><circle cx="20" cy="20" r="10" fill="none" stroke="white" stroke-width="1.8"/><circle cx="20" cy="20" r="3.5" fill="white"/><line x1="20" y1="9" x2="20" y2="12.5" stroke="white" stroke-width="1.5"/><line x1="20" y1="27.5" x2="20" y2="31" stroke="white" stroke-width="1.5"/><line x1="9" y1="20" x2="12.5" y2="20" stroke="white" stroke-width="1.5"/><line x1="27.5" y1="20" x2="31" y2="20" stroke="white" stroke-width="1.5"/><line x1="20" y1="16.5" x2="20" y2="20" stroke="white" stroke-width="2" stroke-linecap="round"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div class="clabel clabel-2" style="margin-bottom:0;">CloudWatch</div></div>
+            <ul class="blist b2" style="gap:0.2em;">
+              <li>Structured JSON logs with trace_id per email</li>
+              <li>Custom metrics: latency_ms · confidence_score · token_count</li>
+              <li>Alerts: error rate &gt; 5% · confidence &lt; 0.3 for 10 consecutive emails</li>
+            </ul>
+          </div>
+
+          <div class="card card-l2">
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.35em;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#8C4FFF"/><path d="M10 20 L16 13 L16 27 Z" fill="white" opacity="0.7"/><path d="M30 20 L24 13 L24 27 Z" fill="white" opacity="0.7"/><text x="20" y="24" text-anchor="middle" fill="white" font-size="8" font-family="'JetBrains Mono',monospace" font-weight="700">API</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="28" text-anchor="middle" fill="white" font-size="20" font-family="Georgia,serif" font-style="italic">λ</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#8C4FFF"/><circle cx="20" cy="20" r="11" fill="none" stroke="white" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="5.5" ry="11" fill="none" stroke="white" stroke-width="1.5"/><line x1="9" y1="20" x2="31" y2="20" stroke="white" stroke-width="1.5"/><line x1="11" y1="14" x2="29" y2="14" stroke="white" stroke-width="1" opacity="0.7"/><line x1="11" y1="26" x2="29" y2="26" stroke="white" stroke-width="1" opacity="0.7"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#DD344C"/><path d="M20 9 L32 14 L32 23 Q32 31 20 35 Q8 31 8 23 L8 14 Z" fill="none" stroke="white" stroke-width="1.8"/><circle cx="20" cy="20" r="4" fill="white"/></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div class="clabel clabel-2" style="margin-bottom:0;">Dashboard Stack</div></div>
+            <ul class="blist b2" style="gap:0.2em;">
+              <li><strong>API Gateway</strong> REST → <strong>api_handlers</strong> Lambda → DynamoDB reads</li>
+              <li><strong>React</strong> frontend · row-click navigation · TruLens score display</li>
+              <li><strong>CloudFront</strong> CDN · S3 static hosting · <strong>Cognito</strong> auth</li>
+            </ul>
+          </div>
+
+          <div class="t-small" style="color:var(--accent-4);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.2em;">Infrastructure as Code</div>
+
+          <div class="card card-l4">
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.35em;"><div style="display:flex;flex-direction:column;align-items:center;gap:0.25em;text-align:center;"><svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#7B42BC"/><path d="M20 8 L30 14 L30 26 L20 32 L10 26 L10 14 Z" fill="none" stroke="white" stroke-width="1.8"/><text x="20" y="24" text-anchor="middle" fill="white" font-size="11" font-family="'Space Grotesk',sans-serif" font-weight="700">TF</text></svg><span style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:#fff;line-height:1.2;max-width:58px;"></span></div><div><div class="clabel clabel-4" style="margin-bottom:0;">Terraform — modular structure</div><div class="t-small">all resources tagged: Project=InsureMailAI · ManagedBy=Terraform</div></div></div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.3em;margin-top:0.3em;">
+              <div class="card" style="padding:0.3rem;text-align:center;border-color:rgba(246,173,85,0.3);"><div class="t-small t-white" style="font-weight:700;">iam</div><div class="t-small">least-privilege roles</div></div>
+              <div class="card" style="padding:0.3rem;text-align:center;border-color:rgba(246,173,85,0.3);"><div class="t-small t-white" style="font-weight:700;">storage</div><div class="t-small">S3 · DynamoDB</div></div>
+              <div class="card" style="padding:0.3rem;text-align:center;border-color:rgba(246,173,85,0.3);"><div class="t-small t-white" style="font-weight:700;">compute</div><div class="t-small">Lambda · SFN</div></div>
+              <div class="card" style="padding:0.3rem;text-align:center;border-color:rgba(246,173,85,0.3);"><div class="t-small t-white" style="font-weight:700;">monitoring</div><div class="t-small">CW · alerts</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════
+     DOMAIN 3 OF 4 — AI / ML
+     ═══════════════════════════════════════════════════ -->
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 07 · HYBRID RAG PIPELINE
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s7-rag">
+  <div class="slide-num">07</div>
+  <div class="slide-content">
+    <div style="max-width:min(96vw,1150px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);"><span class="tag tag-2">AI/ML · 1 of 3</span></div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Hybrid RAG Pipeline</h2>
+
+      <div class="g2 a3">
+
+        <!-- Left: Pipeline flow -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <!-- Input -->
+          <div style="text-align:center;padding:0.4rem 0.6rem;background:rgba(102,126,234,0.12);border:1px solid rgba(102,126,234,0.3);border-radius:6px;">
+            <div class="clabel clabel-2" style="margin-bottom:0.1em;">Email Query</div>
+            <div class="t-small">intent + entity context from classify_intent</div>
+          </div>
+
+          <!-- Two lanes -->
+          <div style="display:flex;gap:var(--gap-sm);">
+            <!-- Semantic lane -->
+            <div style="flex:1;display:flex;flex-direction:column;gap:0.25rem;">
+              <div class="t-small" style="color:var(--accent-3);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;text-align:center;font-size:0.58rem;">Semantic Lane</div>
+              <div class="card card-l3" style="padding:0.4rem 0.6rem;text-align:center;">
+                <div class="clabel clabel-3" style="font-size:0.52rem;margin-bottom:0.1em;">HyDE (Haiku)</div>
+                <div class="t-small" style="font-size:0.6rem;">Hypothetical doc → Titan V2 embed → 1024-dim cosine</div>
+              </div>
+            </div>
+
+            <!-- Lexical lane -->
+            <div style="flex:1;display:flex;flex-direction:column;gap:0.25rem;">
+              <div class="t-small" style="color:var(--accent-4);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;text-align:center;font-size:0.58rem;">Lexical Lane</div>
+              <div class="card card-l4" style="padding:0.4rem 0.6rem;text-align:center;">
+                <div class="clabel clabel-4" style="font-size:0.52rem;margin-bottom:0.1em;">BM25 Keyword</div>
+                <div class="t-small" style="font-size:0.6rem;">Term-frequency scoring on chunk_text field</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RRF Fusion -->
+          <div style="text-align:center;padding:0.45rem 0.6rem;background:rgba(255,87,34,0.1);border:1px solid rgba(255,87,34,0.28);border-radius:6px;">
+            <div class="clabel" style="margin-bottom:0.1em;">RRF Fusion</div>
+            <div class="t-small">Reciprocal Rank Fusion merges both rankings → top-12 candidates</div>
+          </div>
+
+          <!-- Rerank -->
+          <div style="text-align:center;padding:0.45rem 0.6rem;background:rgba(102,126,234,0.1);border:1px solid rgba(102,126,234,0.28);border-radius:6px;">
+            <div class="clabel clabel-2" style="margin-bottom:0.1em;">Cross-encoder Neural Rerank (Haiku)</div>
+            <div class="t-small">Scores each candidate pair · selects top-3 chunks for response</div>
+          </div>
+
+          <!-- Output -->
+          <div style="text-align:center;padding:0.45rem 0.6rem;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.28);border-radius:6px;">
+            <div class="clabel clabel-3" style="margin-bottom:0.1em;">→ claude_response (Mistral 7B)</div>
+            <div class="t-small">top-3 chunks + intent + CRM context → grounded insurance reply</div>
+          </div>
+
+        </div>
+
+        <!-- Right: params + reasoning -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <div class="t-small" style="color:var(--accent-4);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Chunking Parameters</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--gap-sm);">
+            <div class="card card-l4" style="padding:0.45rem 0.6rem;text-align:center;">
+              <div class="clabel clabel-4" style="font-size:0.52rem;">Chunk Size</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.2vw,1.6rem);color:var(--accent-4);">500</div>
+              <div class="t-small" style="font-size:0.58rem;">tokens</div>
+            </div>
+            <div class="card card-l4" style="padding:0.45rem 0.6rem;text-align:center;">
+              <div class="clabel clabel-4" style="font-size:0.52rem;">Overlap</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.2vw,1.6rem);color:var(--accent-4);">50</div>
+              <div class="t-small" style="font-size:0.58rem;">tokens</div>
+            </div>
+            <div class="card card-l2" style="padding:0.45rem 0.6rem;text-align:center;">
+              <div class="clabel clabel-2" style="font-size:0.52rem;">Vector Dims</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.1rem,2.2vw,1.6rem);color:var(--accent-2);">1024</div>
+              <div class="t-small" style="font-size:0.58rem;">Titan V2</div>
+            </div>
+          </div>
+
+          <div class="t-small" style="color:var(--accent-2);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.1em;">DynamoDB: kb_embeddings storage</div>
+          <div class="code-block" style="max-height:9vh;font-size:0.62rem;">PK: doc_id
+fields: chunk_text · embedding[1024]
+        source_doc · chunk_index · md5_hash
+billing: PAY_PER_REQUEST</div>
+
+          <div class="t-small" style="color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.1em;">Why Hybrid?</div>
+          <ul class="blist" style="gap:0.2em;">
+            <li>BM25 catches <strong>exact insurance terms</strong>: policy numbers, procedure codes, benefit names</li>
+            <li>Semantic search finds <strong>conceptually related docs</strong> even with different phrasing</li>
+            <li>RRF + rerank <strong>eliminates the trade-off</strong> — best of both worlds in every query</li>
+          </ul>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 08 · MULTI-LLM STRATEGY
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s8-models">
+  <div class="slide-num">08</div>
+  <div class="slide-content">
+    <div style="max-width:min(96vw,1150px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);"><span class="tag tag-2">AI/ML · 2 of 3</span></div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Multi-LLM Strategy — Right Model for Each Task</h2>
+
+      <div class="a3" style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+        <!-- Column headers -->
+        <div style="display:grid;grid-template-columns:1.8fr 2.2fr 2.8fr 2fr;gap:var(--gap-sm);padding:0 0.7rem;">
+          <div class="t-small" style="font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);font-size:0.58rem;">Model</div>
+          <div class="t-small" style="font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);font-size:0.58rem;">Task</div>
+          <div class="t-small" style="font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);font-size:0.58rem;">Why This Model</div>
+          <div class="t-small" style="font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);font-size:0.58rem;">Bedrock Model ID</div>
+        </div>
+
+        <!-- Row 1: Claude 3 Sonnet -->
+        <div class="card card-l1" style="padding:0.5rem 0.7rem;">
+          <div style="display:grid;grid-template-columns:1.8fr 2.2fr 2.8fr 2fr;gap:var(--gap-sm);align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <svg width="32" height="32" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="15" text-anchor="middle" fill="white" font-size="6" font-family="'Space Grotesk',sans-serif" font-weight="700">CLAUDE 3</text><text x="20" y="26" text-anchor="middle" fill="white" font-size="6.5" font-family="'Space Grotesk',sans-serif" font-weight="700">SONNET</text></svg>
+              <div class="t-small t-white" style="font-weight:700;">Claude 3 Sonnet</div>
+            </div>
+            <div class="t-small"><strong>Intent classification</strong> · 17 classes → 12 routing teams</div>
+            <div class="t-small">Best structured JSON output · highest reasoning for complex multi-class classification</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.56rem;color:var(--accent-3);">anthropic.claude-3-sonnet<br>-20240229-v1:0</div>
+          </div>
+        </div>
+
+        <!-- Row 2: Mistral 7B -->
+        <div class="card card-l2" style="padding:0.5rem 0.7rem;">
+          <div style="display:grid;grid-template-columns:1.8fr 2.2fr 2.8fr 2fr;gap:var(--gap-sm);align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <svg width="32" height="32" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="17" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">MISTRAL</text><text x="20" y="27" text-anchor="middle" fill="white" font-size="7.5" font-family="'Space Grotesk',sans-serif" font-weight="700">7B</text></svg>
+              <div class="t-small t-white" style="font-weight:700;">Mistral 7B</div>
+            </div>
+            <div class="t-small"><strong>Response generation</strong> · <strong>CRM query planning</strong></div>
+            <div class="t-small">Cost-efficient · strong instruction-following · 3× cheaper than Sonnet per generation token</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.56rem;color:var(--accent-2);">mistral.mistral-7b<br>-instruct-v0:2</div>
+          </div>
+        </div>
+
+        <!-- Row 3: Claude 3 Haiku -->
+        <div class="card card-l3" style="padding:0.5rem 0.7rem;">
+          <div style="display:grid;grid-template-columns:1.8fr 2.2fr 2.8fr 2fr;gap:var(--gap-sm);align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <svg width="32" height="32" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#01A88D"/><text x="20" y="15" text-anchor="middle" fill="white" font-size="6" font-family="'Space Grotesk',sans-serif" font-weight="700">CLAUDE 3</text><text x="20" y="26" text-anchor="middle" fill="white" font-size="7" font-family="'Space Grotesk',sans-serif" font-weight="700">HAIKU</text></svg>
+              <div class="t-small t-white" style="font-weight:700;">Claude 3 Haiku</div>
+            </div>
+            <div class="t-small"><strong>HyDE generation</strong> · <strong>cross-encoder rerank</strong></div>
+            <div class="t-small">Fastest Claude · lowest latency for high-frequency auxiliary tasks · ideal for the rerank loop</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.56rem;color:var(--accent-3);">anthropic.claude-3-haiku<br>-20240307-v1:0</div>
+          </div>
+        </div>
+
+        <!-- Row 4: Titan Embed V2 -->
+        <div class="card card-l4" style="padding:0.5rem 0.7rem;">
+          <div style="display:grid;grid-template-columns:1.8fr 2.2fr 2.8fr 2fr;gap:var(--gap-sm);align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <svg width="32" height="32" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="7" fill="#FF9900"/><text x="20" y="15" text-anchor="middle" fill="white" font-size="6" font-family="'Space Grotesk',sans-serif" font-weight="700">TITAN</text><text x="20" y="26" text-anchor="middle" fill="white" font-size="6" font-family="'Space Grotesk',sans-serif" font-weight="700">EMBED V2</text></svg>
+              <div class="t-small t-white" style="font-weight:700;">Titan Embed V2</div>
+            </div>
+            <div class="t-small"><strong>1024-dim vector embeddings</strong> · knowledge base ingestion + query</div>
+            <div class="t-small">AWS-native · Bedrock-integrated · no external vector DB · stores directly in DynamoDB</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.56rem;color:var(--accent-4);">amazon.titan-embed<br>-text-v2:0</div>
+          </div>
+        </div>
+
+        <!-- Confidence routing -->
+        <div style="display:flex;gap:var(--gap-sm);margin-top:0.2em;">
+          <div style="flex:0 0 auto;display:flex;align-items:center;padding-right:var(--gap-sm);">
+            <div class="t-small" style="font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);">Routing</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:0.35rem;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:6px;">
+            <div class="clabel clabel-3" style="font-size:0.52rem;">≥ 0.8 confidence</div>
+            <div class="t-small t-white" style="font-weight:700;">AUTO SEND</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:0.35rem;background:rgba(102,126,234,0.1);border:1px solid rgba(102,126,234,0.3);border-radius:6px;">
+            <div class="clabel clabel-2" style="font-size:0.52rem;">0.5 – 0.8 confidence</div>
+            <div class="t-small t-white" style="font-weight:700;">HUMAN REVIEW</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:0.35rem;background:rgba(229,62,62,0.1);border:1px solid rgba(229,62,62,0.3);border-radius:6px;">
+            <div class="clabel" style="font-size:0.52rem;color:#e53e3e;">&lt; 0.5 confidence</div>
+            <div class="t-small t-white" style="font-weight:700;">ESCALATE</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 09 · EVALUATION & RESULTS
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s9-eval">
+  <div class="slide-num">09</div>
+  <div class="slide-content">
+    <div style="max-width:min(96vw,1150px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);"><span class="tag tag-2">AI/ML · 3 of 3</span></div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Evaluation · TruLens RAG Triad + Live Assessment</h2>
+
+      <div class="g2 a3">
+
+        <!-- Left: TruLens -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <div class="t-small" style="color:var(--accent-2);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">TruLens RAG Triad</div>
+
+          <div class="card card-l2" style="padding:0.6rem 0.8rem;">
+            <div class="clabel clabel-2" style="margin-bottom:0.35em;">Faithfulness (Groundedness)</div>
+            <div class="sbar">
+              <div class="sbar-label">Response ↔ Retrieved chunks</div>
+              <div class="sbar-track"><div class="sbar-fill" style="width:82%;background:var(--accent-2);"></div></div>
+              <div class="sbar-val" style="color:var(--accent-2);">0.82</div>
+            </div>
+            <div class="t-small" style="margin-top:0.3em;">Is the response fully grounded in retrieved context? Detects hallucination.</div>
+          </div>
+
+          <div class="card card-l3" style="padding:0.6rem 0.8rem;">
+            <div class="clabel clabel-3" style="margin-bottom:0.35em;">Answer Relevance</div>
+            <div class="sbar">
+              <div class="sbar-label">Response ↔ Customer question</div>
+              <div class="sbar-track"><div class="sbar-fill" style="width:79%;background:var(--accent-3);"></div></div>
+              <div class="sbar-val" style="color:var(--accent-3);">0.79</div>
+            </div>
+            <div class="t-small" style="margin-top:0.3em;">Does the response actually answer what the customer asked?</div>
+          </div>
+
+          <div class="card card-l4" style="padding:0.6rem 0.8rem;">
+            <div class="clabel clabel-4" style="margin-bottom:0.35em;">Context Relevance</div>
+            <div class="sbar">
+              <div class="sbar-label">Retrieved chunks ↔ Query</div>
+              <div class="sbar-track"><div class="sbar-fill" style="width:75%;background:var(--accent-4);"></div></div>
+              <div class="sbar-val" style="color:var(--accent-4);">0.75</div>
+            </div>
+            <div class="t-small" style="margin-top:0.3em;">Are the top-3 knowledge base chunks relevant to the email query?</div>
+          </div>
+
+          <div class="card card-l1" style="padding:0.4rem 0.8rem;">
+            <div class="t-small">Dataset: <strong class="t-white">Laya Synthetic</strong> · 1,000 emails · 17 intent classes · 12 routing teams · JSONL format</div>
+          </div>
+
+        </div>
+
+        <!-- Right: Live assessment -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <div class="t-small" style="color:var(--accent-3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Live Pipeline Assessment</div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-sm);">
+            <div class="card card-l3" style="padding:0.6rem 0.8rem;">
+              <div class="clabel clabel-3" style="font-size:0.52rem;">Composite Score</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.4rem,3vw,2.2rem);color:var(--accent-3);line-height:1;">0.7776</div>
+              <div class="t-small" style="color:#22c55e;font-weight:700;margin-top:0.2em;">✓ PASSED</div>
+            </div>
+            <div class="card card-l1" style="padding:0.6rem 0.8rem;">
+              <div class="clabel" style="font-size:0.52rem;">Emails Processed</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.4rem,3vw,2.2rem);color:var(--accent);line-height:1;">20/20</div>
+              <div class="t-small" style="margin-top:0.2em;">100% pipeline success rate</div>
+            </div>
+            <div class="card card-l2" style="padding:0.6rem 0.8rem;">
+              <div class="clabel clabel-2" style="font-size:0.52rem;">Routing Accuracy</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.4rem,3vw,2.2rem);color:var(--accent-2);line-height:1;">75%</div>
+              <div class="t-small" style="margin-top:0.2em;">intent → team routing</div>
+            </div>
+            <div class="card card-l4" style="padding:0.6rem 0.8rem;">
+              <div class="clabel clabel-4" style="font-size:0.52rem;">CRM Hit Rate</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.4rem,3vw,2.2rem);color:var(--accent-4);line-height:1;">100%</div>
+              <div class="t-small" style="margin-top:0.2em;">customer record lookup</div>
+            </div>
+          </div>
+
+          <div class="t-small" style="color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.2em;">Evaluation Methodology</div>
+          <ul class="blist" style="gap:0.2em;">
+            <li>Local eval: <strong>intent accuracy · routing precision · confidence calibration</strong> via Bedrock Haiku judge</li>
+            <li>TruLens RAG Triad: <strong>faithfulness · answer relevance · context relevance</strong> · LLM-as-judge scoring</li>
+            <li>Bedrock benchmarking: <strong>multi-LLM comparison</strong> — Sonnet vs Mistral-7B vs Llama-3.1-8B</li>
+            <li>45 unit tests · 78% coverage · moto v5 AWS mocking · custom eval scripts in <code style="font-family:'JetBrains Mono',monospace;font-size:0.85em;color:var(--accent-3);">scripts/</code></li>
+          </ul>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
+<!-- ═══════════════════════════════════════════════════
+     DOMAIN 4 OF 4 — SYSTEM EVALUATION
+     ═══════════════════════════════════════════════════ -->
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 10 · DATA SOURCE
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s10-data">
+  <div class="slide-num">10</div>
+  <div class="slide-content">
+    <div style="max-width:min(96vw,1150px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);"><span class="tag tag-3">System Evaluation · 1 of 3</span></div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Data Source — What We Tested On</h2>
+
+      <div class="g2 a3">
+
+        <!-- Left: dataset overview -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <div class="t-small" style="color:var(--accent-3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Laya Synthetic Dataset</div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--gap-sm);">
+            <div class="card card-l3" style="padding:0.5rem 0.7rem;text-align:center;">
+              <div class="clabel clabel-3" style="font-size:0.52rem;">Total Emails</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.3rem,2.8vw,2rem);color:var(--accent-3);line-height:1;">1,000</div>
+              <div class="t-small">records</div>
+            </div>
+            <div class="card card-l2" style="padding:0.5rem 0.7rem;text-align:center;">
+              <div class="clabel clabel-2" style="font-size:0.52rem;">Intent Classes</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.3rem,2.8vw,2rem);color:var(--accent-2);line-height:1;">17</div>
+              <div class="t-small">categories</div>
+            </div>
+            <div class="card card-l4" style="padding:0.5rem 0.7rem;text-align:center;">
+              <div class="clabel clabel-4" style="font-size:0.52rem;">Routing Teams</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.3rem,2.8vw,2rem);color:var(--accent-4);line-height:1;">12</div>
+              <div class="t-small">teams</div>
+            </div>
+          </div>
+
+          <div class="t-small" style="color:var(--accent-2);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.1em;">4 JSONL Files</div>
+
+          <div class="card card-l3" style="padding:0.45rem 0.8rem;">
+            <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:0.6rem;">
+              <div class="clabel clabel-3" style="margin-bottom:0;font-size:0.58rem;">emails.jsonl</div>
+              <div class="t-small">intent · route_team · requires_human_review · raw email body</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--accent-3);">1,000</div>
+            </div>
+          </div>
+          <div class="card card-l2" style="padding:0.45rem 0.8rem;">
+            <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:0.6rem;">
+              <div class="clabel clabel-2" style="margin-bottom:0;font-size:0.58rem;">cases.jsonl</div>
+              <div class="t-small">joined via email_id · rag_context_group · draft_response_id</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--accent-2);">1,000</div>
+            </div>
+          </div>
+          <div class="card card-l4" style="padding:0.45rem 0.8rem;">
+            <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:0.6rem;">
+              <div class="clabel clabel-4" style="margin-bottom:0;font-size:0.58rem;">draft_responses.jsonl</div>
+              <div class="t-small">generated_reply · grounded_doc_ids · gold standard</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--accent-4);">1,000</div>
+            </div>
+          </div>
+          <div class="card card-l1" style="padding:0.45rem 0.8rem;">
+            <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:0.6rem;">
+              <div class="clabel" style="margin-bottom:0;font-size:0.58rem;">attachment_content.jsonl</div>
+              <div class="t-small">doc_category · raw_text · structured_gold_fields · 14 doc types</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--accent);">1,044</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right: why this data + class distribution -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <div class="t-small" style="color:var(--accent-4);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Why Synthetic?</div>
+          <div class="card card-l4" style="padding:0.5rem 0.8rem;">
+            <ul class="blist" style="gap:0.2em;">
+              <li><strong>No PII risk</strong> — real insurance emails contain sensitive customer data</li>
+              <li><strong>Reproducible</strong> — same dataset across every eval run, no distribution drift</li>
+              <li><strong>Controlled distribution</strong> — all 17 intents represented, rare cases included</li>
+              <li><strong>Gold labels</strong> — human-verified intent + routing ground truth per record</li>
+            </ul>
+          </div>
+
+          <div class="t-small" style="color:var(--accent-3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.1em;">17 Intent Classes</div>
+          <div class="code-block" style="max-height:18vh;">coverage_query      · claim_submission    · claim_status
+claim_reimbursement · pre_authorisation   · payment_issue
+policy_change       · renewal_query       · cancellation_request
+enrollment          · dependent_addition  · complaint
+document_followup   · hospital_network   · id_verification
+broker_query        · other</div>
+
+          <div class="card card-l2" style="padding:0.45rem 0.8rem;">
+            <div class="t-small"><strong class="t-white">Eval subset:</strong> 100-record stratified sample drawn via <code style="font-family:'JetBrains Mono',monospace;font-size:0.82em;color:var(--accent-2);">generate_eval_datasets.py</code> — proportional class balance maintained</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 11 · TEST STRATEGY
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s11-strategy">
+  <div class="slide-num">11</div>
+  <div class="slide-content">
+    <div style="max-width:min(96vw,1150px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);"><span class="tag tag-3">System Evaluation · 2 of 3</span></div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Test Strategy — How We Measured</h2>
+
+      <div class="g2 a3">
+
+        <!-- Left: 3 layers -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <div class="t-small" style="color:var(--accent-3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">3-Layer Test Pyramid</div>
+
+          <!-- Layer 1 -->
+          <div class="card card-l4" style="padding:0.55rem 0.8rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3em;">
+              <div class="clabel clabel-4" style="margin-bottom:0;">Layer 1 · Unit Tests</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:1.1rem;color:var(--accent-4);">45 tests · 78%</div>
+            </div>
+            <ul class="blist" style="gap:0.15em;">
+              <li><strong>pytest</strong> · all 10 Lambda functions tested in isolation</li>
+              <li><strong>moto v5</strong> <code style="font-family:'JetBrains Mono',monospace;font-size:0.82em;color:var(--accent-4);">@mock_aws</code> — DynamoDB · S3 · Step Functions without real AWS</li>
+              <li>Env vars in <code style="font-family:'JetBrains Mono',monospace;font-size:0.82em;color:var(--accent-4);">conftest.py</code> before module import · module isolation per test</li>
+            </ul>
+          </div>
+
+          <!-- Layer 2 -->
+          <div class="card card-l2" style="padding:0.55rem 0.8rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3em;">
+              <div class="clabel clabel-2" style="margin-bottom:0;">Layer 2 · Evaluation Scripts</div>
+              <div class="t-small" style="color:var(--accent-2);font-weight:700;">100-record sample</div>
+            </div>
+            <ul class="blist b2" style="gap:0.15em;">
+              <li><strong>Local eval</strong>: intent accuracy · routing precision · confidence calibration · entity extraction</li>
+              <li><strong>LLM-as-judge</strong>: Bedrock Haiku scores each output on 8 quality dimensions</li>
+              <li><strong>TruLens RAG Triad</strong>: faithfulness · answer relevance · context relevance</li>
+            </ul>
+          </div>
+
+          <!-- Layer 3 -->
+          <div class="card card-l3" style="padding:0.55rem 0.8rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3em;">
+              <div class="clabel clabel-3" style="margin-bottom:0;">Layer 3 · Live Pipeline Assessment</div>
+              <div class="t-small" style="color:var(--accent-3);font-weight:700;">20-email batch</div>
+            </div>
+            <ul class="blist b3" style="gap:0.15em;">
+              <li><strong>StepFunctionAssignment.py</strong>: fires real emails through Step Functions end-to-end</li>
+              <li>Measures: pipeline success rate · routing accuracy · CRM hit rate · latency</li>
+              <li>Results uploaded to S3 → fetched by React dashboard for live display</li>
+            </ul>
+          </div>
+
+        </div>
+
+        <!-- Right: tools + what each metric catches -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <div class="t-small" style="color:var(--accent-4);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">What Each Layer Catches</div>
+
+          <div class="card card-l4" style="padding:0.45rem 0.8rem;">
+            <div class="clabel clabel-4" style="margin-bottom:0.15em;">Unit — logic bugs in isolation</div>
+            <div class="t-small">Lambda handler errors · DynamoDB schema mismatches · missing env vars · wrong model ID · Decimal type handling</div>
+          </div>
+
+          <div class="card card-l2" style="padding:0.45rem 0.8rem;">
+            <div class="clabel clabel-2" style="margin-bottom:0.15em;">Eval Scripts — AI quality issues</div>
+            <div class="t-small">Intent misclassification · overconfident predictions · hallucinated responses · poor RAG retrieval · routing errors by class</div>
+          </div>
+
+          <div class="card card-l3" style="padding:0.45rem 0.8rem;">
+            <div class="clabel clabel-3" style="margin-bottom:0.15em;">Live Pipeline — integration failures</div>
+            <div class="t-small">Step Functions state transitions · Lambda timeouts · CRM lookup failures · end-to-end latency · real Bedrock throttling</div>
+          </div>
+
+          <div class="t-small" style="color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.1em;">Key Tools</div>
+          <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+            <div class="card" style="padding:0.3rem 0.6rem;border-color:rgba(255,87,34,0.3);"><div class="t-small t-white" style="font-weight:700;font-size:0.6rem;">pytest</div></div>
+            <div class="card" style="padding:0.3rem 0.6rem;border-color:rgba(255,87,34,0.3);"><div class="t-small t-white" style="font-weight:700;font-size:0.6rem;">moto v5</div></div>
+            <div class="card" style="padding:0.3rem 0.6rem;border-color:rgba(255,87,34,0.3);"><div class="t-small t-white" style="font-weight:700;font-size:0.6rem;">TruLens</div></div>
+            <div class="card" style="padding:0.3rem 0.6rem;border-color:rgba(255,87,34,0.3);"><div class="t-small t-white" style="font-weight:700;font-size:0.6rem;">Bedrock Haiku judge</div></div>
+            <div class="card" style="padding:0.3rem 0.6rem;border-color:rgba(255,87,34,0.3);"><div class="t-small t-white" style="font-weight:700;font-size:0.6rem;">Step Functions</div></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────
+     SLIDE 12 · RESULTS
+     ───────────────────────────────────────────────── -->
+<section class="slide" id="s12-results">
+  <div class="slide-num">12</div>
+  <div class="slide-content">
+    <div style="max-width:min(96vw,1150px);">
+      <div class="a1" style="margin-bottom:var(--gap-sm);"><span class="tag tag-3">System Evaluation · 3 of 3</span></div>
+      <h2 class="t-h2 a2" style="margin-bottom:var(--gap);">Results — What We Found</h2>
+
+      <div class="g2 a3">
+
+        <!-- Left: pipeline results -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <div class="t-small" style="color:var(--accent-3);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Live Pipeline Assessment</div>
+
+          <div style="display:flex;align-items:baseline;gap:0.8rem;">
+            <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(2rem,4.5vw,3.2rem);color:var(--accent-3);line-height:1;">0.7776</div>
+            <div>
+              <div class="t-small t-white" style="font-weight:700;">Composite Score</div>
+              <div class="t-small" style="color:#22c55e;font-weight:700;">✓ PASSED</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-sm);">
+            <div class="card card-l1" style="padding:0.5rem 0.7rem;">
+              <div class="clabel" style="font-size:0.52rem;">Pipeline Success</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.2rem,2.5vw,1.8rem);color:var(--accent);line-height:1;">20 / 20</div>
+              <div class="t-small">100% completion rate</div>
+            </div>
+            <div class="card card-l2" style="padding:0.5rem 0.7rem;">
+              <div class="clabel clabel-2" style="font-size:0.52rem;">Routing Accuracy</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.2rem,2.5vw,1.8rem);color:var(--accent-2);line-height:1;">75%</div>
+              <div class="t-small">intent → correct team</div>
+            </div>
+            <div class="card card-l4" style="padding:0.5rem 0.7rem;">
+              <div class="clabel clabel-4" style="font-size:0.52rem;">CRM Hit Rate</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.2rem,2.5vw,1.8rem);color:var(--accent-4);line-height:1;">100%</div>
+              <div class="t-small">customer record lookup</div>
+            </div>
+            <div class="card card-l3" style="padding:0.5rem 0.7rem;">
+              <div class="clabel clabel-3" style="font-size:0.52rem;">Intent Accuracy</div>
+              <div style="font-family:'Archivo Black',sans-serif;font-size:clamp(1.2rem,2.5vw,1.8rem);color:var(--accent-3);line-height:1;">100%</div>
+              <div class="t-small">live test · 17 classes</div>
+            </div>
+          </div>
+
+          <!-- honest weakness -->
+          <div style="padding:0.45rem 0.8rem;background:rgba(102,126,234,0.08);border:1px solid rgba(102,126,234,0.2);border-radius:6px;">
+            <div class="clabel clabel-2" style="font-size:0.52rem;margin-bottom:0.15em;">Honest Assessment — Routing at 75%</div>
+            <div class="t-small">12-team routing is intentionally complex. Prioritised <strong>not sending wrong response</strong> over recall — low-confidence emails escalate to human rather than misroute.</div>
+          </div>
+
+        </div>
+
+        <!-- Right: TruLens + unit tests -->
+        <div style="display:flex;flex-direction:column;gap:var(--gap-sm);">
+
+          <div class="t-small" style="color:var(--accent-2);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">TruLens RAG Triad</div>
+
+          <div class="card card-l2" style="padding:0.5rem 0.8rem;">
+            <div class="sbar" style="margin-bottom:0.3em;">
+              <div class="sbar-label">Faithfulness</div>
+              <div class="sbar-track"><div class="sbar-fill" style="width:82%;background:var(--accent-2);"></div></div>
+              <div class="sbar-val" style="color:var(--accent-2);">0.82</div>
+            </div>
+            <div class="sbar" style="margin-bottom:0.3em;">
+              <div class="sbar-label">Answer Relevance</div>
+              <div class="sbar-track"><div class="sbar-fill" style="width:79%;background:var(--accent-3);"></div></div>
+              <div class="sbar-val" style="color:var(--accent-3);">0.79</div>
+            </div>
+            <div class="sbar">
+              <div class="sbar-label">Context Relevance</div>
+              <div class="sbar-track"><div class="sbar-fill" style="width:75%;background:var(--accent-4);"></div></div>
+              <div class="sbar-val" style="color:var(--accent-4);">0.75</div>
+            </div>
+          </div>
+
+          <div class="t-small" style="color:var(--accent-4);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.1em;">Unit Test Coverage</div>
+
+          <div class="card card-l4" style="padding:0.5rem 0.8rem;">
+            <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.3em;">
+              <div style="flex:1;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:0.25em;">
+                  <div class="t-small">45 tests · 10 Lambdas</div>
+                  <div class="t-small t-white" style="font-weight:700;">78%</div>
+                </div>
+                <div style="height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
+                  <div style="width:78%;height:100%;background:var(--accent-4);border-radius:3px;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="t-small">All critical paths covered · moto v5 AWS mocking · 0 flaky tests</div>
+          </div>
+
+          <div class="t-small" style="color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-top:0.1em;">What the Numbers Mean for Business</div>
+          <ul class="blist" style="gap:0.15em;">
+            <li><strong>0.7776 composite</strong> → reliable enough to auto-respond 80% of emails</li>
+            <li><strong>100% pipeline</strong> → zero dropped emails · every input gets a decision</li>
+            <li><strong>0.82 faithfulness</strong> → responses grounded in policy docs · not hallucinated</li>
+          </ul>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════
+     JAVASCRIPT — D3 Knowledge Graph
+     ═══════════════════════════════════════════════════ -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+(function() {
+  const nodes = [
+    // Core infrastructure
+    { id: "Gmail IMAP\nPoller", group: "trigger",   r: 28 },
+    { id: "S3 Emails",         group: "storage",   r: 24 },
+    { id: "Step Functions",    group: "orchestrate",r: 32 },
+    // Pipeline Lambdas
+    { id: "email_parser",      group: "lambda",     r: 24 },
+    { id: "classify_intent",   group: "ai",         r: 26 },
+    { id: "rag_retrieval",     group: "ai",         r: 30 },
+    { id: "claude_response",   group: "ai",         r: 30 },
+    { id: "crm_validation",    group: "ai",         r: 26 },
+    { id: "email_sender",      group: "lambda",     r: 24 },
+    // Routing
+    { id: "auto_response",     group: "output",     r: 22 },
+    { id: "human_review",      group: "output",     r: 22 },
+    { id: "escalate",          group: "output",     r: 22 },
+    // RAG KB
+    { id: "S3 KB Bucket",      group: "storage",    r: 24 },
+    { id: "rag_ingestion",     group: "ai",         r: 26 },
+    { id: "DynamoDB\nEmbeddings", group: "storage", r: 26 },
+    // Bedrock Models
+    { id: "Claude 3\nSonnet",  group: "model",      r: 26 },
+    { id: "Claude 3\nHaiku",   group: "model",      r: 24 },
+    { id: "Titan Embed V2",    group: "model",      r: 24 },
+    // Storage
+    { id: "DynamoDB\nCustomers", group: "storage",  r: 24 },
+    { id: "DynamoDB\nEmail",   group: "storage",    r: 26 },
+    { id: "DynamoDB\nMetrics", group: "storage",    r: 22 },
+    // Dashboard
+    { id: "React\nFrontend",   group: "dashboard",  r: 22 },
+    { id: "API Gateway",       group: "dashboard",  r: 22 },
+    { id: "api_handlers",      group: "lambda",     r: 22 },
+    // Evaluation
+    { id: "TruLens\n(local)",  group: "eval",       r: 24 },
+    { id: "S3 Assessment",     group: "storage",    r: 20 },
+    // Hybrid RAG
+    { id: "HyDE Expand",       group: "ai",         r: 20 },
+    { id: "BM25 Retriever",    group: "ai",         r: 20 },
+    { id: "Cross-Encoder\nRerank", group: "ai",     r: 22 },
+    // Terraform
+    { id: "Terraform IaC",     group: "infra",      r: 20 },
+  ];
+
+  const links = [
+    // Ingestion chain
+    { source: "Gmail IMAP\nPoller",  target: "S3 Emails",          label: "upload" },
+    { source: "S3 Emails",           target: "Step Functions",      label: "trigger" },
+    { source: "Step Functions",      target: "email_parser",        label: "invoke" },
+    // Pipeline
+    { source: "email_parser",        target: "classify_intent",     label: "text" },
+    { source: "classify_intent",     target: "rag_retrieval",       label: "intent" },
+    { source: "rag_retrieval",       target: "crm_validation",      label: "docs" },
+    { source: "crm_validation",      target: "claude_response",     label: "crm_context" },
+    { source: "crm_validation",      target: "DynamoDB\nCustomers",label: "lookup" },
+    { source: "claude_response",     target: "email_sender",        label: "response" },
+    // Routing
+    { source: "email_sender",        target: "auto_response",       label: "≥0.8" },
+    { source: "email_sender",        target: "human_review",        label: "0.5-0.8" },
+    { source: "email_sender",        target: "escalate",            label: "<0.5" },
+    // RAG KB
+    { source: "S3 KB Bucket",        target: "rag_ingestion",       label: "S3 event" },
+    { source: "rag_ingestion",       target: "DynamoDB\nEmbeddings",label: "upsert" },
+    { source: "rag_ingestion",       target: "Titan Embed V2",      label: "embed" },
+    { source: "DynamoDB\nEmbeddings",target: "rag_retrieval",       label: "scan" },
+    // Hybrid RAG internals
+    { source: "rag_retrieval",       target: "HyDE Expand",         label: "uses" },
+    { source: "rag_retrieval",       target: "BM25 Retriever",      label: "uses" },
+    { source: "rag_retrieval",       target: "Cross-Encoder\nRerank",label: "uses" },
+    { source: "HyDE Expand",         target: "Claude 3\nHaiku",     label: "generates" },
+    { source: "Cross-Encoder\nRerank",target:"Claude 3\nHaiku",     label: "rerank" },
+    // Bedrock
+    { source: "classify_intent",     target: "Claude 3\nHaiku",     label: "Bedrock" },
+    { source: "crm_validation",      target: "Claude 3\nHaiku",     label: "Mistral" },
+    { source: "claude_response",     target: "Claude 3\nSonnet",    label: "Mistral" },
+    { source: "rag_retrieval",       target: "Titan Embed V2",      label: "embed" },
+    // Storage writes
+    { source: "claude_response",     target: "DynamoDB\nEmail",     label: "write" },
+    { source: "claude_response",     target: "DynamoDB\nMetrics",   label: "metrics" },
+    // Dashboard
+    { source: "React\nFrontend",     target: "API Gateway",         label: "REST" },
+    { source: "API Gateway",         target: "api_handlers",        label: "invoke" },
+    { source: "api_handlers",        target: "DynamoDB\nEmail",     label: "read" },
+    // Evaluation
+    { source: "TruLens\n(local)",    target: "S3 Assessment",       label: "upload" },
+    { source: "S3 Assessment",       target: "React\nFrontend",     label: "fetch" },
+    { source: "TruLens\n(local)",    target: "claude_response",     label: "eval" },
+    // Infra
+    { source: "Terraform IaC",       target: "Step Functions",      label: "provisions" },
+    { source: "Terraform IaC",       target: "DynamoDB\nEmail",     label: "provisions" },
+  ];
+
+  const colorMap = {
+    trigger:    "#fed7aa", orchestrate:"#fef3c7", lambda:"#93c5fd",
+    ai:         "#ddd6fe", model:      "#c4b5fd", output:"#a7f3d0",
+    storage:    "#60a5fa", dashboard:  "#6ee7b7", eval: "#f0abfc",
+    infra:      "#fde68a",
+  };
+  const strokeMap = {
+    trigger:"#c2410c", orchestrate:"#b45309", lambda:"#1e40af",
+    ai:"#6d28d9",      model:"#7c3aed",       output:"#047857",
+    storage:"#1e3a5f", dashboard:"#065f46",   eval:"#86198f",
+    infra:"#92400e",
+  };
+
+  function initKG() {
+    const svgEl = document.getElementById('kg-svg');
+    if (!svgEl) return;
+    const rect = svgEl.getBoundingClientRect();
+    if (rect.width < 10) { setTimeout(initKG, 200); return; }
+    const W = rect.width, H = rect.height;
+
+    const svg = d3.select(svgEl);
+    svg.selectAll("*").remove();
+
+    const g = svg.append("g");
+    svg.call(d3.zoom().scaleExtent([0.3, 3]).on("zoom", e => g.attr("transform", e.transform)));
+
+    const sim = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).id(d => d.id).distance(d => 90 + (d.source.r || 0) + (d.target.r || 0)))
+      .force("charge", d3.forceManyBody().strength(-280))
+      .force("center", d3.forceCenter(W/2, H/2))
+      .force("collide", d3.forceCollide().radius(d => d.r + 14));
+
+    const link = g.append("g").selectAll("line").data(links).enter().append("line")
+      .attr("stroke", "#334155").attr("stroke-width", 1.5).attr("stroke-opacity", 0.7);
+
+    const linkLabel = g.append("g").selectAll("text").data(links).enter().append("text")
+      .attr("font-size", "8px").attr("fill", "#64748b")
+      .attr("text-anchor", "middle").text(d => d.label);
+
+    const node = g.append("g").selectAll("g").data(nodes).enter().append("g")
+      .call(d3.drag()
+        .on("start", (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+        .on("drag",  (event, d) => { d.fx = event.x; d.fy = event.y; })
+        .on("end",   (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+      );
+
+    node.append("circle")
+      .attr("r", d => d.r)
+      .attr("fill", d => colorMap[d.group] || "#60a5fa")
+      .attr("stroke", d => strokeMap[d.group] || "#1e3a5f")
+      .attr("stroke-width", 2)
+      .on("mouseover", function(event, d) {
+        d3.select(this).attr("stroke-width", 3).attr("stroke", "#fff");
+        tooltip.style("opacity", 1).html(`<strong>${d.id.replace(/\n/g,' ')}</strong><br/><em>${d.group}</em>`);
+      })
+      .on("mousemove", event => tooltip.style("left", (event.pageX+10)+"px").style("top",(event.pageY-20)+"px"))
+      .on("mouseout",  function(event, d) {
+        d3.select(this).attr("stroke-width", 2).attr("stroke", strokeMap[d.group] || "#1e3a5f");
+        tooltip.style("opacity", 0);
+      });
+
+    node.append("text")
+      .attr("text-anchor", "middle").attr("dominant-baseline", "middle")
+      .attr("font-size", "9px").attr("font-family", "JetBrains Mono, monospace").attr("fill", "#1e293b")
+      .attr("pointer-events", "none")
+      .each(function(d) {
+        const lines = d.id.split("\n");
+        const el = d3.select(this);
+        if (lines.length === 1) {
+          el.text(d.id);
+        } else {
+          lines.forEach((ln, i) => {
+            el.append("tspan").attr("x", 0).attr("dy", i === 0 ? `-${(lines.length-1)*0.55}em` : "1.1em").text(ln);
+          });
+        }
+      });
+
+    const tooltip = d3.select("body").append("div")
+      .style("position","fixed").style("background","rgba(15,23,42,0.95)")
+      .style("color","#e2e8f0").style("padding","6px 10px").style("border-radius","6px")
+      .style("font-size","12px").style("pointer-events","none").style("opacity",0)
+      .style("border","1px solid rgba(99,102,241,0.4)").style("z-index","9999")
+      .style("font-family","Space Grotesk,sans-serif");
+
+    sim.on("tick", () => {
+      link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+      linkLabel.attr("x", d => (d.source.x+d.target.x)/2).attr("y", d => (d.source.y+d.target.y)/2 - 4);
+      node.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+  }
+
+  // Init when slide 14 becomes visible
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { initKG(); observer.disconnect(); } });
+  }, { threshold: 0.3 });
+  const s14 = document.getElementById('s14');
+  if (s14) observer.observe(s14);
+  else window.addEventListener('load', () => { const el = document.getElementById('s14'); if(el) observer.observe(el); });
+})();
+</script>
+
+<!-- ═══════════════════════════════════════════════════
+     JAVASCRIPT — Navigation
+     ═══════════════════════════════════════════════════ -->
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total  = slides.length;
+  let current  = 0;
+
+  // Build nav dots in first slide's nav-bar, then clone to all
+  const navBar = document.getElementById('nav');
+  slides.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    d.title = `Slide ${i + 1}`;
+    d.addEventListener('click', () => goTo(i));
+    navBar.appendChild(d);
+  });
+  slides.forEach((s, si) => {
+    if (si === 0) return;
+    const clone = navBar.cloneNode(true);
+    clone.querySelectorAll('.nav-dot').forEach((d, i) => d.addEventListener('click', () => goTo(i)));
+    s.appendChild(clone);
+  });
+
+  function updateUI() {
+    document.getElementById('progress').style.width = ((current + 1) / total * 100) + '%';
+    document.querySelectorAll('.nav-dot').forEach((d, i) => d.classList.toggle('active', i === current));
+    slides.forEach((s, i) => s.classList.toggle('active', i === current));
+  }
+
+  function goTo(i) {
+    if (i < 0 || i >= total) return;
+    current = i;
+    slides[i].scrollIntoView({ behavior: 'smooth' });
+    updateUI();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (['ArrowDown','ArrowRight',' '].includes(e.key)) { e.preventDefault(); goTo(current + 1); }
+    else if (['ArrowUp','ArrowLeft'].includes(e.key))   { e.preventDefault(); goTo(current - 1); }
+  });
+
+  let scrollTimer;
+  window.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      current = Math.round(window.scrollY / window.innerHeight);
+      updateUI();
+    }, 80);
+  });
+
+  updateUI();
+</script>
+</body>
+</html>
