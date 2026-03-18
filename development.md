@@ -36,6 +36,7 @@ auto_email_classification_prod/
 │   ├── api_handlers/             # Dashboard REST API
 │   ├── classify_intent/          # Multi-LLM intent classification
 │   ├── claude_response/          # Claude 3 response generation
+│   ├── crm_validation/           # CRM lookup: Text-to-SQL + DynamoDB customer/policy
 │   ├── email_parser/             # Email body parsing + entity extraction
 │   ├── email_sender/             # SES outbound email sender
 │   ├── gmail_imap_poller/        # Gmail IMAP polling (alternative to SES)
@@ -265,7 +266,38 @@ compute a confidence score.
 
 ---
 
-### 3.3 `email_parser` (deployed as `insuremail-ai-dev-email-parser`)
+### 3.3 `crm_validation` (deployed as `insuremail-ai-dev-crm-validation`)
+
+**Purpose**: Validate the customer against the CRM (DynamoDB `customers` table), look up policy
+eligibility, and enrich the pipeline context with customer/policy details.
+
+**Trigger**: Step Functions (ValidateCRM state)
+
+**Input event**:
+```json
+{
+  "email_id": "uuid",
+  "parsed_email": { "sender_email": "...", "body_text": "..." },
+  "classification": { "customer_intent": "coverage_query" }
+}
+```
+
+**Output**:
+```json
+{
+  "crm_hit": true,
+  "customer_id": "CUST-001",
+  "policy_number": "POL-IE-123456",
+  "policy_status": "active",
+  "eligibility": "eligible"
+}
+```
+
+**Key env vars**: `CUSTOMERS_TABLE_NAME`, `EMAIL_TABLE_NAME`
+
+---
+
+### 3.4 `email_parser` (deployed as `insuremail-ai-dev-email-parser`)
 
 **Purpose**: Parse a raw email (S3 object), extract entities (policy number, member ID, PII),
 detect language, and write the structured record to DynamoDB.
@@ -276,7 +308,7 @@ detect language, and write the structured record to DynamoDB.
 
 ---
 
-### 3.4 `rag_ingestion` (deployed as `insuremail-ai-dev-rag-ingestion`)
+### 3.5 `rag_ingestion` (deployed as `insuremail-ai-dev-rag-ingestion`)
 
 **Purpose**: Read PDFs/text from S3, chunk them (500 tokens, 50-token overlap), embed
 with Amazon Titan, store vectors in DynamoDB.
@@ -289,7 +321,7 @@ with Amazon Titan, store vectors in DynamoDB.
 
 ---
 
-### 3.5 `rag_retrieval` (deployed as `insuremail-ai-dev-rag-retrieval`)
+### 3.6 `rag_retrieval` (deployed as `insuremail-ai-dev-rag-retrieval`)
 
 **Purpose**: Embed a query, scan DynamoDB for all vectors, return top-3 by cosine
 similarity.
@@ -301,7 +333,7 @@ similarity.
 
 ---
 
-### 3.6 `email_sender` (deployed as `insuremail-ai-dev-email-sender`)
+### 3.7 `email_sender` (deployed as `insuremail-ai-dev-email-sender`)
 
 **Purpose**: Send the LLM-generated reply via Amazon SES, update DynamoDB status.
 
@@ -312,7 +344,7 @@ similarity.
 
 ---
 
-### 3.7 `api_handlers` (deployed as `insuremail-ai-dev-api-handlers`)
+### 3.8 `api_handlers` (deployed as `insuremail-ai-dev-api-handlers`)
 
 **Purpose**: REST API backend for the React dashboard.
 
@@ -347,7 +379,7 @@ Parallel (ClassifyAndRetrieve)
                                     {retrieved_documents: [], statusCode: 200}
     │
     ▼
-ValidateCRM  (pass-through for now)
+ValidateCRM  (Text-to-SQL + DynamoDB customer/policy lookup)
     │
     ▼
 GenerateResponse   ← uses $.analysis[0].intent.classification (full dict)
@@ -726,13 +758,14 @@ aws lambda wait function-updated --function-name insuremail-ai-dev-<deployed-nam
 
 | Source directory | Deployed function name |
 |-----------------|----------------------|
+| `api_handlers` | `insuremail-ai-dev-api-handlers` |
 | `classify_intent` | `insuremail-ai-dev-multi-llm-inference` |
 | `claude_response` | `insuremail-ai-dev-claude-response` |
+| `crm_validation` | `insuremail-ai-dev-crm-validation` |
 | `email_parser` | `insuremail-ai-dev-email-parser` |
 | `email_sender` | `insuremail-ai-dev-email-sender` |
 | `rag_ingestion` | `insuremail-ai-dev-rag-ingestion` |
 | `rag_retrieval` | `insuremail-ai-dev-rag-retrieval` |
-| `api_handlers` | `insuremail-ai-dev-api-handlers` |
 
 ### Update Step Functions state machine
 

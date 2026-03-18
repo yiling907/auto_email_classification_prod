@@ -29,7 +29,7 @@ The InsureMail AI project has comprehensive test coverage including:
 
 ```
 📊 Test Statistics:
-  - Unit Tests: 45 test cases
+  - Unit Tests: 45+ test cases (4 test files)
   - Integration Tests: 10+ scenarios
   - Terraform Tests: 15+ validation checks
   - Current Coverage: 78%
@@ -84,13 +84,10 @@ tests/
 ├── conftest.py                          # Shared fixtures and configuration
 ├── requirements.txt                     # Test dependencies
 ├── unit/                                # Unit tests
-│   ├── test_classify_intent.py     # Multi-LLM inference tests
-│   ├── test_evaluation_metrics.py      # Metrics calculation tests
-│   ├── test_rag_ingestion.py           # RAG document ingestion tests
-│   ├── test_rag_retrieval.py           # RAG document retrieval tests
+│   ├── test_classify_intent.py         # Multi-LLM inference tests
 │   ├── test_email_parser.py            # Email parsing tests
-│   ├── test_claude_response.py         # Response generation tests
-│   └── test_api_handlers.py            # API endpoint tests
+│   ├── test_rag_ingestion.py           # RAG document ingestion tests
+│   └── test_rag_retrieval.py           # RAG document retrieval tests
 ├── integration/                         # Integration tests
 │   └── test_email_workflow.py          # End-to-end workflow tests
 └── terraform/                           # Terraform validation tests
@@ -204,14 +201,11 @@ addopts =
 Name                                          Stmts   Miss  Cover
 -----------------------------------------------------------------
 lambda/classify_intent/lambda_function.py       120     18    85%
-lambda/evaluation_metrics/lambda_function.py     80     12    85%
+lambda/email_parser/lambda_function.py           60      8    87%
 lambda/rag_ingestion/lambda_function.py          95     15    84%
 lambda/rag_retrieval/lambda_function.py          75     10    87%
-lambda/claude_response/lambda_function.py       150     30    80%
-lambda/email_parser/lambda_function.py           60      8    87%
-lambda/api_handlers/lambda_function.py          200     42    79%
 -----------------------------------------------------------------
-TOTAL                                           780    135    83%
+TOTAL                                           350     51    85%
 ```
 
 ---

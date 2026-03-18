@@ -125,6 +125,7 @@ running a full `terraform apply`.
 bash scripts/deploy_lambdas.sh --fn api_handlers
 bash scripts/deploy_lambdas.sh --fn classify_intent
 bash scripts/deploy_lambdas.sh --fn claude_response
+bash scripts/deploy_lambdas.sh --fn crm_validation
 bash scripts/deploy_lambdas.sh --fn email_parser
 bash scripts/deploy_lambdas.sh --fn email_sender
 bash scripts/deploy_lambdas.sh --fn rag_ingestion
@@ -158,6 +159,7 @@ For each Lambda it:
 | `api_handlers` | `insuremail-ai-dev-api-handlers` |
 | `classify_intent` | `insuremail-ai-dev-multi-llm-inference` |
 | `claude_response` | `insuremail-ai-dev-claude-response` |
+| `crm_validation` | `insuremail-ai-dev-crm-validation` |
 | `email_parser` | `insuremail-ai-dev-email-parser` |
 | `email_sender` | `insuremail-ai-dev-email-sender` |
 | `rag_ingestion` | `insuremail-ai-dev-rag-ingestion` |
