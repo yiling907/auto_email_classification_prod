@@ -4,81 +4,133 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**InsureMail AI** - An AI-powered automated email response system for insurance companies using AWS Bedrock (Claude 3), Terraform, and serverless architecture.
+**InsureMail AI** — AWS serverless email classification and auto-response system for insurance companies. Uses AWS Bedrock (Claude 3 Sonnet for intent classification, Mistral 7B for response generation, Titan V2 for embeddings), Step Functions orchestration, and a React dashboard.
 
-The complete project specification is in `claude.md`. This file provides practical development guidance.
+## Commands
+
+### Testing
+```bash
+# Required env var for unit tests that import lambda modules at collection time:
+EMAIL_TABLE_NAME=test-emails pytest tests/unit/
+
+# Run a single test file:
+EMAIL_TABLE_NAME=test-emails pytest tests/unit/test_email_parser.py -v
+
+# Run a single test by name:
+EMAIL_TABLE_NAME=test-emails pytest tests/unit/test_email_parser.py::TestAttachmentCounting::test_attachment_detected_in_multipart
+
+# Skip slow tests:
+pytest tests/ -m "not slow" -v
+
+# All tests via Makefile (sets env vars via scripts/run_tests.sh):
+make test
+make test-unit
+make test-coverage   # generates htmlcov/index.html
+```
+
+### Linting & Formatting
+```bash
+make lint        # flake8, line length 120
+make fmt         # black --line-length 120
+make pre-commit  # fmt + lint + test
+```
+
+### Terraform
+```bash
+make tf-init      # terraform init
+make tf-plan      # show planned changes
+make tf-apply     # deploy (prompts for confirmation)
+make deploy-lambda  # redeploy Lambda functions only
+```
+
+### Dashboard (React + Vite)
+```bash
+cd dashboard/frontend
+npm install
+npm run dev      # http://localhost:3000
+npm run build    # output to dist/
+```
+Set `VITE_API_BASE_URL` in `dashboard/frontend/.env` to the API Gateway URL (`terraform output api_gateway_url`).
+
+### Data Loading & Assessment Scripts
+```bash
+python scripts/load_customers.py         # bulk-load customers.jsonl → DynamoDB (idempotent)
+python scripts/load_knowledge_docs.py    # Titan-embed knowledge docs → DynamoDB
+python scripts/run_stepfn_assessment.py  # live pipeline eval against Laya dataset (20–1000 emails)
+python scripts/StepFunctionAssignment.py # demo: upload MIME emails to S3, trigger live Step Functions
+```
 
 ## Architecture
 
-### Technology Stack
-- **Cloud Platform**: AWS (Bedrock, Lambda, Step Functions, S3, DynamoDB, CloudWatch, API Gateway)
-- **Infrastructure as Code**: Terraform
-- **Primary AI Model**: Claude 3 (Sonnet for production, Haiku for evaluation)
-- **Additional Models**: Amazon Titan, Llama 3, Mistral (for benchmarking)
-- **Language**: Python 3.11+ (Lambda runtime)
-- **Frontend**: React (S3 + CloudFront static hosting)
+### Pipeline (Step Functions)
 
-### System Components
-1. **Infrastructure Layer**: Terraform modules for all AWS resources
-2. **Data Layer**: Email parsing, entity extraction, RAG pipeline
-3. **AI Orchestration**: Step Functions state machine coordinating Lambda functions
-4. **Evaluation Layer**: Multi-LLM benchmarking and metrics
-5. **Observability**: CloudWatch logging/metrics + React dashboard
+`step-functions/email_processing_workflow.json` defines the 6-step workflow:
 
-## Key Technical Requirements
+```
+email_parser
+    ↓
+[ClassifyIntent ∥ ExtractEntities]   ← parallel; FallbackEntities on error
+    ↓
+rag_retrieval                         ← SetEmptyRAG fallback on error
+    ↓
+crm_validation                        ← SetEmptyCRM fallback on error
+    ↓
+claude_response
+    ↓
+email_sender  → auto_response (≥0.8) / human_review (0.5–0.8) / escalate (<0.5)
+```
 
-### Terraform Conventions
-- Use modular structure (separate modules for IAM, storage, compute, monitoring)
-- All resources must be tagged: `Project=InsureMailAI`, `ManagedBy=Terraform`
-- Use `PAY_PER_REQUEST` billing for DynamoDB (cost optimization)
-- Enable versioning and encryption for all S3 buckets
-- Implement least-privilege IAM policies
+Graceful fallbacks mean the pipeline never hard-fails mid-run. All errors result in escalation at `email_sender`.
 
-### Lambda Best Practices
-- Python 3.11 or higher runtime
-- Use environment variables for configuration (no hardcoded values)
-- Implement structured logging with trace IDs
-- Include error handling and retries
-- PII redaction in all logs
+### Lambda Functions (`lambda/`)
 
-### Data Schema Standards
-- **Email Processing Table** (DynamoDB): PK = `email_id` (UUID)
-- **Model Performance Table**: PK = `task_type`, SK = `model_id#timestamp`
-- **Knowledge Base Embeddings**: PK = `doc_id`, includes vector embedding as list
-- All timestamps in ISO 8601 format
-- All JSON outputs must include `confidence_score` (0-1)
+| Function | Role |
+|---|---|
+| `email_parser` | RFC 2822 parse, PII redact, PDF/DOCX/TXT extraction, `_dynamo_safe()` float→Decimal |
+| `classify_intent` | Claude 3 Sonnet → 17 intents → 12 route teams via `INTENT_TO_ROUTE` map |
+| `extract_entity` | AWS Textract + Bedrock Claude for structured field extraction from attachments |
+| `rag_retrieval` | HyDE (Haiku) + Titan vector + BM25 + RRF fusion + cross-encoder rerank |
+| `crm_validation` | Text-to-SQL (Mistral 7B) → DynamoDB customer/policy lookup, no `Limit=` on Scan |
+| `claude_response` | Mistral/Llama response gen + 8-dim quality judge |
+| `email_sender` | Confidence-based routing + Amazon SES |
+| `rag_ingestion` | 500-token chunks, 50-token overlap, MD5 dedup → Titan embed → DynamoDB |
+| `api_handlers` | REST API for dashboard; uses FilterExpression on DynamoDB Scan (no GSI) |
+| `gmail_imap_poller` | Scheduled Gmail IMAP polling |
 
-### AI/ML Conventions
-- **RAG chunking**: 500 tokens per chunk, 50 token overlap
-- **Confidence thresholds**: ≥0.8 auto-response, 0.5-0.8 review, <0.5 escalate
-- **Bedrock model IDs**:
-  - Claude 3 Sonnet: `anthropic.claude-3-sonnet-20240229-v1:0`
-  - Claude 3 Haiku: `anthropic.claude-3-haiku-20240307-v1:0`
-  - Titan Embeddings: `amazon.titan-embed-text-v1`
-- Always log: model ID, tokens used, latency, confidence score, RAG references
+### Terraform Modules (`terraform/modules/`)
 
-## Development Workflow
+`iam`, `storage`, `lambda`, `step-functions`, `api-gateway`, `bedrock`, `ses`, `monitoring`.
+All resources tagged `Project=InsureMailAI, ManagedBy=Terraform`. DynamoDB uses `PAY_PER_REQUEST`.
 
-### Phase 1: Infrastructure Foundation
-1. Create Terraform backend (S3 + DynamoDB state lock)
-2. Build modular Terraform structure for all AWS resources
-3. Deploy and validate base infrastructure
+### DynamoDB Tables
 
-### Phase 2: Core Pipeline
-1. Implement email parsing Lambda
-2. Build RAG knowledge base (ingestion + retrieval)
-3. Create Claude 3 response generation Lambda
-4. Define Step Functions state machine
-5. Wire up end-to-end pipeline
+| Table | PK | SK |
+|---|---|---|
+| `email_processing` | `email_id` (UUID) | — |
+| `model_metrics` | `task_type` | `model_id#timestamp` |
+| `kb_embeddings` | `doc_id` | — |
+| `customers` | `customer_id` | — |
 
-### Phase 3: Evaluation & Observability
-1. Implement multi-LLM benchmarking
-2. Build evaluation metrics system
-3. Set up CloudWatch metrics and alerts
-4. Create unified logging framework
+## Key Conventions
 
-### Phase 4: Dashboard
-1. Build backend API (Lambda + API Gateway)
-2. Create React frontend
-3. Deploy to S3 + CloudFront
-4. Integrate authentication (Cognito)
+### Bedrock Model IDs
+- Claude 3 Sonnet (intent): `anthropic.claude-3-sonnet-20240229-v1:0`
+- Claude 3 Haiku (HyDE + rerank): `anthropic.claude-3-haiku-20240307-v1:0`
+- Mistral 7B (response gen + CRM SQL): `mistral.mistral-7b-instruct-v0:2`
+- Llama 3.1 8B (fallback): `meta.llama3-8b-instruct-v1:0`
+- Titan Embeddings V2 (1024-dim): `amazon.titan-embed-text-v1`
+
+### Test Patterns
+- **AWS mocking**: `@mock_aws` from moto v5.x — never `@mock_dynamodb` or `@mock_s3`.
+- **Module collision**: Each test file calls `sys.modules.pop('lambda_function', None)` before importing its Lambda module.
+- **DynamoDB Decimal**: moto returns `Decimal` types; use `int(item['field'])` in assertions.
+- **`lambda_context`**: tests that call `lambda_handler` need a `lambda_context` pytest fixture (typically `MagicMock()`).
+
+### 17 Valid Intent Classes
+`coverage_query`, `claim_submission`, `claim_status`, `claim_reimbursement_query`, `pre_authorisation`, `payment_issue`, `policy_change`, `renewal_query`, `cancellation_request`, `enrollment_new_policy`, `dependent_addition`, `complaint`, `document_followup`, `hospital_network_query`, `id_verification`, `broker_query`, `other`
+
+### Data Standards
+- Timestamps: ISO 8601 UTC (`2026-03-10T09:00:00Z`)
+- All AI outputs include `confidence_score` (float 0–1)
+- PII redacted in all logs via `email_parser.redact_pii()`
+- Attachment text extraction: PDF → `pdf_document`, DOCX → `word_document`, TXT → `text_document`; images skipped (handled by `extract_entity` via Textract)

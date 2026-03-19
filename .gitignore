@@ -81,3 +81,5 @@ tmp/
 temp/
 coverage.xml
 terraform/terraform.tfvars
+/lambda/extract_entity/pypdf/
+/lambda/extract_entity/pypdf-6.9.1.dist-info/

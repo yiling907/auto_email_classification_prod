@@ -6,14 +6,14 @@ Production entity extraction using Amazon Textract + AWS Bedrock Claude.
 Flow:
   1. Seed base entities (policy_number, member_id, customer_id, sender_email,
      pii_present) from email_parser output passed via Step Functions.
-  2. Collect pre-extracted attachment text already produced by email_parser
-     (PDF/DOCX/TXT content stored in attachments_content list).
-  3. For attachments that email_parser could not parse (PNG/JPG/scanned docs),
-     fetch the raw MIME email from S3, extract attachment bytes, and run
-     Amazon Textract DetectDocumentText.
-  4. Call Bedrock Claude 3 Haiku with the full text corpus (email body +
+  2. When the email has attachments, fetch the raw MIME email from S3, extract
+     attachment bytes, and run Amazon Textract / pypdf per attachment type:
+       PDF   → pypdf text-layer extraction, then Textract S3Object fallback
+               for scanned / image-only PDFs.
+       Image → Textract DetectDocumentText with raw bytes (JPEG/PNG/TIFF).
+  3. Call Bedrock Claude 3 Haiku with the full text corpus (email body +
      attachment text) to extract structured insurance domain fields.
-  5. Return a standardised entity JSON stored at $.entities in the Step
+  4. Return a standardised entity JSON stored at $.entities in the Step
      Functions state.
 
 Environment variables:
@@ -31,7 +31,6 @@ Input event keys (passed from Step Functions Parameters block):
     customer_id           (str, optional) — pre-extracted by email_parser
     pii_present           (bool) — PII detected flag from email_parser
     has_attachment        (bool) — True when email has ≥1 attachment
-    attachments_content   (list) — pre-extracted attachment text entries
     s3_bucket             (str)  — S3 bucket holding the raw email
     s3_key                (str)  — S3 key of the raw MIME email
 
@@ -62,12 +61,13 @@ Output (stored at ResultPath $.entities):
 """
 
 import email as _email_lib
+import io
 import json
 import logging
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
@@ -239,29 +239,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "pii_present":   bool(event.get("pii_present", False)),
     }
 
-    # ── 2. Collect pre-extracted attachment text ──────────────────────────────
-    email_body: str             = str(event.get("email_body") or "")
-    subject:    str             = str(event.get("subject")    or "")
-    sources_used: List[str]     = []
-    text_chunks:  List[str]     = []
-    textract_used: bool         = False
+    # ── 2. Collect attachment text via Textract / pypdf ───────────────────────
+    email_body: str         = str(event.get("email_body") or "")
+    subject:    str         = str(event.get("subject")    or "")
+    sources_used: List[str] = []
+    text_chunks:  List[str] = []
+    textract_used: bool     = False
 
     if email_body.strip():
         sources_used.append("email_body")
 
-    attachments_content: List[Dict] = event.get("attachments_content") or []
-    for att in attachments_content:
-        raw = (att.get("raw_text") or "").strip()
-        if raw:
-            category = att.get("doc_category", "unknown")
-            text_chunks.append(f"[Attachment – {category}]\n{raw[:2000]}")
-            if "attachment_text" not in sources_used:
-                sources_used.append("attachment_text")
-
-    # ── 3. Textract for image / scanned-PDF attachments ───────────────────────
-    # Only triggered when the email has attachments but email_parser produced
-    # no text (i.e. attachments were images that PyPDF2/docx couldn't handle).
-    if event.get("has_attachment") and not text_chunks:
+    if event.get("has_attachment"):
         bucket = str(event.get("s3_bucket") or "")
         key    = str(event.get("s3_key")    or "")
         ocr_chunks = _run_textract_on_email(bucket, key, email_id)
@@ -270,7 +258,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             sources_used.append("textract")
             textract_used = True
 
-    # ── 4. Bedrock structured extraction ──────────────────────────────────────
+    # ── 3. Bedrock structured extraction ──────────────────────────────────────
     extracted_fields:      Dict[str, Any] = {}
     bedrock_used:          bool           = False
     extraction_confidence: float          = 0.5
@@ -289,7 +277,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             else:
                 extracted_fields.pop(field, None)  # avoid duplication
 
-    # ── 5. Compose result ─────────────────────────────────────────────────────
+    # ── 4. Compose result ─────────────────────────────────────────────────────
     result: Dict[str, Any] = {
         **base_entities,
         "extracted_fields":      extracted_fields,
@@ -415,12 +403,21 @@ def _extract_pdf_text(
         combined = "\n".join(pages_text).strip()
         if combined:
             logger.info(json.dumps({
-                "trace_id": email_id,
-                "op":       "pypdf_extract",
-                "filename": filename,
-                "chars":    len(combined),
+                "trace_id":  email_id,
+                "op":        "pypdf_extract",
+                "filename":  filename,
+                "chars":     len(combined),
+                "pages":     len(reader.pages),
+                "preview":   combined[:300],
             }))
             return combined
+        else:
+            logger.warning(json.dumps({
+                "trace_id": email_id,
+                "warning":  "pypdf_empty_text",
+                "filename": filename,
+                "pages":    len(reader.pages),
+            }))
     except Exception as exc:
         logger.warning(json.dumps({
             "trace_id": email_id,
@@ -441,7 +438,7 @@ def _extract_pdf_text(
 
     temp_key = f"tmp/textract/{email_id}/{filename}"
     try:
-        s3.put_object(Bucket=bucket, Key=temp_key, Body=payload)
+        s3.put_object(Bucket=bucket, Key=temp_key, Body=payload, ContentType="application/pdf")
         t0   = time.monotonic()
         resp = textract.detect_document_text(
             Document={"S3Object": {"Bucket": bucket, "Name": temp_key}}
@@ -550,10 +547,21 @@ def _extract_via_bedrock(
     Never raises — returns empty dict on any failure.
     """
     if text_chunks:
-        combined           = "\n\n".join(text_chunks[:3])[:3000]
+        combined           = "\n\n".join(text_chunks[:3])[:8000]
         attachment_section = f"Attachment content:\n\"\"\"\n{combined}\n\"\"\""
+        logger.info(json.dumps({
+            "trace_id":           email_id,
+            "op":                 "bedrock_input",
+            "total_chunk_chars":  sum(len(c) for c in text_chunks),
+            "truncated_to":       len(combined),
+            "attachment_preview": combined[:300],
+        }))
     else:
         attachment_section = "No attachment content available."
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "bedrock_no_attachment_text",
+        }))
 
     prompt = _EXTRACTION_PROMPT.format(
         subject            = subject[:200],
@@ -563,7 +571,7 @@ def _extract_via_bedrock(
 
     body = json.dumps({
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens":        512,
+        "max_tokens":        2048,
         "temperature":       0.0,
         "messages":          [{"role": "user", "content": prompt}],
     })
@@ -592,6 +600,12 @@ def _extract_via_bedrock(
         "op":         "bedrock_extract",
         "model":      ENTITY_MODEL_ID,
         "latency_ms": latency_ms,
+    }))
+
+    logger.info(json.dumps({
+        "trace_id":       email_id,
+        "op":             "bedrock_raw_output",
+        "text_out":       text_out[:1000],
     }))
 
     fields, confidence = _parse_extraction_json(text_out, email_id)
@@ -626,6 +640,13 @@ def _parse_extraction_json(
     raw_conf   = obj.pop("confidence", 0.7)
     confidence = max(0.0, min(1.0, float(raw_conf)))
 
+    logger.info(json.dumps({
+        "trace_id":          email_id,
+        "op":                "parse_extraction",
+        "receipts_raw":      obj.get("receipts"),
+        "receipts_total_raw": obj.get("receipts_total_cost"),
+    }))
+
     # Strip null / empty-string scalar values; keep arrays (even empty ones)
     # and booleans (False is a valid value, not "missing").
     fields = {
@@ -633,4 +654,10 @@ def _parse_extraction_json(
         for k, v in obj.items()
         if isinstance(v, (list, bool)) or (v is not None and v != "" and v != "null")
     }
+    logger.info(json.dumps({
+        "trace_id":       email_id,
+        "op":             "parse_extraction_result",
+        "receipts_final": fields.get("receipts"),
+        "field_keys":     list(fields.keys()),
+    }))
     return fields, confidence
