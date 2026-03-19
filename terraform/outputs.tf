@@ -70,3 +70,8 @@ output "api_gateway_url" {
   description = "Base URL of the API Gateway for dashboard"
   value       = module.api_gateway.api_gateway_url
 }
+
+output "pipeline_results_table_name" {
+  description = "Name of the DynamoDB table for aggregated pipeline results"
+  value       = module.storage.pipeline_results_table_name
+}

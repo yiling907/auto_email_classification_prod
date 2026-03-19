@@ -108,3 +108,13 @@ output "rag_ingestion_lambda_permission_id" {
   description = "ID of the S3 permission for RAG ingestion Lambda"
   value       = aws_lambda_permission.allow_s3_rag_ingestion.id
 }
+
+output "save_result_arn" {
+  description = "ARN of the save result Lambda function"
+  value       = aws_lambda_function.save_result.arn
+}
+
+output "save_result_name" {
+  description = "Name of the save result Lambda function"
+  value       = aws_lambda_function.save_result.function_name
+}

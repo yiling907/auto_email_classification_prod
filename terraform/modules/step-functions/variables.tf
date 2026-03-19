@@ -48,6 +48,11 @@ variable "extract_entity_lambda_arn" {
   type        = string
 }
 
+variable "save_result_lambda_arn" {
+  description = "ARN of the save result Lambda function"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

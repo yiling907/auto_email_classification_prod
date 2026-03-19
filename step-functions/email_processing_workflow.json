@@ -225,12 +225,12 @@
         "confidence_score.$": "$.response.confidence_score"
       },
       "ResultPath": "$.email_result",
-      "Next": "Success",
+      "Next": "SaveResult",
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
           "ResultPath": "$.email_error",
-          "Next": "Success"
+          "Next": "SaveResult"
         }
       ]
     },
@@ -242,7 +242,7 @@
         "message": "Queued for human review"
       },
       "ResultPath": "$.final_action",
-      "Next": "Success"
+      "Next": "SaveResult"
     },
     "Escalate": {
       "Type": "Pass",
@@ -252,7 +252,7 @@
         "message": "Escalated to human agent"
       },
       "ResultPath": "$.final_action",
-      "Next": "Success"
+      "Next": "SaveResult"
     },
     "HandleError": {
       "Type": "Pass",
@@ -262,7 +262,21 @@
         "message": "Error occurred, escalating to human agent"
       },
       "ResultPath": "$.final_action",
-      "Next": "Success"
+      "Next": "SaveResult"
+    },
+    "SaveResult": {
+      "Type": "Task",
+      "Resource": "${save_result_lambda_arn}",
+      "Comment": "Persist aggregated pipeline result to pipeline_results DynamoDB",
+      "Next": "Success",
+      "ResultPath": "$.save_result",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.save_result_error",
+          "Next": "Success"
+        }
+      ]
     },
     "Success": {
       "Type": "Succeed",

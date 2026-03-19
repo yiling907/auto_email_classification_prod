@@ -71,6 +71,11 @@ variable "sender_name" {
   default     = "InsureMail AI Support"
 }
 
+variable "pipeline_results_table_name" {
+  description = "Name of the pipeline results DynamoDB table"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

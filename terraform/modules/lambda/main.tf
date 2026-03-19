@@ -360,3 +360,35 @@ resource "aws_cloudwatch_log_group" "email_sender" {
   retention_in_days = var.log_retention_days
   tags              = var.tags
 }
+
+# Save Result Lambda
+data "archive_file" "save_result" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_path}/save_result"
+  output_path = "${path.module}/builds/save_result.zip"
+}
+
+resource "aws_lambda_function" "save_result" {
+  filename         = data.archive_file.save_result.output_path
+  function_name    = "${local.resource_prefix}-save-result"
+  role             = var.lambda_execution_role_arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = var.lambda_runtime
+  timeout          = 30
+  memory_size      = 128
+  source_code_hash = data.archive_file.save_result.output_base64sha256
+
+  environment {
+    variables = {
+      PIPELINE_RESULTS_TABLE_NAME = var.pipeline_results_table_name
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-save-result" })
+}
+
+resource "aws_cloudwatch_log_group" "save_result" {
+  name              = "/aws/lambda/${aws_lambda_function.save_result.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}

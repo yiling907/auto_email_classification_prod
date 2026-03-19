@@ -48,6 +48,11 @@ variable "customers_table_arn" {
   type        = string
 }
 
+variable "pipeline_results_table_arn" {
+  description = "ARN of the pipeline results DynamoDB table"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

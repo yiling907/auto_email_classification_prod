@@ -39,11 +39,12 @@ module "iam" {
   email_bucket_arn      = module.storage.email_bucket_arn
   knowledge_base_bucket_arn = module.storage.knowledge_base_bucket_arn
   logs_bucket_arn       = module.storage.logs_bucket_arn
-  email_table_arn       = module.storage.email_table_arn
-  model_metrics_table_arn = module.storage.model_metrics_table_arn
-  embeddings_table_arn  = module.storage.embeddings_table_arn
-  customers_table_arn   = module.storage.customers_table_arn
-  tags                  = local.common_tags
+  email_table_arn             = module.storage.email_table_arn
+  model_metrics_table_arn     = module.storage.model_metrics_table_arn
+  embeddings_table_arn        = module.storage.embeddings_table_arn
+  customers_table_arn         = module.storage.customers_table_arn
+  pipeline_results_table_arn  = module.storage.pipeline_results_table_arn
+  tags                        = local.common_tags
 }
 
 # Lambda module - All Lambda functions
@@ -59,8 +60,9 @@ module "lambda" {
   email_table_name          = module.storage.email_table_name
   model_metrics_table_name  = module.storage.model_metrics_table_name
   embeddings_table_name     = module.storage.embeddings_table_name
-  customers_table_name      = module.storage.customers_table_name
-  log_retention_days        = var.log_retention_days
+  customers_table_name          = module.storage.customers_table_name
+  pipeline_results_table_name   = module.storage.pipeline_results_table_name
+  log_retention_days            = var.log_retention_days
   state_machine_arn         = module.step_functions.state_machine_arn
   sender_email              = var.sender_email
   sender_name               = var.sender_name
@@ -88,7 +90,8 @@ module "step_functions" {
   email_sender_lambda_arn     = module.lambda.email_sender_arn
   crm_validation_lambda_arn   = module.lambda.crm_validation_arn
   extract_entity_lambda_arn   = module.lambda.extract_entity_arn
-  tags                            = local.common_tags
+  save_result_lambda_arn      = module.lambda.save_result_arn
+  tags                        = local.common_tags
 }
 
 # Bedrock module - Model access configuration

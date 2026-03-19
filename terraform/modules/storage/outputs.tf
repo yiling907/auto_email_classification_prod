@@ -69,3 +69,13 @@ output "embeddings_table_arn" {
   description = "ARN of the embeddings DynamoDB table"
   value       = aws_dynamodb_table.embeddings.arn
 }
+
+output "pipeline_results_table_name" {
+  description = "Name of the pipeline results DynamoDB table"
+  value       = aws_dynamodb_table.pipeline_results.name
+}
+
+output "pipeline_results_table_arn" {
+  description = "ARN of the pipeline results DynamoDB table"
+  value       = aws_dynamodb_table.pipeline_results.arn
+}

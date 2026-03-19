@@ -251,3 +251,42 @@ resource "aws_dynamodb_table" "embeddings" {
 
   tags = merge(var.tags, { Name = "${local.resource_prefix}-embeddings" })
 }
+
+# DynamoDB table for aggregated pipeline execution results
+resource "aws_dynamodb_table" "pipeline_results" {
+  name         = "${local.resource_prefix}-pipeline-results"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "email_id"
+
+  attribute {
+    name = "email_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "final_action"
+    type = "S"
+  }
+
+  attribute {
+    name = "executed_at"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "action-date-index"
+    hash_key        = "final_action"
+    range_key       = "executed_at"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-pipeline-results" })
+}

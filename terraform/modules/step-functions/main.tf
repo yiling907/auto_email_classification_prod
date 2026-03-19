@@ -16,6 +16,7 @@ locals {
       email_sender_lambda_arn    = var.email_sender_lambda_arn
       crm_validation_lambda_arn  = var.crm_validation_lambda_arn
       extract_entity_lambda_arn  = var.extract_entity_lambda_arn
+      save_result_lambda_arn     = var.save_result_lambda_arn
     }
   )
 }
