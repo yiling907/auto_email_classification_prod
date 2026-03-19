@@ -41,13 +41,48 @@
           "StartAt": "ExtractEntities",
           "States": {
             "ExtractEntities": {
-              "Type": "Pass",
-              "Comment": "Pass through real entities extracted by email_parser Lambda",
+              "Type": "Task",
+              "Resource": "${extract_entity_lambda_arn}",
+              "Comment": "Extract structured entities from email body and attachments using Textract + Bedrock Claude",
               "Parameters": {
-                "policy_number.$": "$.parsed_email.parsed_data.policy_number",
-                "member_id.$": "$.parsed_email.parsed_data.member_id",
-                "sender_email.$": "$.parsed_email.parsed_data.sender_email",
-                "pii_present.$": "$.parsed_email.parsed_data.pii_present"
+                "email_id.$":           "$.parsed_email.email_id",
+                "email_body.$":         "$.parsed_email.parsed_data.body_text",
+                "subject.$":            "$.parsed_email.parsed_data.subject",
+                "sender_email.$":       "$.parsed_email.parsed_data.sender_email",
+                "policy_number.$":      "$.parsed_email.parsed_data.policy_number",
+                "member_id.$":          "$.parsed_email.parsed_data.member_id",
+                "customer_id.$":        "$.parsed_email.parsed_data.customer_id",
+                "pii_present.$":        "$.parsed_email.parsed_data.pii_present",
+                "has_attachment.$":     "$.parsed_email.parsed_data.has_attachment",
+                "attachments_content.$":"$.parsed_email.parsed_data.attachments_content",
+                "s3_bucket.$":          "$.parsed_email.parsed_data.s3_bucket",
+                "s3_key.$":             "$.parsed_email.parsed_data.s3_key"
+              },
+              "ResultPath": "$.entities",
+              "End": true,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Comment": "Fall back to email_parser entities on any extraction failure",
+                  "ResultPath": "$.entity_error",
+                  "Next": "FallbackEntities"
+                }
+              ]
+            },
+            "FallbackEntities": {
+              "Type": "Pass",
+              "Comment": "Entity extraction failed — use email_parser entities as fallback",
+              "Parameters": {
+                "policy_number.$":      "$.parsed_email.parsed_data.policy_number",
+                "member_id.$":          "$.parsed_email.parsed_data.member_id",
+                "customer_id.$":        "$.parsed_email.parsed_data.customer_id",
+                "sender_email.$":       "$.parsed_email.parsed_data.sender_email",
+                "pii_present.$":        "$.parsed_email.parsed_data.pii_present",
+                "extracted_fields":     {},
+                "textract_used":        false,
+                "bedrock_used":         false,
+                "extraction_confidence":0.0,
+                "sources":              ["fallback"]
               },
               "ResultPath": "$.entities",
               "End": true

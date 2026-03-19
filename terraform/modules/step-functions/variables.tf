@@ -43,6 +43,11 @@ variable "crm_validation_lambda_arn" {
   type        = string
 }
 
+variable "extract_entity_lambda_arn" {
+  description = "ARN of the extract entity Lambda function"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

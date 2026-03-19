@@ -294,6 +294,38 @@ resource "aws_cloudwatch_log_group" "crm_validation" {
   tags              = var.tags
 }
 
+# Extract Entity Lambda
+data "archive_file" "extract_entity" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_path}/extract_entity"
+  output_path = "${path.module}/builds/extract_entity.zip"
+}
+
+resource "aws_lambda_function" "extract_entity" {
+  filename         = data.archive_file.extract_entity.output_path
+  function_name    = "${local.resource_prefix}-extract-entity"
+  role             = var.lambda_execution_role_arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = var.lambda_runtime
+  timeout          = 120  # 2 minutes: Textract OCR + Bedrock call
+  memory_size      = 512
+  source_code_hash = data.archive_file.extract_entity.output_base64sha256
+
+  environment {
+    variables = {
+      ENTITY_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-extract-entity" })
+}
+
+resource "aws_cloudwatch_log_group" "extract_entity" {
+  name              = "/aws/lambda/${aws_lambda_function.extract_entity.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
 # Data source to package Email Sender Lambda
 data "archive_file" "email_sender" {
   type        = "zip"

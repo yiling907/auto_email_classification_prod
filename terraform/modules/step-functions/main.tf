@@ -15,6 +15,7 @@ locals {
       classify_intent_lambda_arn = var.classify_intent_lambda_arn
       email_sender_lambda_arn    = var.email_sender_lambda_arn
       crm_validation_lambda_arn  = var.crm_validation_lambda_arn
+      extract_entity_lambda_arn  = var.extract_entity_lambda_arn
     }
   )
 }

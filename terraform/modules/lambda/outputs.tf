@@ -89,6 +89,16 @@ output "crm_validation_name" {
   value       = aws_lambda_function.crm_validation.function_name
 }
 
+output "extract_entity_arn" {
+  description = "ARN of the extract entity Lambda function"
+  value       = aws_lambda_function.extract_entity.arn
+}
+
+output "extract_entity_name" {
+  description = "Name of the extract entity Lambda function"
+  value       = aws_lambda_function.extract_entity.function_name
+}
+
 output "email_parser_lambda_permission_id" {
   description = "ID of the S3 permission for email parser Lambda"
   value       = aws_lambda_permission.allow_s3_email_parser.id

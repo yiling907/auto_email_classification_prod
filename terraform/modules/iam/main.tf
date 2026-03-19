@@ -124,6 +124,26 @@ resource "aws_iam_role_policy" "lambda_bedrock" {
   })
 }
 
+# Lambda policy for Textract access (document OCR in extract_entity Lambda)
+resource "aws_iam_role_policy" "lambda_textract" {
+  name = "${local.resource_prefix}-lambda-textract"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "textract:DetectDocumentText",
+          "textract:AnalyzeDocument"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # Lambda policy for SES access (sending emails)
 resource "aws_iam_role_policy" "lambda_ses" {
   name = "${local.resource_prefix}-lambda-ses"

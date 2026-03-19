@@ -87,6 +87,7 @@ module "step_functions" {
   classify_intent_lambda_arn  = module.lambda.classify_intent_arn
   email_sender_lambda_arn     = module.lambda.email_sender_arn
   crm_validation_lambda_arn   = module.lambda.crm_validation_arn
+  extract_entity_lambda_arn   = module.lambda.extract_entity_arn
   tags                            = local.common_tags
 }
 
