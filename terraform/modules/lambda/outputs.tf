@@ -118,3 +118,13 @@ output "save_result_name" {
   description = "Name of the save result Lambda function"
   value       = aws_lambda_function.save_result.function_name
 }
+
+output "sagemaker_inference_arn" {
+  description = "ARN of the SageMaker inference Lambda function"
+  value       = aws_lambda_function.sagemaker_inference.arn
+}
+
+output "sagemaker_inference_name" {
+  description = "Name of the SageMaker inference Lambda function"
+  value       = aws_lambda_function.sagemaker_inference.function_name
+}

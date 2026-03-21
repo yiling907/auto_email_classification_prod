@@ -392,3 +392,35 @@ resource "aws_cloudwatch_log_group" "save_result" {
   retention_in_days = var.log_retention_days
   tags              = var.tags
 }
+
+# SageMaker Inference Lambda — proxies POST /api/model/inference to the SageMaker GPU endpoint
+data "archive_file" "sagemaker_inference" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_path}/sagemaker_inference"
+  output_path = "${path.module}/builds/sagemaker_inference.zip"
+}
+
+resource "aws_lambda_function" "sagemaker_inference" {
+  filename         = data.archive_file.sagemaker_inference.output_path
+  function_name    = "${local.resource_prefix}-sagemaker-inference"
+  role             = var.lambda_execution_role_arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = var.lambda_runtime
+  timeout          = 60    # SageMaker inference can take several seconds on first call
+  memory_size      = 256
+  source_code_hash = data.archive_file.sagemaker_inference.output_base64sha256
+
+  environment {
+    variables = {
+      SAGEMAKER_ENDPOINT_NAME = var.sagemaker_endpoint_name
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-sagemaker-inference" })
+}
+
+resource "aws_cloudwatch_log_group" "sagemaker_inference" {
+  name              = "/aws/lambda/${aws_lambda_function.sagemaker_inference.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}

@@ -76,6 +76,11 @@ variable "pipeline_results_table_name" {
   type        = string
 }
 
+variable "sagemaker_endpoint_name" {
+  description = "Name of the SageMaker inference endpoint"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags for resources"
   type        = map(string)

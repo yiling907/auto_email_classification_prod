@@ -22,3 +22,13 @@ variable "tags" {
   description = "Common tags for resources"
   type        = map(string)
 }
+
+variable "sagemaker_inference_lambda_arn" {
+  description = "ARN of the SageMaker inference Lambda function"
+  type        = string
+}
+
+variable "sagemaker_inference_lambda_name" {
+  description = "Name of the SageMaker inference Lambda function"
+  type        = string
+}

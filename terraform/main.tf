@@ -73,6 +73,8 @@ module "lambda" {
   imap_server           = var.imap_server
   mark_emails_as_read   = var.mark_emails_as_read ? "true" : "false"
 
+  sagemaker_endpoint_name   = module.sagemaker.endpoint_name
+
   tags                      = local.common_tags
 }
 
@@ -126,7 +128,22 @@ module "api_gateway" {
   environment             = var.environment
   api_handler_lambda_arn  = module.lambda.api_handlers_arn
   api_handler_lambda_name = module.lambda.api_handlers_name
+
+  sagemaker_inference_lambda_arn  = module.lambda.sagemaker_inference_arn
+  sagemaker_inference_lambda_name = module.lambda.sagemaker_inference_name
+
   tags                    = local.common_tags
+}
+
+# SageMaker module - GPU inference endpoint for PyTorch model
+module "sagemaker" {
+  source = "./modules/sagemaker"
+
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
+  account_id   = data.aws_caller_identity.current.account_id
+  tags         = local.common_tags
 }
 
 # SES module - Email sending only (receiving via Gmail IMAP)

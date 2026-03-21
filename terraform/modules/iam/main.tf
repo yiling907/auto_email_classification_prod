@@ -265,6 +265,21 @@ resource "aws_iam_role_policy" "step_functions_logs" {
   })
 }
 
+# Lambda policy for SageMaker endpoint invocation
+resource "aws_iam_role_policy" "lambda_sagemaker" {
+  name = "${local.resource_prefix}-lambda-sagemaker"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sagemaker:InvokeEndpoint"]
+      Resource = "arn:aws:sagemaker:${var.aws_region}:${data.aws_caller_identity.current.account_id}:endpoint/${local.resource_prefix}-*"
+    }]
+  })
+}
+
 # Step Functions policy for X-Ray tracing
 resource "aws_iam_role_policy" "step_functions_xray" {
   name = "${local.resource_prefix}-step-functions-xray"

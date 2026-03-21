@@ -75,3 +75,18 @@ output "pipeline_results_table_name" {
   description = "Name of the DynamoDB table for aggregated pipeline results"
   value       = module.storage.pipeline_results_table_name
 }
+
+output "sagemaker_endpoint_name" {
+  description = "Name of the SageMaker GPU inference endpoint"
+  value       = module.sagemaker.endpoint_name
+}
+
+output "sagemaker_model_artifacts_bucket" {
+  description = "S3 bucket name for model artifacts"
+  value       = module.sagemaker.model_artifacts_bucket_name
+}
+
+output "inference_api_url" {
+  description = "Full URL for the SageMaker inference API endpoint"
+  value       = "${module.api_gateway.api_gateway_url}/model/inference"
+}

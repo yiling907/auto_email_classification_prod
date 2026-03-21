@@ -1,0 +1,305 @@
+<mxfile host="app.diagrams.net" version="21.0.0">
+  <diagram name="InsureMail AI Pipeline" id="insuremail-ai-pipeline">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ═══════════════════════════════════════════ TITLE -->
+        <mxCell id="title" value="InsureMail AI — Email Processing Pipeline (Step Functions)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="150" y="15" width="870" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ START -->
+        <mxCell id="start" value="Email Received" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;arcSize=50;" vertex="1" parent="1">
+          <mxGeometry x="510" y="70" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Gmail IMAP Poller -->
+        <mxCell id="gmail" value="&lt;b&gt;Gmail IMAP Poller&lt;/b&gt;&lt;br&gt;gmail_imap_poller Lambda&lt;br&gt;Scheduled poll · builds .eml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=#c87800;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="472" y="158" width="226" height="62" as="geometry" />
+        </mxCell>
+
+        <!-- S3 -->
+        <mxCell id="s3" value="&lt;b&gt;S3 Email Bucket&lt;/b&gt;&lt;br&gt;insuremail-ai-dev-emails&lt;br&gt;incoming/*.eml" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#7AA116;strokeColor=#578008;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="477" y="262" width="216" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ───── ParseEmail ───── -->
+        <mxCell id="parse" value="&lt;b&gt;① ParseEmail&lt;/b&gt;&lt;br&gt;email_parser Lambda&lt;br&gt;RFC 2822 · PII redact · PDF/DOCX/TXT extract" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=#c87800;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="462" y="373" width="246" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ───── Parallel Analysis background ───── -->
+        <mxCell id="parallel_bg" value="② Parallel Analysis" style="swimlane;startSize=28;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontColor=#555555;fontSize=11;fontStyle=1;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="130" y="482" width="910" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- ClassifyIntent -->
+        <mxCell id="classify" value="&lt;b&gt;ClassifyIntent&lt;/b&gt;&lt;br&gt;classify_intent Lambda&lt;br&gt;Claude 3 Sonnet → 17 intents → 12 teams" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=#c87800;fontColor=#ffffff;fontSize=10;" vertex="1" parent="parallel_bg">
+          <mxGeometry x="30" y="45" width="240" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ExtractEntities -->
+        <mxCell id="extract" value="&lt;b&gt;ExtractEntities&lt;/b&gt;&lt;br&gt;extract_entity Lambda&lt;br&gt;Textract OCR + Bedrock Claude" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=#c87800;fontColor=#ffffff;fontSize=10;" vertex="1" parent="parallel_bg">
+          <mxGeometry x="380" y="45" width="230" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- FallbackEntities -->
+        <mxCell id="fallback_ent" value="FallbackEntities (Pass)&lt;br&gt;Use email_parser fields" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="parallel_bg">
+          <mxGeometry x="680" y="45" width="200" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ───── RAG Retrieval ───── -->
+        <mxCell id="rag" value="&lt;b&gt;③ RAG Retrieval&lt;/b&gt;&lt;br&gt;rag_retrieval Lambda&lt;br&gt;HyDE (Haiku) + Titan + BM25 + RRF + Rerank" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=#c87800;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="462" y="666" width="246" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- SetEmptyRAG -->
+        <mxCell id="empty_rag" value="SetEmptyRAG (Pass)&lt;br&gt;Empty doc list fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="776" y="674" width="190" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ───── CRM Validation ───── -->
+        <mxCell id="crm" value="&lt;b&gt;④ CRM Validation&lt;/b&gt;&lt;br&gt;crm_validation Lambda&lt;br&gt;Text-to-SQL (Mistral 7B) → DynamoDB customers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=#c87800;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="462" y="778" width="246" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- SetEmptyCRM -->
+        <mxCell id="empty_crm" value="SetEmptyCRM (Pass)&lt;br&gt;CRM lookup failed fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="776" y="786" width="190" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ───── Fraud Risk ───── -->
+        <mxCell id="fraud" value="&lt;b&gt;⑤ Assess Fraud Risk (Pass)&lt;/b&gt;&lt;br&gt;Rule-based · risk_level / risk_score" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="462" y="888" width="246" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ───── Generate Response ───── -->
+        <mxCell id="genresp" value="&lt;b&gt;⑥ Generate Response&lt;/b&gt;&lt;br&gt;claude_response Lambda&lt;br&gt;Mistral 7B / Llama 3.1 8B + 8-dim quality judge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=#c87800;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="462" y="988" width="246" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- HandleError -->
+        <mxCell id="handle_error" value="&lt;b&gt;HandleError (Pass)&lt;/b&gt;&lt;br&gt;action: error_escalation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="790" y="900" width="185" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ───── Determine Action ───── -->
+        <mxCell id="choice" value="&lt;b&gt;Determine Action&lt;/b&gt;&lt;br&gt;(Choice)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="522" y="1100" width="126" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- Confidence labels -->
+        <mxCell id="conf_auto" value="confidence ≥ 0.8" style="text;html=1;fontSize=9;fontColor=#82b366;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="248" y="1120" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="conf_review" value="0.5 – 0.8" style="text;html=1;fontSize=9;fontColor=#d6b656;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="555" y="1218" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="conf_esc" value="confidence &lt; 0.5" style="text;html=1;fontSize=9;fontColor=#b85450;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1120" width="110" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ───── AutoRespond ───── -->
+        <mxCell id="autorespond" value="&lt;b&gt;AutoRespond&lt;/b&gt;&lt;br&gt;email_sender Lambda&lt;br&gt;Send reply via Amazon SES" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=#c87800;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="165" y="1275" width="210" height="62" as="geometry" />
+        </mxCell>
+
+        <!-- QueueForReview -->
+        <mxCell id="review" value="&lt;b&gt;QueueForReview (Pass)&lt;/b&gt;&lt;br&gt;action: queued_for_review" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="462" y="1280" width="246" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Escalate -->
+        <mxCell id="escalate" value="&lt;b&gt;Escalate (Pass)&lt;/b&gt;&lt;br&gt;action: escalated" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1280" width="185" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ───── SaveResult ───── -->
+        <mxCell id="saveresult" value="&lt;b&gt;⑦ SaveResult&lt;/b&gt;&lt;br&gt;save_result Lambda&lt;br&gt;Persist full execution state → DynamoDB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6a0dad;strokeColor=#4a0090;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="462" y="1394" width="246" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- pipeline_results DynamoDB -->
+        <mxCell id="dynamo_results" value="&lt;b&gt;pipeline_results&lt;/b&gt;&lt;br&gt;DynamoDB Table&lt;br&gt;PK: email_id · GSI: action-date-index" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#2E73B8;strokeColor=#1a4f82;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="472" y="1510" width="226" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ───── SUCCESS ───── -->
+        <mxCell id="success" value="✅  Success" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="510" y="1628" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ LEGEND -->
+        <mxCell id="leg_bg" value="Legend" style="swimlane;startSize=24;fillColor=#f9f9f9;strokeColor=#aaaaaa;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="780" width="160" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="Lambda Function" style="rounded=1;fillColor=#FF9900;strokeColor=#c87800;fontColor=#ffffff;fontSize=10;" vertex="1" parent="leg_bg">
+          <mxGeometry x="10" y="34" width="140" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="Pass / Choice State" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="leg_bg">
+          <mxGeometry x="10" y="76" width="140" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="Error / Fallback" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="leg_bg">
+          <mxGeometry x="10" y="118" width="140" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="DynamoDB / S3" style="shape=cylinder3;fillColor=#2E73B8;strokeColor=#1a4f82;fontColor=#ffffff;fontSize=10;" vertex="1" parent="leg_bg">
+          <mxGeometry x="10" y="160" width="140" height="38" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════ EDGES -->
+
+        <!-- Start → Gmail -->
+        <mxCell id="e_start_gmail" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="start" target="gmail" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Gmail → S3 -->
+        <mxCell id="e_gmail_s3" value="Upload .eml" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="gmail" target="s3" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- S3 → ParseEmail -->
+        <mxCell id="e_s3_parse" value="S3 trigger" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="s3" target="parse" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ParseEmail → ClassifyIntent (into swimlane) -->
+        <mxCell id="e_parse_classify" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="parse" target="classify" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ParseEmail → ExtractEntities -->
+        <mxCell id="e_parse_extract" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="parse" target="extract" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ParseEmail → HandleError (error catch) -->
+        <mxCell id="e_parse_err" value="on error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;fontColor=#b85450;dashed=1;fontSize=9;" edge="1" source="parse" target="handle_error" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="850" y="405" />
+              <mxPoint x="850" y="927" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ExtractEntities → FallbackEntities (error) -->
+        <mxCell id="e_extract_fallback" value="on error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;fontColor=#b85450;dashed=1;fontSize=9;" edge="1" source="extract" target="fallback_ent" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ClassifyIntent → RAG -->
+        <mxCell id="e_classify_rag" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="classify" target="rag" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ExtractEntities → RAG -->
+        <mxCell id="e_extract_rag" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="extract" target="rag" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- FallbackEntities → RAG -->
+        <mxCell id="e_fallback_rag" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="fallback_ent" target="rag" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- RAG → SetEmptyRAG (error) -->
+        <mxCell id="e_rag_emptyrag" value="on error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;fontColor=#b85450;dashed=1;fontSize=9;" edge="1" source="rag" target="empty_rag" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- RAG → CRM -->
+        <mxCell id="e_rag_crm" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="rag" target="crm" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- SetEmptyRAG → CRM -->
+        <mxCell id="e_emptyrag_crm" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="empty_rag" target="crm" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- CRM → SetEmptyCRM (error) -->
+        <mxCell id="e_crm_emptycrm" value="on error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;fontColor=#b85450;dashed=1;fontSize=9;" edge="1" source="crm" target="empty_crm" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- CRM → Fraud -->
+        <mxCell id="e_crm_fraud" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="crm" target="fraud" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- SetEmptyCRM → Fraud -->
+        <mxCell id="e_emptycrm_fraud" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="empty_crm" target="fraud" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Fraud → GenerateResponse -->
+        <mxCell id="e_fraud_genresp" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="fraud" target="genresp" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- GenerateResponse → HandleError (error) -->
+        <mxCell id="e_genresp_err" value="on error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;fontColor=#b85450;dashed=1;fontSize=9;" edge="1" source="genresp" target="handle_error" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- GenerateResponse → DetermineAction -->
+        <mxCell id="e_genresp_choice" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="genresp" target="choice" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- DetermineAction → AutoRespond -->
+        <mxCell id="e_choice_auto" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#82b366;" edge="1" source="choice" target="autorespond" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- DetermineAction → QueueForReview -->
+        <mxCell id="e_choice_review" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;" edge="1" source="choice" target="review" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- DetermineAction → Escalate -->
+        <mxCell id="e_choice_esc" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;" edge="1" source="choice" target="escalate" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- AutoRespond → SaveResult -->
+        <mxCell id="e_auto_save" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="autorespond" target="saveresult" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- QueueForReview → SaveResult -->
+        <mxCell id="e_review_save" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="review" target="saveresult" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Escalate → SaveResult -->
+        <mxCell id="e_esc_save" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="escalate" target="saveresult" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- HandleError → SaveResult -->
+        <mxCell id="e_err_save" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;" edge="1" source="handle_error" target="saveresult" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="882" y="1426" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- SaveResult → DynamoDB -->
+        <mxCell id="e_save_dynamo" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="saveresult" target="dynamo_results" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- DynamoDB → Success -->
+        <mxCell id="e_dynamo_success" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;" edge="1" source="dynamo_results" target="success" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
