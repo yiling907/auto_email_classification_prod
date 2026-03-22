@@ -15,8 +15,8 @@ const MODEL_LABELS = {
 }
 
 const FUNCTION_LABELS = {
-  classify_intent: 'Intent Classification',
-  claude_response: 'Response Generation',
+  classify_intent_by_llm: 'Intent Classification (LLM)',
+  llm_response:           'Response Generation',
 }
 
 function Toggle({ checked, onChange, disabled }) {
@@ -55,7 +55,7 @@ function Toggle({ checked, onChange, disabled }) {
 
 function Dashboard({ apiUrl }) {
   const [overview, setOverview]     = useState(null)
-  const [settings, setSettings]     = useState(null)   // { classify_intent: 'mistral-7b', claude_response: 'mistral-7b' }
+  const [settings, setSettings]     = useState(null)   // { classify_intent_by_llm: 'mistral-7b', llm_response: 'mistral-7b' }
   const [saving, setSaving]         = useState({})     // { fnKey: true/false }
   const [settingsMsg, setSettingsMsg] = useState(null)
   const [loading, setLoading]       = useState(true)
@@ -201,9 +201,9 @@ function Dashboard({ apiUrl }) {
                     <div style={{ fontWeight: 600, marginBottom: 2 }}>{label}</div>
                     <div style={{ fontSize: '0.8rem', color: '#6c757d' }}>
                       Lambda: <code style={{ fontSize: '0.8rem' }}>
-                        {fnKey === 'classify_intent'
-                          ? 'insuremail-ai-dev-multi-llm-inference'
-                          : 'insuremail-ai-dev-claude-response'}
+                        {fnKey === 'classify_intent_by_llm'
+                          ? 'insuremail-ai-dev-classify-intent-by-llm'
+                          : 'insuremail-ai-dev-llm-response'}
                       </code>
                     </div>
                   </div>

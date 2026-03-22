@@ -135,6 +135,31 @@ function EmailDetail({ apiUrl }) {
         <Field label="PII Present"          value={String(email.pii_present ?? 'N/A')} />
       </div>
 
+      {/* ── Entity Extraction (inline Textract + Claude Haiku) ── */}
+      {email.entities && (
+        <div className="card">
+          <h3 className="card-title">Entity Extraction</h3>
+          <Field label="Extraction Confidence"
+                 value={email.entities.extraction_confidence != null
+                   ? parseFloat(email.entities.extraction_confidence).toFixed(4)
+                   : 'N/A'} />
+          <Field label="Textract Used" value={String(email.entities.textract_used ?? 'N/A')} />
+          <Field label="Bedrock Used"  value={String(email.entities.bedrock_used  ?? 'N/A')} />
+          {email.entities.extracted_fields && Object.keys(email.entities.extracted_fields).length > 0 && (
+            <div style={{ marginTop: '0.75rem' }}>
+              <strong style={{ fontSize: '0.85rem', color: '#555' }}>Extracted Fields:</strong>
+              <pre style={{
+                marginTop: '0.4rem', padding: '0.75rem', background: '#f8f9fa',
+                borderRadius: '4px', fontSize: '0.8rem', whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word', maxHeight: '300px', overflowY: 'auto',
+              }}>
+                {JSON.stringify(email.entities.extracted_fields, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── AI Decision ── */}
       <div className="card">
         <h3 className="card-title">AI Decision</h3>

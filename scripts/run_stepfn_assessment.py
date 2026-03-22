@@ -236,12 +236,20 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
     """
     out = exec_result.get("output", {})
 
-    # ── predicted intent (from classify_intent_by_llm — $.classifiers[0].llm_result)
+    # ── predicted intent ─────────────────────────────────────────────────────
+    # Supports both state machine versions:
+    #   New (after tf-apply): $.classifiers[0].llm_result.classification
+    #   Legacy (deployed):    $.analysis[0].intent.classification
     clf = {}
     try:
         clf = out["classifiers"][0]["llm_result"]["classification"]
     except (KeyError, IndexError, TypeError):
         pass
+    if not clf:
+        try:
+            clf = out["analysis"][0]["intent"]["classification"]
+        except (KeyError, IndexError, TypeError):
+            pass
 
     predicted_intent    = clf.get("customer_intent", "other")
     predicted_urgency   = clf.get("urgency", "")
@@ -249,6 +257,7 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
     predicted_route     = clf.get("gold_route_team") or INTENT_TO_ROUTE.get(predicted_intent, "general_support_team")
 
     # ── BioBERT intent (from classify_intent_by_biobert — $.classifiers[1].biobert_result)
+    # Only available after the new state machine is deployed.
     biobert_clf = {}
     try:
         biobert_clf = out["classifiers"][1].get("biobert_result", {})

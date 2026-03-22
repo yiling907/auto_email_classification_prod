@@ -22,6 +22,7 @@ const DIMENSION_LABELS = {
   rag_retrieval:          'RAG Retrieval',
   response_quality:       'Response Quality',
   confidence_calibration: 'Confidence Calibration',
+  biobert_vs_llm:         'BioBERT vs LLM',
 }
 
 function scoreToPct(dim, dims) {
@@ -32,6 +33,7 @@ function scoreToPct(dim, dims) {
     case 'rag_retrieval':          return (dims[dim]?.hit_rate ?? 0) * 100
     case 'response_quality':       return (dims[dim]?.escalation_agreement ?? dims[dim]?.hedge_rate ?? 0) * 100
     case 'confidence_calibration': return Math.max(0, (1 - (dims[dim]?.ece ?? 1))) * 100
+    case 'biobert_vs_llm':         return dims[dim]?.available ? (dims[dim]?.agreement_rate ?? 0) * 100 : 0
     default: return 0
   }
 }
@@ -66,6 +68,16 @@ function DimensionCard({ dimKey, dims }) {
       `Human Review: ${PCT(d.routing_distribution?.human_review)}`,
       `Escalate: ${PCT(d.routing_distribution?.escalate)}`
     )
+  } else if (dimKey === 'biobert_vs_llm') {
+    if (d.available) {
+      details.push(
+        `Agreement Rate: ${PCT(d.agreement_rate)}  (${d.agree_count}/${d.n_compared})`,
+        `BioBERT Accuracy vs Gold: ${PCT(d.biobert_accuracy)}`,
+        `BioBERT Avg Confidence: ${PCT(d.avg_confidence)}`
+      )
+    } else {
+      details.push('BioBERT endpoint unavailable')
+    }
   }
 
   return (
@@ -247,10 +259,12 @@ function Assessment({ apiUrl }) {
           </div>
 
           {/* ── Dimension Score Cards ────────────────────────────────── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-            {Object.keys(DIMENSION_LABELS).map(k => (
-              <DimensionCard key={k} dimKey={k} dims={dims} />
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            {Object.keys(DIMENSION_LABELS)
+              .filter(k => k !== 'biobert_vs_llm' || dims.biobert_vs_llm)
+              .map(k => (
+                <DimensionCard key={k} dimKey={k} dims={dims} />
+              ))}
           </div>
 
           {/* ── Radar + Routing Distribution ─────────────────────────── */}
@@ -303,22 +317,25 @@ function Assessment({ apiUrl }) {
                     <tr>
                       <th>Email ID</th>
                       <th>Gold Intent</th>
-                      <th>Predicted</th>
-                      <th>Match</th>
+                      <th>LLM Predicted</th>
+                      <th>LLM ✓</th>
+                      <th>BioBERT</th>
+                      <th>Agree</th>
                       <th>Gold Route</th>
                       <th>Predicted Route</th>
                       <th>Confidence</th>
                       <th>Action</th>
-                      <th>RAG Docs</th>
+                      <th>RAG</th>
                       <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.per_email_results.slice(0, 50).map(r => {
-                      const intentMatch = r.predicted_intent === r.gold_intent
-                      const routeMatch  = r.predicted_route?.toLowerCase() === r.gold_route_team?.toLowerCase()
-                      const actionColor = r.action === 'auto_response' ? '#28a745'
-                                        : r.action === 'human_review'  ? '#f39c12' : '#dc3545'
+                      const intentMatch   = r.predicted_intent === r.gold_intent
+                      const routeMatch    = r.predicted_route?.toLowerCase() === r.gold_route_team?.toLowerCase()
+                      const biobertMatch  = r.biobert_intent === r.gold_intent
+                      const actionColor   = r.action === 'auto_response' ? '#28a745'
+                                          : r.action === 'human_review'  ? '#f39c12' : '#dc3545'
                       return (
                         <tr
                           key={r.laya_email_id}
@@ -333,6 +350,14 @@ function Assessment({ apiUrl }) {
                             {r.predicted_intent}
                           </td>
                           <td style={{ textAlign: 'center' }}>{intentMatch ? '✓' : '✗'}</td>
+                          <td style={{ fontSize: '0.75rem', color: r.biobert_intent ? (biobertMatch ? '#28a745' : '#dc3545') : '#999' }}>
+                            {r.biobert_intent || '—'}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {r.classifiers_agree == null ? '—'
+                              : r.classifiers_agree ? <span style={{ color: '#28a745' }}>✓</span>
+                              : <span style={{ color: '#dc3545' }}>✗</span>}
+                          </td>
                           <td style={{ fontSize: '0.75rem' }}>{r.gold_route_team}</td>
                           <td style={{ fontSize: '0.75rem', color: routeMatch ? '#28a745' : '#dc3545' }}>
                             {r.predicted_route}
