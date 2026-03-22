@@ -8,7 +8,9 @@ labels from the Laya synthetic dataset.
 
 Unlike run_e2e_assessment.py (which simulates locally using gold labels),
 this script exercises every real Lambda end-to-end:
-  email_parser → classify_intent → rag_retrieval → crm_validation → llm_response
+  email_parser (parse + entity extraction)
+    → classify_intent_by_llm ∥ classify_intent_by_biobert (parallel)
+    → rag_retrieval → crm_validation → llm_response
 
 For each test email the script:
   1. Builds a raw RFC 2822 .eml string from the dataset record
@@ -234,17 +236,27 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
     """
     out = exec_result.get("output", {})
 
-    # ── predicted intent (from classify_intent Lambda) ─────────────────────
+    # ── predicted intent (from classify_intent_by_llm — $.classifiers[0].llm_result)
     clf = {}
     try:
-        clf = out["analysis"][0]["intent"]["classification"]
+        clf = out["classifiers"][0]["llm_result"]["classification"]
     except (KeyError, IndexError, TypeError):
         pass
 
-    predicted_intent = clf.get("customer_intent", "other")
+    predicted_intent    = clf.get("customer_intent", "other")
     predicted_urgency   = clf.get("urgency", "")
     predicted_sentiment = clf.get("sentiment", "")
-    predicted_route = clf.get("gold_route_team") or INTENT_TO_ROUTE.get(predicted_intent, "general_support_team")
+    predicted_route     = clf.get("gold_route_team") or INTENT_TO_ROUTE.get(predicted_intent, "general_support_team")
+
+    # ── BioBERT intent (from classify_intent_by_biobert — $.classifiers[1].biobert_result)
+    biobert_clf = {}
+    try:
+        biobert_clf = out["classifiers"][1].get("biobert_result", {})
+    except (KeyError, IndexError, TypeError):
+        pass
+    biobert_intent     = (biobert_clf.get("classification") or {}).get("customer_intent", "")
+    biobert_confidence = float(biobert_clf.get("confidence", 0.0))
+    biobert_model      = biobert_clf.get("model", "")
 
     # ── response + confidence (from llm_response Lambda) ────────────────
     resp = out.get("response", {})
@@ -262,12 +274,15 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
     crm_policy    = crm.get("policy") or {}
     crm_validation_block = crm.get("validation") or {}
 
-    # ── parsed email entities (from email_parser Lambda) ───────────────────
+    # ── parsed email entities (from email_parser — inline Textract + Claude extraction)
     parsed = out.get("parsed_email", {}).get("parsed_data", {})
     extracted_policy = parsed.get("policy_number", "")
     extracted_member = parsed.get("member_id", "")
     pii_detected     = bool(parsed.get("pii_present", False))
     medical_detected = bool(parsed.get("medical_terms_present", False))
+    # Bedrock entity extraction confidence (stored under parsed_data['entities'])
+    entities_block   = parsed.get("entities", {})
+    entity_confidence = float(entities_block.get("extraction_confidence", 0.0)) if entities_block else 0.0
 
     # Build RAG context string for TruLens scoring (joined doc snippets)
     rag_context_str = "\n\n".join(
@@ -280,10 +295,17 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
         "gold_intent":        laya_record.get("customer_intent", ""),
         "gold_route_team":    laya_record.get("gold_route_team", ""),
         "gold_requires_human":laya_record.get("requires_human_review", False),
+        # ── LLM classifier (authoritative)
         "predicted_intent":   predicted_intent,
         "predicted_urgency":  predicted_urgency,
         "predicted_sentiment":predicted_sentiment,
         "predicted_route":    predicted_route,
+        # ── BioBERT classifier (parallel branch, for comparison)
+        "biobert_intent":     biobert_intent,
+        "biobert_confidence": biobert_confidence,
+        "biobert_model":      biobert_model,
+        "classifiers_agree":  predicted_intent == biobert_intent if biobert_intent else None,
+        # ── Response
         "confidence_score":   confidence_score,
         "action":             action,
         "response_text":      response_text[:500],   # truncate for report size
@@ -293,11 +315,12 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
         "crm_policy_status":  crm_policy.get("policy_status", ""),
         "crm_plan_name":      crm_policy.get("plan_name", ""),
         "crm_eligible":       crm_validation_block.get("eligible_for_intent"),
-        # ── Entity extraction
+        # ── Entity extraction (email_parser inline Textract + Claude)
         "extracted_policy":   extracted_policy,
         "extracted_member":   extracted_member,
         "pii_detected":       pii_detected,
         "medical_detected":   medical_detected,
+        "entity_confidence":  entity_confidence,
         "exec_status":        exec_result["status"],
         "exec_error":         exec_result.get("error"),
         # ── TruLens inputs (stripped before saving to report) ──────────────
@@ -319,27 +342,34 @@ def run_one(run_id: str, laya_record: Dict) -> Dict:
         return extract_pipeline_result(laya_record, result)
     except Exception as exc:
         return {
-            "laya_email_id":   laya_id,
-            "sfn_email_id":    "",
-            "gold_intent":     laya_record.get("customer_intent", ""),
-            "gold_route_team": laya_record.get("gold_route_team", ""),
-            "gold_requires_human": laya_record.get("requires_human_review", False),
-            "predicted_intent": "other",
-            "predicted_route":  "general_support_team",
-            "confidence_score": 0.0,
-            "action":           "escalate",
-            "response_text":    "",
-            "rag_hit_count":    0,
-            "crm_found":        False,
-            "crm_policy_status":"",
-            "crm_plan_name":    "",
-            "crm_eligible":     None,
-            "extracted_policy": "",
-            "extracted_member": "",
-            "pii_detected":     False,
-            "medical_detected": False,
-            "exec_status":      "EXCEPTION",
-            "exec_error":       str(exc)[:300],
+            "laya_email_id":      laya_id,
+            "sfn_email_id":       "",
+            "gold_intent":        laya_record.get("customer_intent", ""),
+            "gold_route_team":    laya_record.get("gold_route_team", ""),
+            "gold_requires_human":laya_record.get("requires_human_review", False),
+            "predicted_intent":   "other",
+            "predicted_urgency":  "",
+            "predicted_sentiment":"",
+            "predicted_route":    "general_support_team",
+            "biobert_intent":     "",
+            "biobert_confidence": 0.0,
+            "biobert_model":      "",
+            "classifiers_agree":  None,
+            "confidence_score":   0.0,
+            "action":             "escalate",
+            "response_text":      "",
+            "rag_hit_count":      0,
+            "crm_found":          False,
+            "crm_policy_status":  "",
+            "crm_plan_name":      "",
+            "crm_eligible":       None,
+            "extracted_policy":   "",
+            "extracted_member":   "",
+            "pii_detected":       False,
+            "medical_detected":   False,
+            "entity_confidence":  0.0,
+            "exec_status":        "EXCEPTION",
+            "exec_error":         str(exc)[:300],
         }
 
 
@@ -504,6 +534,33 @@ def score_response(results: List[Dict]) -> Dict:
     }
 
 
+def score_biobert(results: List[Dict]) -> Dict:
+    """Agreement between LLM and BioBERT classifiers on this sample."""
+    comparable = [r for r in results if r.get("biobert_intent")]
+    if not comparable:
+        return {"available": False, "n_compared": 0}
+
+    agree = sum(1 for r in comparable if r.get("classifiers_agree"))
+    agreement_rate = agree / len(comparable)
+
+    # BioBERT accuracy against gold labels (independent of LLM)
+    biobert_correct = sum(
+        1 for r in comparable if r.get("biobert_intent") == r.get("gold_intent")
+    )
+    biobert_accuracy = biobert_correct / len(comparable)
+
+    avg_confidence = sum(r.get("biobert_confidence", 0.0) for r in comparable) / len(comparable)
+
+    return {
+        "available":        True,
+        "n_compared":       len(comparable),
+        "agreement_rate":   round(agreement_rate, 4),
+        "biobert_accuracy": round(biobert_accuracy, 4),
+        "avg_confidence":   round(avg_confidence, 4),
+        "agree_count":      agree,
+    }
+
+
 def score_crm(results: List[Dict]) -> Dict:
     """CRM lookup hit rate and policy status distribution across the sample."""
     total     = len(results)
@@ -663,7 +720,7 @@ def score_trulens_rag_triad(results: List[Dict]) -> Optional[Dict]:
 # ── Composite score ───────────────────────────────────────────────────────────
 
 def compute_composite(intent_m, routing_m, entity_m, rag_m, crm_m, response_m, calib_m,
-                      trulens_m=None) -> float:
+                      biobert_m=None, trulens_m=None) -> float:
     scores = []
     scores.append(intent_m["accuracy"])
     scores.append(routing_m["routing_accuracy"])
@@ -689,9 +746,9 @@ def _strip_trulens_inputs(results: List[Dict]) -> List[Dict]:
 
 def build_report(emails, results, cases, intent_m, routing_m, entity_m,
                  rag_m, crm_m, response_m, calib_m, elapsed: float, run_id: str,
-                 trulens_m=None) -> Dict:
+                 biobert_m=None, trulens_m=None) -> Dict:
     composite = compute_composite(intent_m, routing_m, entity_m, rag_m, crm_m,
-                                  response_m, calib_m, trulens_m)
+                                  response_m, calib_m, biobert_m, trulens_m)
     passed    = composite >= PASS_THRESHOLD
     n_failed  = sum(1 for r in results if r["exec_status"] != "SUCCEEDED")
 
@@ -704,6 +761,8 @@ def build_report(emails, results, cases, intent_m, routing_m, entity_m,
         "response_quality":       response_m,
         "confidence_calibration": calib_m,
     }
+    if biobert_m:
+        dimensions["biobert_vs_llm"] = biobert_m
     if trulens_m:
         # Store aggregate + per-email (without the raw text inputs)
         trulens_stored = {k: v for k, v in trulens_m.items() if k != "per_email"}
@@ -794,6 +853,18 @@ def print_report(report: Dict):
         print(f"\n  Top confused pairs:")
         for pair in n_confused[:5]:
             print(f"    {pair['true']:<35} → {pair['predicted']:<35} (n={pair['count']})")
+
+    if "biobert_vs_llm" in dims:
+        b = dims["biobert_vs_llm"]
+        print(f"\n{'-'*72}")
+        print(f"  STAGE — BIOBERT vs LLM CLASSIFIER COMPARISON")
+        print(f"{'-'*72}")
+        if b.get("available"):
+            print(f"  BioBERT accuracy (vs gold): {b['biobert_accuracy']:.4f}")
+            print(f"  LLM–BioBERT agreement:      {b['agreement_rate']:.4f}  ({b['agree_count']}/{b['n_compared']})")
+            print(f"  BioBERT avg confidence:     {b['avg_confidence']:.4f}")
+        else:
+            print("  BioBERT endpoint unavailable — no comparison data")
 
     if "trulens_rag_triad" in dims:
         t = dims["trulens_rag_triad"]
@@ -892,13 +963,14 @@ def main() -> int:
     gold_map = {e["email_id"]: e for e in emails}
     gold_records = [gold_map[r["laya_email_id"]] for r in succeeded if r["laya_email_id"] in gold_map]
 
-    intent_m  = score_intent(succeeded)
-    routing_m = score_routing(succeeded)
-    entity_m  = score_entity(succeeded, gold_records)
-    rag_m     = score_rag(succeeded, cases)
-    crm_m     = score_crm(succeeded)
+    intent_m   = score_intent(succeeded)
+    routing_m  = score_routing(succeeded)
+    entity_m   = score_entity(succeeded, gold_records)
+    rag_m      = score_rag(succeeded, cases)
+    crm_m      = score_crm(succeeded)
     response_m = score_response(succeeded)
-    calib_m   = score_confidence(succeeded)
+    calib_m    = score_confidence(succeeded)
+    biobert_m  = score_biobert(succeeded)
 
     # ── TruLens RAG Triad (optional) ──────────────────────────────────────────
     trulens_m = None
@@ -913,7 +985,7 @@ def main() -> int:
     elapsed = time.monotonic() - t0
     report  = build_report(emails, succeeded, cases, intent_m, routing_m, entity_m,
                            rag_m, crm_m, response_m, calib_m, elapsed, run_id,
-                           trulens_m=trulens_m)
+                           biobert_m=biobert_m, trulens_m=trulens_m)
 
     with open(args.output, "w", encoding="utf-8") as fh:
         json.dump(report, fh, indent=2, ensure_ascii=False)
