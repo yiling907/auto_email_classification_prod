@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/rag_ret
 import lambda_function as rag_retrieval
 
 sys.modules.pop('lambda_function', None)
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/claude_response'))
-import lambda_function as claude_response
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/llm_response'))
+import lambda_function as llm_response
 
 
 class TestEmailProcessingWorkflow:
@@ -145,8 +145,8 @@ Date: {sample_email['timestamp']}
             'fraud_score': {'risk_level': 'low', 'risk_score': 0.1},
         }
 
-        with patch.object(claude_response.bedrock_runtime, 'invoke_model', side_effect=response_side_effects):
-            final_result = claude_response.lambda_handler(response_event, lambda_context)
+        with patch.object(llm_response.bedrock_runtime, 'invoke_model', side_effect=response_side_effects):
+            final_result = llm_response.lambda_handler(response_event, lambda_context)
 
             assert final_result['statusCode'] == 200
             assert final_result['confidence_score'] >= 0.8
@@ -187,8 +187,8 @@ Date: {sample_email['timestamp']}
             'fraud_score': {'risk_level': 'high', 'risk_score': 0.85},
         }
 
-        with patch.object(claude_response.bedrock_runtime, 'invoke_model', side_effect=side_effects):
-            result = claude_response.lambda_handler(response_event, lambda_context)
+        with patch.object(llm_response.bedrock_runtime, 'invoke_model', side_effect=side_effects):
+            result = llm_response.lambda_handler(response_event, lambda_context)
 
             assert result['statusCode'] == 200
             assert result['confidence_score'] < 0.5
@@ -202,7 +202,7 @@ Date: {sample_email['timestamp']}
     ):
         """Test that workflow handles errors gracefully"""
 
-        with patch.object(claude_response.bedrock_runtime, 'invoke_model', side_effect=Exception('API Error')):
+        with patch.object(llm_response.bedrock_runtime, 'invoke_model', side_effect=Exception('API Error')):
             response_event = {
                 'email_body': sample_email['body_text'],
                 'subject': sample_email['subject'],
@@ -212,7 +212,7 @@ Date: {sample_email['timestamp']}
                 'fraud_score': {},
             }
 
-            result = claude_response.lambda_handler(response_event, lambda_context)
+            result = llm_response.lambda_handler(response_event, lambda_context)
 
             assert result['statusCode'] == 500
             assert 'error' in result

@@ -28,24 +28,34 @@ output "rag_retrieval_name" {
   value       = aws_lambda_function.rag_retrieval.function_name
 }
 
-output "claude_response_arn" {
-  description = "ARN of the Claude response Lambda function"
-  value       = aws_lambda_function.claude_response.arn
+output "llm_response_arn" {
+  description = "ARN of the LLM response Lambda function"
+  value       = aws_lambda_function.llm_response.arn
 }
 
-output "claude_response_name" {
-  description = "Name of the Claude response Lambda function"
-  value       = aws_lambda_function.claude_response.function_name
+output "llm_response_name" {
+  description = "Name of the LLM response Lambda function"
+  value       = aws_lambda_function.llm_response.function_name
 }
 
-output "classify_intent_arn" {
-  description = "ARN of the multi-LLM inference Lambda function"
-  value       = aws_lambda_function.classify_intent.arn
+output "classify_intent_by_llm_arn" {
+  description = "ARN of the LLM intent classification Lambda function"
+  value       = aws_lambda_function.classify_intent_by_llm.arn
 }
 
-output "classify_intent_name" {
-  description = "Name of the multi-LLM inference Lambda function"
-  value       = aws_lambda_function.classify_intent.function_name
+output "classify_intent_by_llm_name" {
+  description = "Name of the LLM intent classification Lambda function"
+  value       = aws_lambda_function.classify_intent_by_llm.function_name
+}
+
+output "classify_intent_by_biobert_arn" {
+  description = "ARN of the BioBERT intent classification Lambda function"
+  value       = aws_lambda_function.classify_intent_by_biobert.arn
+}
+
+output "classify_intent_by_biobert_name" {
+  description = "Name of the BioBERT intent classification Lambda function"
+  value       = aws_lambda_function.classify_intent_by_biobert.function_name
 }
 
 output "api_handlers_arn" {
@@ -87,21 +97,6 @@ output "crm_validation_arn" {
 output "crm_validation_name" {
   description = "Name of the CRM validation Lambda function"
   value       = aws_lambda_function.crm_validation.function_name
-}
-
-output "extract_entity_arn" {
-  description = "ARN of the extract entity Lambda function"
-  value       = aws_lambda_function.extract_entity.arn
-}
-
-output "extract_entity_name" {
-  description = "Name of the extract entity Lambda function"
-  value       = aws_lambda_function.extract_entity.function_name
-}
-
-output "email_parser_lambda_permission_id" {
-  description = "ID of the S3 permission for email parser Lambda"
-  value       = aws_lambda_permission.allow_s3_email_parser.id
 }
 
 output "rag_ingestion_lambda_permission_id" {

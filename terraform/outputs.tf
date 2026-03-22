@@ -38,8 +38,9 @@ output "lambda_functions" {
     email_parser        = module.lambda.email_parser_arn
     rag_ingestion       = module.lambda.rag_ingestion_arn
     rag_retrieval       = module.lambda.rag_retrieval_arn
-    claude_response     = module.lambda.claude_response_arn
-    classify_intent = module.lambda.classify_intent_arn
+    llm_response        = module.lambda.llm_response_arn
+    classify_intent_by_llm     = module.lambda.classify_intent_by_llm_arn
+    classify_intent_by_biobert = module.lambda.classify_intent_by_biobert_arn
   }
 }
 

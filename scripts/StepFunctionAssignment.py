@@ -16,7 +16,7 @@ Pipeline stages exercised
                       + entity extraction (policy_number, member_id, …)
   RetrieveKnowledge — rag_retrieval Lambda (Titan V2 embeddings + RRF fusion)
   ValidateCRM       — crm_validation Lambda (Text-to-SQL → DynamoDB customer lookup)
-  GenerateResponse  — claude_response Lambda (Claude 3 Sonnet + confidence score)
+  GenerateResponse  — llm_response Lambda (Claude 3 Sonnet + confidence score)
   Route             — DetermineAction (auto_response / human_review / escalate)
 
 Two demo test cases
@@ -413,7 +413,7 @@ def extract_results(output: Dict[str, Any]) -> Dict[str, Any]:
     # ResultPath in the state machine is "$.crm_validation"
     crm_context  = output.get("crm_validation", {})
 
-    # ── Response (claude_response Lambda) ─────────────────────────────────────
+    # ── Response (llm_response Lambda) ─────────────────────────────────────
     response     = output.get("response", {})
 
     # ── Final routing decision ────────────────────────────────────────────────

@@ -8,7 +8,7 @@ labels from the Laya synthetic dataset.
 
 Unlike run_e2e_assessment.py (which simulates locally using gold labels),
 this script exercises every real Lambda end-to-end:
-  email_parser → classify_intent → rag_retrieval → crm_validation → claude_response
+  email_parser → classify_intent → rag_retrieval → crm_validation → llm_response
 
 For each test email the script:
   1. Builds a raw RFC 2822 .eml string from the dataset record
@@ -246,7 +246,7 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
     predicted_sentiment = clf.get("sentiment", "")
     predicted_route = clf.get("gold_route_team") or INTENT_TO_ROUTE.get(predicted_intent, "general_support_team")
 
-    # ── response + confidence (from claude_response Lambda) ────────────────
+    # ── response + confidence (from llm_response Lambda) ────────────────
     resp = out.get("response", {})
     confidence_score = float(resp.get("confidence_score", 0.0))
     action           = resp.get("action", "escalate")

@@ -1,27 +1,41 @@
 """
 Email Parser Lambda Function
-Parses raw emails from S3 and extracts fields matching the emails.jsonl schema.
+Parses raw emails from S3, extracts fields matching the emails.jsonl schema,
+and runs entity extraction (Textract + Bedrock Claude) on any attachments.
 """
+import io
 import json
+import logging
 import os
 import re
+import time
 import uuid
 from datetime import datetime, timezone
-from email import message_from_string
+from email import message_from_string, message_from_bytes
 from email.utils import parseaddr, parsedate_to_datetime
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
 from decimal import Decimal
 
+# ── Logging ───────────────────────────────────────────────────────────────────
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 # ── AWS clients ───────────────────────────────────────────────────────────────
-s3_client = boto3.client('s3')
+_REGION   = os.environ.get("AWS_REGION", "us-east-1")
+s3_client = boto3.client('s3', region_name=_REGION)
 dynamodb  = boto3.resource('dynamodb')
+bedrock   = boto3.client("bedrock-runtime", region_name=_REGION)
+textract  = boto3.client("textract",        region_name=_REGION)
 
 # ── Environment variables ─────────────────────────────────────────────────────
 EMAIL_TABLE_NAME = os.environ['EMAIL_TABLE_NAME']
 email_table      = dynamodb.Table(EMAIL_TABLE_NAME)
+ENTITY_MODEL_ID  = os.environ.get(
+    "ENTITY_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0"
+)
 
 # ── Medical terms for detection ───────────────────────────────────────────────
 MEDICAL_TERMS = {
@@ -39,6 +53,125 @@ _RE_PHONE  = re.compile(r'\b(\+353|0)\d[\d\s\-]{7,11}\b')
 _RE_POLICY = re.compile(r'\bPOL-IE-\d{6}\b', re.IGNORECASE)
 _RE_MEMBER = re.compile(r'\bMEM-\d{6}\b',    re.IGNORECASE)
 _RE_PPSN   = re.compile(r'\b\d{7}[A-Z]{1,2}\b')
+
+# ── MIME content types for Textract ───────────────────────────────────────────
+_IMAGE_EXTENSIONS    = frozenset({"jpg", "jpeg", "png", "tiff", "tif"})
+_IMAGE_CONTENT_TYPES = frozenset({
+    "image/jpeg", "image/jpg", "image/png", "image/tiff",
+})
+_PDF_CONTENT_TYPES   = frozenset({"application/pdf"})
+
+# ── Bedrock structured extraction prompt ──────────────────────────────────────
+_EXTRACTION_PROMPT = """\
+You are an insurance document entity extractor specialised in Laya Healthcare \
+Out-patient Claim Forms (Ireland).
+
+Given text from a Laya Healthcare email and/or an attached Out-patient Claim \
+Form, extract every field listed below. Use null for any field not present in \
+the source text. Return ONLY valid JSON — no explanation, no markdown.
+
+--- SECTION 1: Member's details ---
+  membership_no          : string  (laya membership number)
+  title                  : string  (Mr / Ms / Mrs / Dr / Prof etc.)
+  surname                : string
+  forenames              : string
+  date_of_birth          : string  ISO date YYYY-MM-DD or null
+  telephone              : string
+  correspondence_address : string  (full address, newlines replaced with ", ")
+
+--- SECTION 2: Dependants ---
+  dependants             : array of objects, each:
+    {{ "name": string, "relationship": string }}
+  (empty array [] if none)
+
+--- SECTION 3: MRI ---
+  mri_date               : string  ISO date YYYY-MM-DD or null
+  mri_reason_for_referral: string or null
+  mri_centre             : string or null
+  mri_procedure          : string  (names and codes) or null
+  mri_referring_gp       : string  (GP or consultant name) or null
+  mri_consultant_code    : string or null
+
+--- SECTION 4: Accidents ---
+  accident_date          : string  ISO date YYYY-MM-DD or null
+  accident_description   : string or null
+  expenses_recoverable   : boolean or null
+  recovery_via_solicitor : boolean or null
+  recovery_via_piab      : boolean or null  (Personal Injuries Assessment Board)
+  third_party_details    : string or null
+
+--- SECTION 5: Emergency Dental ---
+  dental_injury_date     : string  ISO date YYYY-MM-DD or null
+  dental_injury_place    : string or null
+  dental_injury_description : string or null
+  dental_treatment_start : string  ISO date YYYY-MM-DD or null
+  dental_treatment_end   : string  ISO date YYYY-MM-DD or null
+  dental_cost            : number or null
+
+--- SECTION 6: Receipt details ---
+  receipts               : array of objects (up to 8 rows), each:
+    {{ "treatment_type": string, "num_receipts": integer, "total_cost": number }}
+  (empty array [] if none)
+  receipts_total_cost    : number  (sum across all rows, or null)
+
+--- SECTION 7: Payment details ---
+  account_holder_name    : string or null
+  account_number         : string or null
+  bank_sort_code         : string or null  (format "XX-XX-XX")
+  bank_name_address      : string or null
+
+--- SECTION 8 / Meta ---
+  declaration_date       : string  ISO date YYYY-MM-DD or null
+  doc_category           : string  always "claim_form" for this document
+  confidence             : float   0.0–1.0  overall extraction confidence
+
+Email subject: {subject}
+Email body (first 800 chars):
+\"\"\"
+{body_excerpt}
+\"\"\"
+
+{attachment_section}
+
+Respond ONLY with JSON matching this exact key set (nulls/empty arrays for \
+missing fields):
+{{
+  "membership_no":            ...,
+  "title":                    ...,
+  "surname":                  ...,
+  "forenames":                ...,
+  "date_of_birth":            ...,
+  "telephone":                ...,
+  "correspondence_address":   ...,
+  "dependants":               [...],
+  "mri_date":                 ...,
+  "mri_reason_for_referral":  ...,
+  "mri_centre":               ...,
+  "mri_procedure":            ...,
+  "mri_referring_gp":         ...,
+  "mri_consultant_code":      ...,
+  "accident_date":            ...,
+  "accident_description":     ...,
+  "expenses_recoverable":     ...,
+  "recovery_via_solicitor":   ...,
+  "recovery_via_piab":        ...,
+  "third_party_details":      ...,
+  "dental_injury_date":       ...,
+  "dental_injury_place":      ...,
+  "dental_injury_description": ...,
+  "dental_treatment_start":   ...,
+  "dental_treatment_end":     ...,
+  "dental_cost":              ...,
+  "receipts":                 [...],
+  "receipts_total_cost":      ...,
+  "account_holder_name":      ...,
+  "account_number":           ...,
+  "bank_sort_code":           ...,
+  "bank_name_address":        ...,
+  "declaration_date":         ...,
+  "doc_category":             "claim_form",
+  "confidence":               ...
+}}""".strip()
 
 
 # ── DynamoDB type helpers ─────────────────────────────────────────────────────
@@ -58,29 +191,15 @@ def _dynamo_safe(obj: Any) -> Any:
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
-    Main Lambda handler.  Accepts S3 events, SES SNS events, or direct
-    {bucket, key} invocations.
+    Main Lambda handler. Accepts direct {bucket, key} invocations.
 
-    Returns {statusCode, email_id, parsed_data}.
+    Parses the raw email from S3, runs Textract + Bedrock entity extraction
+    on any attachments, stores to DynamoDB, and returns
+    {statusCode, email_id, parsed_data, entities}.
     """
     try:
-        if 'Records' in event:
-            record = event['Records'][0]
-            if 's3' in record:
-                bucket = record['s3']['bucket']['name']
-                key    = record['s3']['object']['key']
-            elif 'Sns' in record:
-                sns_message = json.loads(record['Sns']['Message'])
-                action  = sns_message.get('receipt', {}).get('action', {})
-                bucket  = action.get('bucketName')
-                key     = action.get('objectKey')
-            else:
-                raise ValueError(
-                    f"Unsupported Records event source: {record.get('eventSource', 'unknown')}"
-                )
-        else:
-            bucket = event.get('bucket')
-            key    = event.get('key')
+        bucket = event.get('bucket')
+        key    = event.get('key')
 
         if not bucket or not key:
             raise ValueError("Missing bucket or key in event")
@@ -90,11 +209,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         raw_email = response['Body'].read().decode('utf-8')
 
         parsed_data = parse_email(raw_email)
-        print(f"[DEBUG] parse_email keys: {list(parsed_data.keys())}")
-        print(f"[DEBUG] has_attachment={parsed_data.get('has_attachment')}, "
-              f"attachment_count={parsed_data.get('attachment_count')}, "
-              f"attachments_content present={('attachments_content' in parsed_data)}, "
-              f"attachments_content={parsed_data.get('attachments_content')}")
 
         email_id = str(uuid.uuid4())
         parsed_data.update({
@@ -104,17 +218,31 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'processing_status': 'parsed',
         })
 
+        # ── Entity extraction (Textract + Bedrock) ────────────────────────────
+        entities = _extract_entities(
+            email_id      = email_id,
+            email_body    = parsed_data['body_text'],
+            subject       = parsed_data['subject'],
+            sender_email  = parsed_data['sender_email'],
+            policy_number = parsed_data['policy_number'],
+            member_id     = parsed_data['member_id'],
+            customer_id   = parsed_data['customer_id'],
+            pii_present   = parsed_data['pii_present'],
+            has_attachment = parsed_data['has_attachment'],
+            bucket        = bucket,
+            key           = key,
+        )
+        parsed_data['entities'] = entities
+
         email_table.put_item(Item=_dynamo_safe(parsed_data))
         print(f"Stored email {email_id} in DynamoDB")
 
-        result = {
+        return {
             'statusCode':  200,
             'email_id':    email_id,
             'parsed_data': parsed_data,
+            'entities':    entities,
         }
-        print(f"[DEBUG] return keys: {list(result.keys())}")
-        print(f"[DEBUG] parsed_data keys in return: {list(result['parsed_data'].keys())}")
-        return result
 
     except ClientError as e:
         print(f"AWS Error: {str(e)}")
@@ -305,3 +433,421 @@ def _detect_medical_terms(text: str) -> bool:
 def redact_pii(text: str) -> str:
     """Redact email addresses for log output (never stored)."""
     return re.sub(r'(\w{1,3})\w+@', r'\1***@', text)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Entity extraction (merged from extract_entity Lambda)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _extract_entities(
+    email_id:      str,
+    email_body:    str,
+    subject:       str,
+    sender_email:  str,
+    policy_number: str,
+    member_id:     str,
+    customer_id:   str,
+    pii_present:   bool,
+    has_attachment: bool,
+    bucket:        str,
+    key:           str,
+) -> Dict[str, Any]:
+    """
+    Run Textract + Bedrock Claude entity extraction on the email and its
+    attachments.  Returns an entities dict (never raises).
+    """
+    logger.info(json.dumps({
+        "trace_id":       email_id,
+        "step":           "extract_entities",
+        "has_attachment": has_attachment,
+    }))
+
+    # Seed base entities from email_parser regex output
+    base_entities: Dict[str, Any] = {
+        "policy_number": policy_number or None,
+        "member_id":     member_id     or None,
+        "customer_id":   customer_id   or None,
+        "sender_email":  sender_email,
+        "pii_present":   pii_present,
+    }
+
+    sources_used:  List[str] = []
+    text_chunks:   List[str] = []
+    textract_used: bool      = False
+
+    if email_body.strip():
+        sources_used.append("email_body")
+
+    if has_attachment:
+        ocr_chunks = _run_textract_on_email(bucket, key, email_id)
+        if ocr_chunks:
+            text_chunks.extend(ocr_chunks)
+            sources_used.append("textract")
+            textract_used = True
+
+    extracted_fields:      Dict[str, Any] = {}
+    bedrock_used:          bool           = False
+    extraction_confidence: float          = 0.5
+
+    if email_body.strip() or text_chunks:
+        extracted_fields, extraction_confidence, bedrock_used = _extract_via_bedrock(
+            subject     = subject,
+            email_body  = email_body,
+            text_chunks = text_chunks,
+            email_id    = email_id,
+        )
+        # Promote identifiers only if regex didn't already find them
+        for field in ("policy_number", "member_id", "customer_id"):
+            if not base_entities[field] and extracted_fields.get(field):
+                base_entities[field] = extracted_fields.pop(field)
+            else:
+                extracted_fields.pop(field, None)
+
+    result: Dict[str, Any] = {
+        **base_entities,
+        "extracted_fields":      extracted_fields,
+        "textract_used":         textract_used,
+        "bedrock_used":          bedrock_used,
+        "extraction_confidence": extraction_confidence,
+        "sources":               list(dict.fromkeys(sources_used)),
+    }
+
+    logger.info(json.dumps({
+        "trace_id":   email_id,
+        "step":       "extract_entities",
+        "sources":    result["sources"],
+        "textract":   textract_used,
+        "bedrock":    bedrock_used,
+        "confidence": extraction_confidence,
+    }))
+
+    return result
+
+
+# ── Textract pipeline ──────────────────────────────────────────────────────────
+
+def _run_textract_on_email(bucket: str, key: str, email_id: str) -> List[str]:
+    """
+    Fetch the raw MIME email from S3, find image/PDF attachments and extract
+    text from each via Textract / pypdf.
+    """
+    if not bucket or not key:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "textract_skipped_no_s3_coords",
+        }))
+        return []
+
+    try:
+        obj      = s3_client.get_object(Bucket=bucket, Key=key)
+        raw_mime = obj["Body"].read()
+    except ClientError as exc:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "s3_fetch_failed",
+            "error":    exc.response["Error"]["Message"],
+        }))
+        return []
+
+    results: List[str] = []
+    try:
+        msg = message_from_bytes(raw_mime)
+        for part in msg.walk():
+            cd       = str(part.get("Content-Disposition", ""))
+            ct       = str(part.get("Content-Type", "")).split(";")[0].strip().lower()
+            filename = part.get_filename() or ""
+
+            if "attachment" not in cd and "inline" not in cd:
+                continue
+
+            payload = part.get_payload(decode=True)
+            if not payload:
+                continue
+
+            ext      = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+            is_pdf   = ext == "pdf"   or ct in _PDF_CONTENT_TYPES
+            is_image = ext in _IMAGE_EXTENSIONS or ct in _IMAGE_CONTENT_TYPES
+
+            if is_pdf:
+                text = _extract_pdf_text(payload, filename, bucket, email_id)
+                if text:
+                    results.append(f"[PDF: {filename}]\n{text}")
+            elif is_image:
+                text = _textract_image_bytes(payload, filename, email_id)
+                if text:
+                    results.append(f"[Image OCR: {filename}]\n{text}")
+
+    except Exception as exc:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "mime_parse_failed",
+            "error":    str(exc),
+        }))
+
+    return results
+
+
+def _extract_pdf_text(
+    payload: bytes, filename: str, bucket: str, email_id: str
+) -> str:
+    """
+    Extract text from a PDF attachment.
+    Step 1: pypdf text-layer extraction (fast, zero cost).
+    Step 2: Textract via S3Object fallback for scanned/image-only PDFs.
+    """
+    try:
+        import pypdf as _pypdf
+        reader     = _pypdf.PdfReader(io.BytesIO(payload))
+        pages_text = []
+        for page in reader.pages:
+            pt = page.extract_text() or ""
+            if pt.strip():
+                pages_text.append(pt.strip())
+        combined = "\n".join(pages_text).strip()
+        if combined:
+            logger.info(json.dumps({
+                "trace_id": email_id,
+                "op":       "pypdf_extract",
+                "filename": filename,
+                "chars":    len(combined),
+                "pages":    len(reader.pages),
+                "preview":  combined[:300],
+            }))
+            return combined
+        else:
+            logger.warning(json.dumps({
+                "trace_id": email_id,
+                "warning":  "pypdf_empty_text",
+                "filename": filename,
+                "pages":    len(reader.pages),
+            }))
+    except Exception as exc:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "pypdf_extract_failed",
+            "filename": filename,
+            "error":    str(exc),
+        }))
+
+    if len(payload) > 5 * 1024 * 1024:
+        logger.warning(json.dumps({
+            "trace_id":   email_id,
+            "warning":    "textract_pdf_skipped_too_large",
+            "filename":   filename,
+            "size_bytes": len(payload),
+        }))
+        return ""
+
+    temp_key = f"tmp/textract/{email_id}/{filename}"
+    try:
+        s3_client.put_object(
+            Bucket=bucket, Key=temp_key, Body=payload, ContentType="application/pdf"
+        )
+        t0   = time.monotonic()
+        resp = textract.detect_document_text(
+            Document={"S3Object": {"Bucket": bucket, "Name": temp_key}}
+        )
+        lines      = [b["Text"] for b in resp.get("Blocks", []) if b["BlockType"] == "LINE"]
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        logger.info(json.dumps({
+            "trace_id":   email_id,
+            "op":         "textract_pdf_s3",
+            "filename":   filename,
+            "lines":      len(lines),
+            "latency_ms": latency_ms,
+        }))
+        return "\n".join(lines)
+    except ClientError as exc:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "textract_pdf_failed",
+            "filename": filename,
+            "error":    exc.response["Error"]["Message"],
+        }))
+        return ""
+    except Exception as exc:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "textract_pdf_unexpected_error",
+            "filename": filename,
+            "error":    str(exc),
+        }))
+        return ""
+    finally:
+        try:
+            s3_client.delete_object(Bucket=bucket, Key=temp_key)
+        except Exception:
+            pass
+
+
+def _textract_image_bytes(payload: bytes, filename: str, email_id: str) -> str:
+    """
+    Call Textract DetectDocumentText with raw image bytes (JPEG/PNG/TIFF).
+    Payloads over 5 MB are skipped (Textract synchronous API limit).
+    """
+    if len(payload) > 5 * 1024 * 1024:
+        logger.warning(json.dumps({
+            "trace_id":   email_id,
+            "warning":    "textract_image_skipped_too_large",
+            "filename":   filename,
+            "size_bytes": len(payload),
+        }))
+        return ""
+
+    t0 = time.monotonic()
+    try:
+        resp       = textract.detect_document_text(Document={"Bytes": payload})
+        lines      = [b["Text"] for b in resp.get("Blocks", []) if b["BlockType"] == "LINE"]
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        logger.info(json.dumps({
+            "trace_id":   email_id,
+            "op":         "textract_image_bytes",
+            "filename":   filename,
+            "lines":      len(lines),
+            "latency_ms": latency_ms,
+        }))
+        return "\n".join(lines)
+    except ClientError as exc:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "textract_image_failed",
+            "filename": filename,
+            "error":    exc.response["Error"]["Message"],
+        }))
+        return ""
+    except Exception as exc:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "textract_image_unexpected_error",
+            "filename": filename,
+            "error":    str(exc),
+        }))
+        return ""
+
+
+# ── Bedrock structured extraction ──────────────────────────────────────────────
+
+def _extract_via_bedrock(
+    subject:     str,
+    email_body:  str,
+    text_chunks: List[str],
+    email_id:    str,
+) -> Tuple[Dict[str, Any], float, bool]:
+    """
+    Call Bedrock Claude 3 Haiku to extract structured insurance fields.
+    Returns (extracted_fields, confidence, was_called).
+    Never raises — returns empty dict on any failure.
+    """
+    if text_chunks:
+        combined           = "\n\n".join(text_chunks[:3])[:8000]
+        attachment_section = f"Attachment content:\n\"\"\"\n{combined}\n\"\"\""
+        logger.info(json.dumps({
+            "trace_id":           email_id,
+            "op":                 "bedrock_input",
+            "total_chunk_chars":  sum(len(c) for c in text_chunks),
+            "truncated_to":       len(combined),
+            "attachment_preview": combined[:300],
+        }))
+    else:
+        attachment_section = "No attachment content available."
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "bedrock_no_attachment_text",
+        }))
+
+    prompt = _EXTRACTION_PROMPT.format(
+        subject            = subject[:200],
+        body_excerpt       = email_body[:800].replace('"', "'"),
+        attachment_section = attachment_section,
+    )
+
+    body = json.dumps({
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens":        2048,
+        "temperature":       0.0,
+        "messages":          [{"role": "user", "content": prompt}],
+    })
+
+    t0 = time.monotonic()
+    try:
+        resp     = bedrock.invoke_model(
+            modelId     = ENTITY_MODEL_ID,
+            body        = body,
+            contentType = "application/json",
+            accept      = "application/json",
+        )
+        raw      = json.loads(resp["body"].read())
+        text_out = raw["content"][0]["text"]
+    except Exception as exc:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "bedrock_extraction_failed",
+            "error":    str(exc),
+        }))
+        return {}, 0.5, False
+
+    latency_ms = int((time.monotonic() - t0) * 1000)
+    logger.info(json.dumps({
+        "trace_id":   email_id,
+        "op":         "bedrock_extract",
+        "model":      ENTITY_MODEL_ID,
+        "latency_ms": latency_ms,
+    }))
+    logger.info(json.dumps({
+        "trace_id": email_id,
+        "op":       "bedrock_raw_output",
+        "text_out": text_out[:1000],
+    }))
+
+    fields, confidence = _parse_extraction_json(text_out, email_id)
+    return fields, confidence, True
+
+
+def _parse_extraction_json(
+    text: str, email_id: str
+) -> Tuple[Dict[str, Any], float]:
+    """
+    Extract the first JSON object from Bedrock's output.
+    Returns (fields_dict, confidence). Never raises.
+    """
+    match = re.search(r"\{[\s\S]*\}", text)
+    if not match:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "no_json_in_bedrock_output",
+        }))
+        return {}, 0.5
+
+    try:
+        obj = json.loads(match.group())
+    except json.JSONDecodeError as exc:
+        logger.warning(json.dumps({
+            "trace_id": email_id,
+            "warning":  "bedrock_json_parse_error",
+            "error":    str(exc),
+        }))
+        return {}, 0.5
+
+    raw_conf   = obj.pop("confidence", 0.7)
+    confidence = max(0.0, min(1.0, float(raw_conf)))
+
+    logger.info(json.dumps({
+        "trace_id":           email_id,
+        "op":                 "parse_extraction",
+        "receipts_raw":       obj.get("receipts"),
+        "receipts_total_raw": obj.get("receipts_total_cost"),
+    }))
+
+    # Strip null/empty scalars; keep arrays (even empty) and booleans
+    fields = {
+        k: v
+        for k, v in obj.items()
+        if isinstance(v, (list, bool)) or (v is not None and v != "" and v != "null")
+    }
+    logger.info(json.dumps({
+        "trace_id":       email_id,
+        "op":             "parse_extraction_result",
+        "receipts_final": fields.get("receipts"),
+        "field_keys":     list(fields.keys()),
+    }))
+    return fields, confidence

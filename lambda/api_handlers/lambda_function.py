@@ -573,7 +573,7 @@ LAMBDA_CLIENT = boto3.client('lambda')
 
 MANAGED_FUNCTIONS = {
     'classify_intent': os.environ.get('CLASSIFY_INTENT_FUNCTION_NAME', 'insuremail-ai-dev-multi-llm-inference'),
-    'claude_response':  os.environ.get('CLAUDE_RESPONSE_FUNCTION_NAME', 'insuremail-ai-dev-claude-response'),
+    'llm_response':     os.environ.get('LLM_RESPONSE_FUNCTION_NAME', 'insuremail-ai-dev-llm-response'),
 }
 
 VALID_MODELS = {'mistral-7b', 'llama-3.1-8b'}
@@ -605,7 +605,7 @@ def get_settings() -> Dict[str, Any]:
 def update_settings(event: Dict[str, Any]) -> Dict[str, Any]:
     """Update ACTIVE_MODEL for one or both managed Lambdas.
 
-    Body: {"classify_intent": "llama-3.1-8b", "claude_response": "mistral-7b"}
+    Body: {"classify_intent": "llama-3.1-8b", "llm_response": "mistral-7b"}
     Omit a key to leave that function unchanged.
     """
     try:

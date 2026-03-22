@@ -24,16 +24,22 @@ data "archive_file" "rag_retrieval" {
   output_path = "${path.module}/builds/rag_retrieval.zip"
 }
 
-data "archive_file" "claude_response" {
+data "archive_file" "llm_response" {
   type        = "zip"
-  source_dir  = "${local.lambda_source_path}/claude_response"
-  output_path = "${path.module}/builds/claude_response.zip"
+  source_dir  = "${local.lambda_source_path}/llm_response"
+  output_path = "${path.module}/builds/llm_response.zip"
 }
 
-data "archive_file" "classify_intent" {
+data "archive_file" "classify_intent_by_llm" {
   type        = "zip"
-  source_dir  = "${local.lambda_source_path}/classify_intent"
-  output_path = "${path.module}/builds/classify_intent.zip"
+  source_dir  = "${local.lambda_source_path}/classify_intent_by_llm"
+  output_path = "${path.module}/builds/classify_intent_by_llm.zip"
+}
+
+data "archive_file" "classify_intent_by_biobert" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_path}/classify_intent_by_biobert"
+  output_path = "${path.module}/builds/classify_intent_by_biobert.zip"
 }
 
 # Email Parser Lambda
@@ -43,13 +49,14 @@ resource "aws_lambda_function" "email_parser" {
   role            = var.lambda_execution_role_arn
   handler         = "lambda_function.lambda_handler"
   runtime         = var.lambda_runtime
-  timeout         = 60
+  timeout         = 180  # 3 minutes: parsing + Textract OCR + Bedrock extraction
   memory_size     = 512
   source_code_hash = data.archive_file.email_parser.output_base64sha256
 
   environment {
     variables = {
       EMAIL_TABLE_NAME = var.email_table_name
+      ENTITY_MODEL_ID  = "anthropic.claude-3-haiku-20240307-v1:0"
     }
   }
 
@@ -115,15 +122,15 @@ resource "aws_cloudwatch_log_group" "rag_retrieval" {
 }
 
 # Claude Response Lambda
-resource "aws_lambda_function" "claude_response" {
-  filename         = data.archive_file.claude_response.output_path
-  function_name    = "${local.resource_prefix}-claude-response"
+resource "aws_lambda_function" "llm_response" {
+  filename         = data.archive_file.llm_response.output_path
+  function_name    = "${local.resource_prefix}-llm-response"
   role            = var.lambda_execution_role_arn
   handler         = "lambda_function.lambda_handler"
   runtime         = var.lambda_runtime
   timeout         = 180  # 3 minutes: primary model call + evaluator model call
   memory_size     = 1024
-  source_code_hash = data.archive_file.claude_response.output_base64sha256
+  source_code_hash = data.archive_file.llm_response.output_base64sha256
 
   environment {
     variables = {
@@ -133,25 +140,25 @@ resource "aws_lambda_function" "claude_response" {
     }
   }
 
-  tags = merge(var.tags, { Name = "${local.resource_prefix}-claude-response" })
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-llm-response" })
 }
 
-resource "aws_cloudwatch_log_group" "claude_response" {
-  name              = "/aws/lambda/${aws_lambda_function.claude_response.function_name}"
+resource "aws_cloudwatch_log_group" "llm_response" {
+  name              = "/aws/lambda/${aws_lambda_function.llm_response.function_name}"
   retention_in_days = var.log_retention_days
   tags              = var.tags
 }
 
-# Multi-LLM Inference Lambda
-resource "aws_lambda_function" "classify_intent" {
-  filename         = data.archive_file.classify_intent.output_path
-  function_name    = "${local.resource_prefix}-multi-llm-inference"
+# LLM Intent Classification Lambda
+resource "aws_lambda_function" "classify_intent_by_llm" {
+  filename         = data.archive_file.classify_intent_by_llm.output_path
+  function_name    = "${local.resource_prefix}-classify-intent-by-llm"
   role            = var.lambda_execution_role_arn
   handler         = "lambda_function.lambda_handler"
   runtime         = var.lambda_runtime
   timeout         = 180  # 3 minutes for parallel model calls
   memory_size     = 1024
-  source_code_hash = data.archive_file.classify_intent.output_base64sha256
+  source_code_hash = data.archive_file.classify_intent_by_llm.output_base64sha256
 
   environment {
     variables = {
@@ -161,11 +168,37 @@ resource "aws_lambda_function" "classify_intent" {
     }
   }
 
-  tags = merge(var.tags, { Name = "${local.resource_prefix}-multi-llm-inference" })
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-classify-intent-by-llm" })
 }
 
-resource "aws_cloudwatch_log_group" "classify_intent" {
-  name              = "/aws/lambda/${aws_lambda_function.classify_intent.function_name}"
+resource "aws_cloudwatch_log_group" "classify_intent_by_llm" {
+  name              = "/aws/lambda/${aws_lambda_function.classify_intent_by_llm.function_name}"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
+# BioBERT Intent Classification Lambda
+resource "aws_lambda_function" "classify_intent_by_biobert" {
+  filename         = data.archive_file.classify_intent_by_biobert.output_path
+  function_name    = "${local.resource_prefix}-classify-intent-by-biobert"
+  role            = var.lambda_execution_role_arn
+  handler         = "lambda_function.lambda_handler"
+  runtime         = var.lambda_runtime
+  timeout         = 60
+  memory_size     = 512
+  source_code_hash = data.archive_file.classify_intent_by_biobert.output_base64sha256
+
+  environment {
+    variables = {
+      SAGEMAKER_ENDPOINT_NAME = var.sagemaker_endpoint_name
+    }
+  }
+
+  tags = merge(var.tags, { Name = "${local.resource_prefix}-classify-intent-by-biobert" })
+}
+
+resource "aws_cloudwatch_log_group" "classify_intent_by_biobert" {
+  name              = "/aws/lambda/${aws_lambda_function.classify_intent_by_biobert.function_name}"
   retention_in_days = var.log_retention_days
   tags              = var.tags
 }
@@ -212,15 +245,6 @@ resource "aws_lambda_permission" "allow_s3_rag_ingestion" {
   function_name = aws_lambda_function.rag_ingestion.function_name
   principal     = "s3.amazonaws.com"
   source_arn    = "arn:aws:s3:::${var.knowledge_base_bucket_name}"
-}
-
-# S3 trigger for email parser (when new emails are uploaded)
-resource "aws_lambda_permission" "allow_s3_email_parser" {
-  statement_id  = "AllowExecutionFromS3"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.email_parser.function_name
-  principal     = "s3.amazonaws.com"
-  source_arn    = "arn:aws:s3:::${var.email_bucket_name}"
 }
 
 # Gmail IMAP Poller Lambda (replaces SES email receiver)
@@ -290,38 +314,6 @@ resource "aws_lambda_function" "crm_validation" {
 
 resource "aws_cloudwatch_log_group" "crm_validation" {
   name              = "/aws/lambda/${aws_lambda_function.crm_validation.function_name}"
-  retention_in_days = var.log_retention_days
-  tags              = var.tags
-}
-
-# Extract Entity Lambda
-data "archive_file" "extract_entity" {
-  type        = "zip"
-  source_dir  = "${local.lambda_source_path}/extract_entity"
-  output_path = "${path.module}/builds/extract_entity.zip"
-}
-
-resource "aws_lambda_function" "extract_entity" {
-  filename         = data.archive_file.extract_entity.output_path
-  function_name    = "${local.resource_prefix}-extract-entity"
-  role             = var.lambda_execution_role_arn
-  handler          = "lambda_function.lambda_handler"
-  runtime          = var.lambda_runtime
-  timeout          = 120  # 2 minutes: Textract OCR + Bedrock call
-  memory_size      = 512
-  source_code_hash = data.archive_file.extract_entity.output_base64sha256
-
-  environment {
-    variables = {
-      ENTITY_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
-    }
-  }
-
-  tags = merge(var.tags, { Name = "${local.resource_prefix}-extract-entity" })
-}
-
-resource "aws_cloudwatch_log_group" "extract_entity" {
-  name              = "/aws/lambda/${aws_lambda_function.extract_entity.function_name}"
   retention_in_days = var.log_retention_days
   tags              = var.tags
 }

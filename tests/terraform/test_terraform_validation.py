@@ -208,7 +208,7 @@ class TestLambdaConfiguration:
             'email_parser',
             'email_sender',
             'classify_intent',
-            'claude_response',
+            'llm_response',
             'rag_ingestion',
             'rag_retrieval',
             'api_handlers'

@@ -14,7 +14,7 @@ import boto3
 
 # Clear any cached lambda_function module from other test files
 sys.modules.pop('lambda_function', None)
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/classify_intent'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../lambda/classify_intent_by_llm'))
 import lambda_function as lf
 
 

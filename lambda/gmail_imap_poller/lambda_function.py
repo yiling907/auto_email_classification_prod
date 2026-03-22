@@ -145,11 +145,7 @@ def process_email(email_message, raw_email):
         from_addr = parseaddr(email_message.get('From', ''))[1]
         to_addr = parseaddr(email_message.get('To', ''))[1]
         subject = decode_header_value(email_message.get('Subject', ''))
-        date = email_message.get('Date', '')
         message_id = email_message.get('Message-ID', f'<{uuid.uuid4()}@gmail-imap>')
-
-        # Extract body
-        body = extract_email_body(email_message)
 
         # Generate unique ID
         email_id = str(uuid.uuid4())
@@ -222,37 +218,6 @@ def process_email(email_message, raw_email):
             'success': False,
             'error': str(e)
         }
-
-
-def extract_email_body(email_message):
-    """
-    Extract plain text body from email message.
-    """
-    body = ""
-
-    if email_message.is_multipart():
-        for part in email_message.walk():
-            content_type = part.get_content_type()
-            content_disposition = str(part.get("Content-Disposition"))
-
-            # Skip attachments
-            if "attachment" in content_disposition:
-                continue
-
-            # Get text/plain parts
-            if content_type == "text/plain":
-                try:
-                    body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
-                    break
-                except:
-                    pass
-    else:
-        try:
-            body = email_message.get_payload(decode=True).decode('utf-8', errors='ignore')
-        except:
-            body = str(email_message.get_payload())
-
-    return body.strip()
 
 
 def decode_header_value(header_value):

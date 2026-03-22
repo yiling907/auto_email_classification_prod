@@ -23,13 +23,18 @@ variable "rag_retrieval_lambda_arn" {
   type        = string
 }
 
-variable "claude_response_lambda_arn" {
-  description = "ARN of the Claude response Lambda function"
+variable "llm_response_lambda_arn" {
+  description = "ARN of the LLM response Lambda function"
   type        = string
 }
 
-variable "classify_intent_lambda_arn" {
-  description = "ARN of the multi-LLM inference Lambda function"
+variable "classify_intent_by_llm_lambda_arn" {
+  description = "ARN of the LLM intent classification Lambda function"
+  type        = string
+}
+
+variable "classify_intent_by_biobert_lambda_arn" {
+  description = "ARN of the BioBERT intent classification Lambda function"
   type        = string
 }
 
@@ -40,11 +45,6 @@ variable "email_sender_lambda_arn" {
 
 variable "crm_validation_lambda_arn" {
   description = "ARN of the CRM validation Lambda function"
-  type        = string
-}
-
-variable "extract_entity_lambda_arn" {
-  description = "ARN of the extract entity Lambda function"
   type        = string
 }
 

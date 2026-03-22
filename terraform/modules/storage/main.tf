@@ -37,19 +37,6 @@ resource "aws_s3_bucket_public_access_block" "emails" {
   restrict_public_buckets = true
 }
 
-# S3 event notification for email parsing (for manually uploaded emails)
-# Note: SES-received emails use SNS → Lambda flow, not S3 → Lambda
-resource "aws_s3_bucket_notification" "emails" {
-  bucket = aws_s3_bucket.emails.id
-
-  lambda_function {
-    lambda_function_arn = var.email_parser_lambda_arn
-    events              = ["s3:ObjectCreated:*"]
-  }
-
-  depends_on = [var.email_parser_lambda_permission_id]
-}
-
 # S3 Bucket for knowledge base documents
 resource "aws_s3_bucket" "knowledge_base" {
   bucket = "${local.resource_prefix}-knowledge-base"

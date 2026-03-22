@@ -11,7 +11,7 @@ Flow:
        customer_id  → GetItem  (O(1), exact PK match)
        policy_number / member_id / email → Scan + FilterExpression
   4. Policy validation: active status, coverage, renewal, intent eligibility
-  5. Returns structured crm_context dict consumed by claude_response Lambda
+  5. Returns structured crm_context dict consumed by llm_response Lambda
 
 Environment variables:
     CUSTOMERS_TABLE_NAME   — DynamoDB table name (required)

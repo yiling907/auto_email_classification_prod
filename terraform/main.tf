@@ -23,8 +23,6 @@ module "storage" {
   tags         = local.common_tags
 
   # S3 event triggers (configured after Lambda module)
-  email_parser_lambda_arn            = module.lambda.email_parser_arn
-  email_parser_lambda_permission_id  = module.lambda.email_parser_lambda_permission_id
   rag_ingestion_lambda_arn           = module.lambda.rag_ingestion_arn
   rag_ingestion_lambda_permission_id = module.lambda.rag_ingestion_lambda_permission_id
 }
@@ -87,11 +85,11 @@ module "step_functions" {
   step_functions_role_arn         = module.iam.step_functions_role_arn
   email_parser_lambda_arn         = module.lambda.email_parser_arn
   rag_retrieval_lambda_arn        = module.lambda.rag_retrieval_arn
-  claude_response_lambda_arn      = module.lambda.claude_response_arn
-  classify_intent_lambda_arn  = module.lambda.classify_intent_arn
-  email_sender_lambda_arn     = module.lambda.email_sender_arn
+  llm_response_lambda_arn         = module.lambda.llm_response_arn
+  classify_intent_by_llm_lambda_arn     = module.lambda.classify_intent_by_llm_arn
+  classify_intent_by_biobert_lambda_arn = module.lambda.classify_intent_by_biobert_arn
+  email_sender_lambda_arn               = module.lambda.email_sender_arn
   crm_validation_lambda_arn   = module.lambda.crm_validation_arn
-  extract_entity_lambda_arn   = module.lambda.extract_entity_arn
   save_result_lambda_arn      = module.lambda.save_result_arn
   tags                        = local.common_tags
 }
