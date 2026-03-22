@@ -10,22 +10,26 @@ EventBridge (schedule)
         ▼
 gmail_imap_poller ──► S3 (.eml) ──► Step Functions state machine
                                             │
-                            ┌───────────────┼───────────────────┐
-                            ▼               ▼                   │
-                      email_parser    [Parallel branch]         │
-                            │         classify_intent           │
-                            │         extract_entity            │
-                            └───────────────┤                   │
-                                            ▼                   │
-                                      rag_retrieval             │
-                                            ▼                   │
-                                      crm_validation            │
-                                            ▼                   │
-                                      claude_response           │
-                                            ▼                   │
-                                       email_sender             │
-                                            ▼                   │
-                                        save_result ◄───────────┘
+                                            ▼
+                                      email_parser        ← RFC 2822 parse + PII redact
+                                      + entity extraction    Textract + Claude (inline)
+                                            │
+                              ┌─────────────┴─────────────┐
+                              ▼                           ▼
+                  classify_intent_by_llm     classify_intent_by_biobert
+                  (Bedrock Mistral/Llama)    (SageMaker BioBERT endpoint)
+                              └─────────────┬─────────────┘
+                                            │ $.classifiers[0].llm_result wins
+                                            ▼
+                                      rag_retrieval
+                                            ▼
+                                      crm_validation
+                                            ▼
+                                       llm_response
+                                            ▼
+                                       email_sender
+                                            ▼
+                                        save_result
 
 Side paths (not in Step Functions):
   rag_ingestion       — offline document ingestion (S3 trigger)
@@ -65,9 +69,8 @@ Side paths (not in Step Functions):
               ├─ s3_client.put_object → incoming/gmail-{uuid}.eml
               │       Metadata: from, to, subject, source=gmail-imap
               └─ stepfunctions_client.start_execution
-                     Input shape: SNS-compatible envelope
-                     { Records[0].Sns.Message: { notificationType, mail, receipt.action.objectKey } }
-                     SNS envelope is used so email_parser handles both SES and Gmail identically
+                     Input: { bucket, key } direct invocation format
+                     (email_parser first step reads the S3 object from these coordinates)
 
         d. If success + MARK_AS_READ:
               mail.store(email_id, '+FLAGS', '\\Seen')
@@ -100,17 +103,7 @@ Side paths (not in Step Functions):
 
 ## 2. `email_parser`
 
-**Trigger:** Step Functions (first step in the state machine). Accepts S3 events, SES/SNS events, or direct `{bucket, key}` payloads.
-
-### Event Routing
-
-```
-event has 'Records'?
-  ├─ record['s3'] present   → bucket + key from S3 event
-  └─ record['Sns'] present  → parse SNS Message JSON → receipt.action.bucketName/objectKey
-else
-  → bucket/key directly from event dict
-```
+**Trigger:** Step Functions (first step in the state machine). Accepts direct `{bucket, key}` payloads only.
 
 ### Flow
 
@@ -136,14 +129,61 @@ else
 3. Generate email_id (UUID)
         Add: email_id, s3_bucket, s3_key, processing_status='parsed'
 
-4. _dynamo_safe(parsed_data)
+4. _extract_entities(bucket, key, email_id, parsed_data)   [inline entity extraction]
+        4a. Seed base_entities from parse_email output:
+              policy_number, member_id, customer_id, sender_email, pii_present
+
+        4b. If has_attachment=True:
+              _run_textract_on_email(bucket, key, email_id)
+                ├─ s3.get_object → raw MIME bytes
+                ├─ Walk MIME parts (accepts both 'attachment' and 'inline' dispositions)
+                ├─ Per attachment:
+                │     PDF  → _extract_pdf_text()
+                │               Step 1: pypdf text-layer extraction (fast, zero cost)
+                │                       Works for text-layer PDFs (Word exports, ReportLab, etc.)
+                │               Step 2: if pypdf returns empty (scanned/image PDF) →
+                │                       Upload to temp S3 key →
+                │                       textract.detect_document_text(S3Object=temp_key) →
+                │                       Delete temp key in finally block
+                │                       (PDFs require S3Object mode; Bytes mode is image-only)
+                │                       Skip if > 5 MB (Textract sync API limit)
+                │     Image (JPEG/PNG/TIFF) → _textract_image_bytes()
+                │               textract.detect_document_text(Bytes=payload)
+                │               Skip if > 5 MB
+                └─ Returns list of "[PDF: filename]\n{text}" chunks
+
+        4c. _extract_via_bedrock(subject, email_body, text_chunks, email_id)
+              ├─ Build _EXTRACTION_PROMPT
+              │     8 sections mirroring the Laya Healthcare Out-patient Claim Form:
+              │       §1 Member details     §2 Dependants      §3 MRI
+              │       §4 Accidents          §5 Emergency Dental §6 Receipts
+              │       §7 Payment details    §8 Meta/confidence
+              │     Combine up to first 3 attachment chunks, truncate to 8000 chars
+              ├─ bedrock.invoke_model(Claude 3 Haiku, max_tokens=2048, temperature=0)
+              ├─ _parse_extraction_json(text_out)
+              │     regex find first {...} block
+              │     Pop 'confidence' field (0–1, clamped)
+              │     Strip null/empty scalar values; keep arrays + booleans
+              └─ Return (extracted_fields, confidence, bedrock_used=True)
+
+        4d. Promote identifiers:
+              If email_parser didn't find policy_number/member_id/customer_id
+              but Bedrock did → move them into base_entities (avoids duplication)
+
+        4e. Store entities in parsed_data['entities']
+
+5. _dynamo_safe(parsed_data)
         Recursively converts float → Decimal for DynamoDB compatibility
 
-5. email_table.put_item(Item=safe_data)
-        Stores the full parsed record in the email_processing DynamoDB table
+6. email_table.put_item(Item=safe_data)
+        Stores the full parsed record (including entities) in email_processing table
 
-6. Return { statusCode:200, email_id, parsed_data }
+7. Return { statusCode:200, email_id, parsed_data, entities }
 ```
+
+### Extracted Fields Schema (§1–§8)
+
+`membership_no`, `title`, `surname`, `forenames`, `date_of_birth`, `telephone`, `correspondence_address`, `dependants[]`, `mri_date`, `mri_reason_for_referral`, `mri_centre`, `mri_procedure`, `mri_referring_gp`, `mri_consultant_code`, `accident_date`, `accident_description`, `expenses_recoverable`, `recovery_via_solicitor`, `recovery_via_piab`, `third_party_details`, `dental_injury_date`, `dental_injury_place`, `dental_injury_description`, `dental_treatment_start`, `dental_treatment_end`, `dental_cost`, `receipts[]`, `receipts_total_cost`, `account_holder_name`, `account_number`, `bank_sort_code`, `bank_name_address`, `declaration_date`, `doc_category`
 
 ### Key Regex Patterns
 
@@ -160,9 +200,9 @@ Checks 30 terms including: `hospital`, `clinic`, `gp`, `doctor`, `mri`, `x-ray`,
 
 ---
 
-## 3. `classify_intent`
+## 3. `classify_intent_by_llm`
 
-**Trigger:** Step Functions (parallel branch alongside `extract_entity`).
+**Trigger:** Step Functions (Parallel state branch 1, runs alongside `classify_intent_by_biobert`).
 
 ### Model Registry
 
@@ -223,63 +263,58 @@ Checks 30 terms including: `hospital`, `clinic`, `gp`, `doctor`, `mri`, `x-ray`,
 
 ---
 
-## 4. `extract_entity`
+## 4. `classify_intent_by_biobert`
 
-**Trigger:** Step Functions (parallel branch alongside `classify_intent`).
+**Trigger:** Step Functions (Parallel state branch 2, runs alongside `classify_intent_by_llm`). Falls back to `FallbackBioBERT` Pass state if the SageMaker endpoint is unavailable.
 
 ### Flow
 
 ```
-1. Seed base_entities from email_parser output
-        policy_number, member_id, customer_id, sender_email, pii_present
+1. Combine subject + email_body into a single input string
+        input_text = subject + " " + email_body
 
-2. If has_attachment=True:
-        _run_textract_on_email(bucket, key, email_id)
-          ├─ s3.get_object → raw MIME bytes
-          ├─ Walk MIME parts (accepts both 'attachment' and 'inline' dispositions)
-          ├─ Per attachment:
-          │     PDF  → _extract_pdf_text()
-          │               Step 1: pypdf text-layer extraction (fast, zero cost)
-          │                       Works for text-layer PDFs (Word exports, ReportLab, etc.)
-          │               Step 2: if pypdf returns empty (scanned/image PDF) →
-          │                       Upload to temp S3 key →
-          │                       textract.detect_document_text(S3Object=temp_key) →
-          │                       Delete temp key in finally block
-          │                       (PDFs require S3Object mode; Bytes mode is image-only)
-          │                       Skip if > 5 MB (Textract sync API limit)
-          │     Image (JPEG/PNG/TIFF) → _textract_image_bytes()
-          │               textract.detect_document_text(Bytes=payload)
-          │               Skip if > 5 MB
-          └─ Returns list of "[PDF: filename]\n{text}" chunks
+2. _invoke_endpoint(input_text)
+        sagemaker_runtime.invoke_endpoint(
+          EndpointName = SAGEMAKER_ENDPOINT_NAME,
+          ContentType  = 'application/json',
+          Accept       = 'application/json',
+          Body         = json.dumps({"instances": [input_text]})
+        )
 
-3. _extract_via_bedrock(subject, email_body, text_chunks, email_id)
-        ├─ Build _EXTRACTION_PROMPT
-        │     8 sections mirroring the Laya Healthcare Out-patient Claim Form:
-        │       §1 Member details     §2 Dependants      §3 MRI
-        │       §4 Accidents          §5 Emergency Dental §6 Receipts
-        │       §7 Payment details    §8 Meta/confidence
-        │     Combine up to first 3 attachment chunks, truncate to 8000 chars
-        ├─ bedrock.invoke_model(Claude 3 Haiku, max_tokens=2048, temperature=0)
-        ├─ _parse_extraction_json(text_out)
-        │     regex find first {...} block
-        │     Pop 'confidence' field (0–1, clamped)
-        │     Strip null/empty scalar values; keep arrays + booleans
-        └─ Return (extracted_fields, confidence, bedrock_used=True)
+        HuggingFace DLC response unwrapping:
+          Container serialises as [json_string, "application/json"]
+          Detect this shape → json.loads(result[0]) to get real predictions dict
 
-4. Promote identifiers
-        If email_parser didn't find policy_number/member_id/customer_id
-        but Bedrock did → move them into base_entities (avoids duplication)
+3. _decode_predictions(probabilities)
+        BIOBERT_LABELS (17 classes, alphabetical order — must match training-time order):
+          broker_query, cancellation_request, claim_reimbursement_query, claim_status,
+          claim_submission, complaint, coverage_query, dependent_addition,
+          document_followup, enrollment_new_policy, hospital_network_query,
+          id_verification, other, payment_issue, policy_change, pre_authorisation,
+          renewal_query
+        argmax(probabilities) → predicted_index → intent_label
+        confidence = probabilities[predicted_index]
 
-5. Return {
-        policy_number, member_id, customer_id, sender_email, pii_present,
-        extracted_fields (full Laya claim form fields dict),
-        textract_used, bedrock_used, extraction_confidence, sources
+4. Return {
+        statusCode, email_id,
+        classification: {
+          customer_intent, secondary_intent: '',
+          business_line: 'health_insurance',
+          urgency: 'medium', sentiment: 'neutral',
+          gold_route_team: INTENT_TO_ROUTE[intent],
+          gold_priority: 'normal',
+          requires_human_review: False
+        },
+        confidence,
+        model: "biobert"
    }
 ```
 
-### Extracted Fields Schema (§1–§8)
+### Notes
 
-`membership_no`, `title`, `surname`, `forenames`, `date_of_birth`, `telephone`, `correspondence_address`, `dependants[]`, `mri_date`, `mri_reason_for_referral`, `mri_centre`, `mri_procedure`, `mri_referring_gp`, `mri_consultant_code`, `accident_date`, `accident_description`, `expenses_recoverable`, `recovery_via_solicitor`, `recovery_via_piab`, `third_party_details`, `dental_injury_date`, `dental_injury_place`, `dental_injury_description`, `dental_treatment_start`, `dental_treatment_end`, `dental_cost`, `receipts[]`, `receipts_total_cost`, `account_holder_name`, `account_number`, `bank_sort_code`, `bank_name_address`, `declaration_date`, `doc_category`
+- `BIOBERT_LABELS` must be hardcoded in alphabetical order — avoids Python/numpy version-dependent dict ordering issues when loading the saved model.
+- The parallel Step Functions state uses `FallbackBioBERT` as a Catch block: if the endpoint is unavailable, `$.biobert_result` is set to `{classification: null, confidence: 0.0, model: "biobert_unavailable"}`.
+- Downstream states use `$.classifiers[0].llm_result.classification` (LLM branch wins). BioBERT result is preserved at `$.classifiers[1].biobert_result` for comparison/logging.
 
 ---
 
@@ -423,7 +458,7 @@ Checks 30 terms including: `hospital`, `clinic`, `gp`, `doctor`, `mri`, `x-ray`,
 
 ---
 
-## 7. `claude_response`
+## 7. `llm_response`
 
 **Trigger:** Step Functions (sequential, after `crm_validation`).
 
@@ -433,7 +468,7 @@ Checks 30 terms including: `hospital`, `clinic`, `gp`, `doctor`, `mri`, `x-ray`,
 1. generate_response(active_model)
         ├─ Format _GENERATION_PROMPT:
         │     customer email (subject + body)
-        │     customer_intent from classify_intent output
+        │     customer_intent from classify_intent_by_llm output
         │     crm_validation JSON (controls what the agent may reveal)
         │     fraud_score JSON
         │     RAG context: top 5 docs, 600 chars each, numbered by doc_id
@@ -489,7 +524,7 @@ Checks 30 terms including: `hospital`, `clinic`, `gp`, `doctor`, `mri`, `x-ray`,
 
 ## 8. `email_sender`
 
-**Trigger:** Step Functions (after `claude_response`).
+**Trigger:** Step Functions (after `llm_response`).
 
 ### Flow
 
@@ -628,7 +663,7 @@ SES error handling:
 | GET | `/api/metrics/evaluations` | `get_evaluations()` | Reference eval report from S3 + Claude eval records from model_metrics |
 | GET | `/api/assessment` | `get_assessment()` | Latest assessment JSON from S3 `assessment/latest.json` |
 | POST | `/api/assessment/run` | `run_assessment()` | Fire-and-forget async Lambda invoke |
-| GET | `/api/settings` | `get_settings()` | Read `ACTIVE_MODEL` env var from classify_intent + claude_response Lambdas |
+| GET | `/api/settings` | `get_settings()` | Read `ACTIVE_MODEL` env var from classify_intent_by_llm + llm_response Lambdas |
 | POST | `/api/settings` | `update_settings()` | Patch `ACTIVE_MODEL` on managed Lambda function configurations |
 
 ### Shared Behaviours
@@ -701,16 +736,16 @@ Error responses:
 | Lambda | Key env vars |
 |---|---|
 | `gmail_imap_poller` | `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `S3_BUCKET`, `STATE_MACHINE_ARN`, `IMAP_SERVER`, `MARK_AS_READ` |
-| `email_parser` | `EMAIL_TABLE_NAME` |
-| `classify_intent` | `EMAIL_TABLE_NAME`, `MODEL_METRICS_TABLE_NAME`, `ACTIVE_MODEL` |
-| `extract_entity` | `ENTITY_MODEL_ID`, `AWS_REGION` |
+| `email_parser` | `EMAIL_TABLE_NAME`, `ENTITY_MODEL_ID` |
+| `classify_intent_by_llm` | `EMAIL_TABLE_NAME`, `MODEL_METRICS_TABLE_NAME`, `ACTIVE_MODEL` |
+| `classify_intent_by_biobert` | `SAGEMAKER_ENDPOINT_NAME` |
 | `rag_retrieval` | `EMBEDDINGS_TABLE_NAME` |
 | `crm_validation` | `CUSTOMERS_TABLE_NAME`, `TEXT2SQL_MODEL_ID`, `AWS_REGION` |
-| `claude_response` | `EMAIL_TABLE_NAME`, `MODEL_METRICS_TABLE_NAME`, `ACTIVE_MODEL` |
+| `llm_response` | `EMAIL_TABLE_NAME`, `MODEL_METRICS_TABLE_NAME`, `ACTIVE_MODEL` |
 | `email_sender` | `EMAIL_TABLE_NAME`, `SENDER_EMAIL`, `SENDER_NAME` |
 | `save_result` | `PIPELINE_RESULTS_TABLE_NAME` |
 | `rag_ingestion` | `EMBEDDINGS_TABLE_NAME` |
-| `api_handlers` | `EMAIL_TABLE_NAME`, `MODEL_METRICS_TABLE_NAME`, `EMBEDDINGS_TABLE_NAME`, `LOGS_BUCKET_NAME`, `EMAIL_SENDER_FUNCTION_NAME`, `CLASSIFY_INTENT_FUNCTION_NAME`, `CLAUDE_RESPONSE_FUNCTION_NAME` |
+| `api_handlers` | `EMAIL_TABLE_NAME`, `MODEL_METRICS_TABLE_NAME`, `EMBEDDINGS_TABLE_NAME`, `LOGS_BUCKET_NAME`, `EMAIL_SENDER_FUNCTION_NAME`, `CLASSIFY_INTENT_FUNCTION_NAME`, `LLM_RESPONSE_FUNCTION_NAME` |
 | `sagemaker_inference` | `SAGEMAKER_ENDPOINT_NAME` |
 
 ---
@@ -719,8 +754,8 @@ Error responses:
 
 | Model | ID | Used by |
 |---|---|---|
-| Claude 3 Haiku | `anthropic.claude-3-haiku-20240307-v1:0` | `extract_entity` (extraction), `rag_retrieval` (HyDE + rerank) |
+| Claude 3 Haiku | `anthropic.claude-3-haiku-20240307-v1:0` | `email_parser` (entity extraction), `rag_retrieval` (HyDE + rerank) |
 | Claude 3 Sonnet | `anthropic.claude-3-sonnet-20240229-v1:0` | (referenced in config, available as override) |
-| Mistral 7B | `mistral.mistral-7b-instruct-v0:2` | `classify_intent`, `claude_response`, `crm_validation` |
-| Llama 3.1 8B | `meta.llama3-8b-instruct-v1:0` | `classify_intent`, `claude_response` (alternate/judge) |
+| Mistral 7B | `mistral.mistral-7b-instruct-v0:2` | `classify_intent_by_llm`, `llm_response`, `crm_validation` |
+| Llama 3.1 8B | `meta.llama3-8b-instruct-v1:0` | `classify_intent_by_llm`, `llm_response` (alternate/judge) |
 | Titan Embeddings V2 | `amazon.titan-embed-text-v2:0` | `rag_retrieval`, `rag_ingestion` |
