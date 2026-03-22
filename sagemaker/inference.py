@@ -1,8 +1,9 @@
 """
-inference.py — SageMaker serving script for DistilBertForSequenceClassification.
+inference.py — SageMaker serving script for BioBERT insurance intent classifier.
 
-Model: fine-tuned DistilBERT, 5-class insurance intent classifier
-Labels: billing | claim | complaint | coverage | policy
+Model: fine-tuned BioBERT, 15-class insurance intent classifier
+Labels: hardcoded in INTENT_LABELS (matches sklearn LabelEncoder alphabetical order)
+Routing: loaded from routing_map.pkl
 
 Packaged inside model.tar.gz alongside model files.
 """
@@ -10,6 +11,7 @@ Packaged inside model.tar.gz alongside model files.
 import json
 import logging
 import os
+import pickle
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -20,13 +22,32 @@ logger.setLevel(logging.INFO)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info("Inference device: %s", DEVICE)
 
-MAX_LENGTH = 512   # DistilBERT max sequence length
+MAX_LENGTH = 512
+
+# Label order matches sklearn LabelEncoder.classes_ (alphabetical)
+INTENT_LABELS = [
+    "cancellation_request",
+    "claim_reimbursement_query",
+    "claim_status",
+    "claim_submission",
+    "complaint",
+    "coverage_query",
+    "dependent_addition",
+    "document_followup",
+    "enrollment_new_policy",
+    "hospital_network_query",
+    "other",
+    "payment_issue",
+    "policy_change",
+    "pre_authorisation",
+    "renewal_query",
+]
 
 
 # ─── 1. model_fn ─────────────────────────────────────────────────────────────
-def model_fn(model_dir: str):
+def model_fn(model_dir: str, context=None):
     """
-    Load the DistilBERT model and tokenizer from model_dir (/opt/ml/model).
+    Load the BioBERT model, tokenizer, and routing map.
     Called once when the container starts.
     """
     logger.info("Loading model from %s on %s", model_dir, DEVICE)
@@ -36,11 +57,17 @@ def model_fn(model_dir: str):
     model.to(DEVICE)
     model.eval()
 
-    logger.info(
-        "Model loaded — labels: %s",
-        list(model.config.id2label.values()),
-    )
-    return {"model": model, "tokenizer": tokenizer}
+    # Load routing map {intent: team} — plain dict, no numpy dependency
+    routing_path = os.path.join(model_dir, "routing_map.pkl")
+    with open(routing_path, "rb") as f:
+        routing_map = pickle.load(f)
+
+    logger.info("Model loaded — %d intent labels", len(INTENT_LABELS))
+    return {
+        "model": model,
+        "tokenizer": tokenizer,
+        "routing_map": routing_map,
+    }
 
 
 # ─── 2. input_fn ─────────────────────────────────────────────────────────────
@@ -57,7 +84,6 @@ def input_fn(request_body: bytes, content_type: str = "application/json"):
 
     body = json.loads(request_body)
 
-    # Normalise to a list of strings
     if "instances" in body:
         texts = body["instances"]
     elif "text" in body:
@@ -74,12 +100,12 @@ def input_fn(request_body: bytes, content_type: str = "application/json"):
 # ─── 3. predict_fn ───────────────────────────────────────────────────────────
 def predict_fn(texts: list, model_artifacts: dict):
     """
-    Tokenise the input texts and run a forward pass through DistilBERT.
-    Returns a list of dicts: [{label: str, score: float, all_scores: {label: float}}]
+    Tokenise the input texts and run a forward pass through BioBERT.
+    Returns a list of dicts: [{intent, score, route_team, all_scores}]
     """
     model = model_artifacts["model"]
     tokenizer = model_artifacts["tokenizer"]
-    id2label = model.config.id2label
+    routing_map = model_artifacts["routing_map"]
 
     encoded = tokenizer(
         texts,
@@ -91,16 +117,17 @@ def predict_fn(texts: list, model_artifacts: dict):
     encoded = {k: v.to(DEVICE) for k, v in encoded.items()}
 
     with torch.no_grad():
-        logits = model(**encoded).logits           # (batch, num_labels)
-        probs = torch.softmax(logits, dim=-1)      # normalise to probabilities
+        logits = model(**encoded).logits
+        probs = torch.softmax(logits, dim=-1)
 
     results = []
     for prob_row in probs:
-        scores = {id2label[i]: round(float(p), 4) for i, p in enumerate(prob_row)}
-        predicted_label = max(scores, key=scores.get)
+        scores = {INTENT_LABELS[i]: round(float(p), 4) for i, p in enumerate(prob_row)}
+        predicted_intent = max(scores, key=scores.get)
         results.append({
-            "label": predicted_label,
-            "score": scores[predicted_label],
+            "intent": predicted_intent,
+            "score": scores[predicted_intent],
+            "route_team": routing_map.get(predicted_intent, "general_support_team"),
             "all_scores": scores,
         })
     return results

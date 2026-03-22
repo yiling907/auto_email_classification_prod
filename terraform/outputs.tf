@@ -88,5 +88,5 @@ output "sagemaker_model_artifacts_bucket" {
 
 output "inference_api_url" {
   description = "Full URL for the SageMaker inference API endpoint"
-  value       = "${module.api_gateway.api_gateway_url}/model/inference"
+  value       = "${module.api_gateway.api_gateway_url}/api/model/inference"
 }
