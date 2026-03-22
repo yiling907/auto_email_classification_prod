@@ -118,10 +118,13 @@ INTENT_TO_ROUTE = {
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 
-sfn_client = boto3.client("stepfunctions",  region_name=REGION)
-s3_client  = boto3.client("s3",             region_name=REGION)
-dynamo     = boto3.resource("dynamodb",     region_name=REGION)
-email_table = dynamo.Table(EMAIL_TABLE_NAME)
+sfn_client     = boto3.client("stepfunctions",  region_name=REGION)
+s3_client      = boto3.client("s3",             region_name=REGION)
+lambda_client  = boto3.client("lambda",         region_name=REGION)
+dynamo         = boto3.resource("dynamodb",     region_name=REGION)
+email_table    = dynamo.Table(EMAIL_TABLE_NAME)
+
+BIOBERT_LAMBDA = os.environ.get("BIOBERT_LAMBDA", "insuremail-ai-dev-sagemaker-inference")
 
 # ── Data loading ──────────────────────────────────────────────────────────────
 
@@ -257,12 +260,35 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
     predicted_route     = clf.get("gold_route_team") or INTENT_TO_ROUTE.get(predicted_intent, "general_support_team")
 
     # ── BioBERT intent (from classify_intent_by_biobert — $.classifiers[1].biobert_result)
-    # Only available after the new state machine is deployed.
+    # After tf-apply: read from Step Functions output.
+    # Before tf-apply (legacy state machine): invoke the Lambda directly as fallback.
     biobert_clf = {}
     try:
         biobert_clf = out["classifiers"][1].get("biobert_result", {})
     except (KeyError, IndexError, TypeError):
         pass
+    if not biobert_clf:
+        body_text = laya_record.get("body_text", laya_record.get("body", ""))
+        if body_text:
+            try:
+                # Lambda is an API Gateway handler — pass event with "body" key
+                raw = lambda_client.invoke(
+                    FunctionName=BIOBERT_LAMBDA,
+                    InvocationType="RequestResponse",
+                    Payload=json.dumps({"body": json.dumps({"text": body_text[:2000]})}).encode(),
+                )
+                lambda_resp = json.loads(raw["Payload"].read())
+                payload = json.loads(lambda_resp.get("body", "{}"))
+                pred = (payload.get("predictions") or [{}])[0]
+                if pred.get("intent"):
+                    biobert_clf = {
+                        "classification": {"customer_intent": pred["intent"]},
+                        "confidence":     pred.get("score", 0.0),
+                        "model":          "biobert-finetuned",
+                        "all_scores":     pred.get("all_scores", {}),
+                    }
+            except Exception:
+                pass
     biobert_intent     = (biobert_clf.get("classification") or {}).get("customer_intent", "")
     biobert_confidence = float(biobert_clf.get("confidence", 0.0))
     biobert_model      = biobert_clf.get("model", "")
