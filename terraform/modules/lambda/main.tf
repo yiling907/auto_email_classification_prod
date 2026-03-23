@@ -398,7 +398,7 @@ resource "aws_lambda_function" "sagemaker_inference" {
   role             = var.lambda_execution_role_arn
   handler          = "lambda_function.lambda_handler"
   runtime          = var.lambda_runtime
-  timeout          = 60    # SageMaker inference can take several seconds on first call
+  timeout          = 180   # serverless endpoint cold start can take up to 90s
   memory_size      = 256
   source_code_hash = data.archive_file.sagemaker_inference.output_base64sha256
 

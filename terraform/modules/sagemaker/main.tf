@@ -1,11 +1,11 @@
-# SageMaker module — GPU inference endpoint for PyTorch model
+# SageMaker module — Serverless inference endpoint for PyTorch model
+# Serverless inference: pay per invocation, no idle cost (vs ml.g5.xlarge ~$1.41/hr always-on)
 
 locals {
   resource_prefix = "${var.project_name}-${var.environment}"
 
-  # HuggingFace PyTorch GPU DLC — includes transformers pre-installed
-  # Use this instead of plain pytorch-inference to avoid having to install transformers at runtime
-  pytorch_dlc_image = "763104351884.dkr.ecr.${var.aws_region}.amazonaws.com/huggingface-pytorch-inference:2.1.0-transformers4.37.0-gpu-py310-cu118-ubuntu20.04"
+  # HuggingFace PyTorch CPU DLC — serverless does not support GPU instances
+  pytorch_dlc_image = "763104351884.dkr.ecr.${var.aws_region}.amazonaws.com/huggingface-pytorch-inference:2.1.0-transformers4.37.0-cpu-py310-ubuntu22.04"
 
   # S3 path where upload_model.py puts model.tar.gz
   model_data_url = "s3://${aws_s3_bucket.model_artifacts.bucket}/model/model.tar.gz"
@@ -107,10 +107,16 @@ resource "aws_sagemaker_endpoint_configuration" "pytorch" {
   name = "${local.resource_prefix}-pytorch-endpoint-config"
 
   production_variants {
-    variant_name           = "primary"
-    model_name             = aws_sagemaker_model.pytorch.name
-    initial_instance_count = 1
-    instance_type          = "ml.g5.xlarge"   # 1× NVIDIA A10G GPU, 24 GB VRAM
+    variant_name = "primary"
+    model_name   = aws_sagemaker_model.pytorch.name
+
+    # Serverless inference — no instance to provision, billed per invocation only
+    # Cost: ~$0.20/million inference + $0.20/GB-s compute (vs ml.g5.xlarge $1.41/hr always-on)
+    # Cold start: ~60-90s if idle; warm requests ~2-5s on CPU
+    serverless_config {
+      memory_size_in_mb = 4096   # enough for 413MB BERT model + tokenizer overhead
+      max_concurrency   = 5      # matches assessment script --concurrency default
+    }
   }
 
   tags = merge(var.tags, { Name = "${local.resource_prefix}-pytorch-endpoint-config" })
@@ -122,5 +128,5 @@ resource "aws_sagemaker_endpoint" "pytorch" {
   endpoint_config_name = aws_sagemaker_endpoint_configuration.pytorch.name
 
   tags = merge(var.tags, { Name = "${local.resource_prefix}-pytorch-endpoint" })
-  # Note: endpoint creation takes ~10-15 minutes for GPU instances (ml.g5.2xlarge)
+  # Note: serverless endpoint creation takes ~3-5 minutes
 }
