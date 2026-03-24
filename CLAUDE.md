@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**InsureMail AI** — AWS serverless email classification and auto-response system for insurance companies. Uses AWS Bedrock (Claude 3 Sonnet for intent classification, Mistral 7B for response generation, Titan V2 for embeddings), Step Functions orchestration, and a React dashboard.
+**InsureMail AI** — AWS serverless email classification and auto-response system for insurance companies. Uses AWS Bedrock (Mistral 7B for intent classification and response generation, Llama 3.1 8B as fallback, Titan Embeddings V2 for RAG), Step Functions orchestration, and a React dashboard.
 
 ## Commands
 
@@ -87,7 +87,7 @@ Graceful fallbacks mean the pipeline never hard-fails mid-run. All errors result
 | Function | Role |
 |---|---|
 | `email_parser` | RFC 2822 parse, PII redact, PDF/DOCX/TXT extraction, `_dynamo_safe()` float→Decimal |
-| `classify_intent` | Claude 3 Sonnet → 17 intents → 12 route teams via `INTENT_TO_ROUTE` map |
+| `classify_intent` | Mistral 7B → 17 intents → 12 route teams via `INTENT_TO_ROUTE` map |
 | `extract_entity` | AWS Textract + Bedrock Claude for structured field extraction from attachments |
 | `rag_retrieval` | HyDE (Haiku) + Titan vector + BM25 + RRF fusion + cross-encoder rerank |
 | `crm_validation` | Text-to-SQL (Mistral 7B) → DynamoDB customer/policy lookup, no `Limit=` on Scan |
@@ -114,11 +114,9 @@ All resources tagged `Project=InsureMailAI, ManagedBy=Terraform`. DynamoDB uses 
 ## Key Conventions
 
 ### Bedrock Model IDs
-- Claude 3 Sonnet (intent): `anthropic.claude-3-sonnet-20240229-v1:0`
-- Claude 3 Haiku (HyDE + rerank): `anthropic.claude-3-haiku-20240307-v1:0`
-- Mistral 7B (response gen + CRM SQL): `mistral.mistral-7b-instruct-v0:2`
+- Mistral 7B (intent, entity extraction, HyDE, rerank, response gen, CRM SQL): `mistral.mistral-7b-instruct-v0:2`
 - Llama 3.1 8B (fallback): `meta.llama3-8b-instruct-v1:0`
-- Titan Embeddings V2 (1024-dim): `amazon.titan-embed-text-v1`
+- Titan Embeddings V2 (1024-dim): `amazon.titan-embed-text-v2:0`
 
 ### Test Patterns
 - **AWS mocking**: `@mock_aws` from moto v5.x — never `@mock_dynamodb` or `@mock_s3`.

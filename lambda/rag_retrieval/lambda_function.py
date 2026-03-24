@@ -20,12 +20,12 @@ dynamodb        = boto3.resource('dynamodb')
 # ── Config ────────────────────────────────────────────────────────────────────
 EMBEDDINGS_TABLE_NAME    = os.environ['EMBEDDINGS_TABLE_NAME']
 TITAN_EMBEDDINGS_MODEL_ID = "amazon.titan-embed-text-v2:0"
-HAIKU_MODEL_ID           = "anthropic.claude-3-haiku-20240307-v1:0"
+MISTRAL_MODEL_ID         = "mistral.mistral-7b-instruct-v0:2"
 
 SIMILARITY_THRESHOLD = 0.25   # lowered — RRF + reranker handle final filtering
 RRF_K                = 60     # reciprocal rank fusion constant
 RERANK_CANDIDATES    = 12     # how many fused candidates pass to the reranker
-RERANK_WORKERS       = 6      # parallel Haiku calls for cross-encoder
+RERANK_WORKERS       = 6      # parallel Mistral calls for cross-encoder
 
 embeddings_table = dynamodb.Table(EMBEDDINGS_TABLE_NAME)
 
@@ -122,17 +122,16 @@ def _hyde_expand(query: str) -> str:
     )
     try:
         resp = bedrock_runtime.invoke_model(
-            modelId=HAIKU_MODEL_ID,
+            modelId=MISTRAL_MODEL_ID,
             body=json.dumps({
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 150,
-                "temperature": 0,
-                "messages": [{"role": "user", "content": prompt}],
+                "prompt":      f"<s>[INST] {prompt} [/INST]",
+                "max_tokens":  150,
+                "temperature": 0.0,
             }),
             contentType='application/json',
             accept='application/json',
         )
-        return json.loads(resp['body'].read())['content'][0]['text'].strip()
+        return json.loads(resp['body'].read())['outputs'][0]['text'].strip()
     except Exception as e:
         print(f"HyDE failed, falling back to raw query: {e}")
         return query
@@ -251,8 +250,8 @@ def _cross_encoder_rerank(
     candidates: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """
-    Score each (query, document) pair jointly with Haiku.
-    Runs in parallel. Falls back to RRF score if Haiku call fails.
+    Score each (query, document) pair jointly with Mistral 7B.
+    Runs in parallel. Falls back to RRF score if Mistral call fails.
     """
     def score_one(doc: Dict[str, Any]) -> Dict[str, Any]:
         prompt = (
@@ -263,17 +262,16 @@ def _cross_encoder_rerank(
         )
         try:
             resp = bedrock_runtime.invoke_model(
-                modelId=HAIKU_MODEL_ID,
+                modelId=MISTRAL_MODEL_ID,
                 body=json.dumps({
-                    "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 20,
-                    "temperature": 0,
-                    "messages": [{"role": "user", "content": prompt}],
+                    "prompt":      f"<s>[INST] {prompt} [/INST]",
+                    "max_tokens":  20,
+                    "temperature": 0.0,
                 }),
                 contentType='application/json',
                 accept='application/json',
             )
-            raw  = json.loads(resp['body'].read())['content'][0]['text']
+            raw  = json.loads(resp['body'].read())['outputs'][0]['text']
             data = json.loads(_extract_json(raw))
             rerank_score = max(0.0, min(10.0, float(data.get('score', 5)))) / 10.0
         except Exception as e:

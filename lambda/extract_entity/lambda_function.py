@@ -18,7 +18,7 @@ Flow:
 
 Environment variables:
     ENTITY_MODEL_ID   — Bedrock model for structured extraction
-                        (default: anthropic.claude-3-haiku-20240307-v1:0)
+                        (default: mistral.mistral-7b-instruct-v0:2)
     AWS_REGION        — AWS region (default: us-east-1)
 
 Input event keys (passed from Step Functions Parameters block):
@@ -87,7 +87,7 @@ s3       = boto3.client("s3",               region_name=_REGION)
 # ── Environment ───────────────────────────────────────────────────────────────
 
 ENTITY_MODEL_ID = os.environ.get(
-    "ENTITY_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0"
+    "ENTITY_MODEL_ID", "mistral.mistral-7b-instruct-v0:2"
 )
 
 # ── MIME content types that require Textract (image-based) ────────────────────
@@ -542,7 +542,7 @@ def _extract_via_bedrock(
     email_id:    str,
 ) -> Tuple[Dict[str, Any], float, bool]:
     """
-    Call Bedrock Claude 3 Haiku to extract structured insurance fields.
+    Call Bedrock Mistral 7B to extract structured insurance fields.
     Returns (extracted_fields, confidence, was_called).
     Never raises — returns empty dict on any failure.
     """
@@ -570,10 +570,9 @@ def _extract_via_bedrock(
     )
 
     body = json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens":        2048,
-        "temperature":       0.0,
-        "messages":          [{"role": "user", "content": prompt}],
+        "prompt":      f"<s>[INST] {prompt} [/INST]",
+        "max_tokens":  2048,
+        "temperature": 0.0,
     })
 
     t0 = time.monotonic()
@@ -585,7 +584,7 @@ def _extract_via_bedrock(
             accept      = "application/json",
         )
         raw      = json.loads(resp["body"].read())
-        text_out = raw["content"][0]["text"]
+        text_out = raw["outputs"][0]["text"]
     except Exception as exc:
         logger.warning(json.dumps({
             "trace_id": email_id,
