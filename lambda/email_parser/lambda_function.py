@@ -187,6 +187,25 @@ def _dynamo_safe(obj: Any) -> Any:
     return obj
 
 
+# ── Unrelated email filter ────────────────────────────────────────────────────
+
+_FILTER_KEYWORDS = frozenset({
+    "github", "marketplace", "aws", "amazon", "notification", "alert",
+})
+
+
+def filter_unrelated_emails(email_data: dict) -> bool:
+    """
+    Return True if the email should be skipped (unrelated sender).
+    Checks sender_email and sender_name against _FILTER_KEYWORDS (case-insensitive).
+    """
+    haystack = " ".join([
+        (email_data.get("sender_email") or ""),
+        (email_data.get("sender_name")  or ""),
+    ]).lower()
+    return any(kw in haystack for kw in _FILTER_KEYWORDS)
+
+
 # ── Lambda handler ─────────────────────────────────────────────────────────────
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -209,6 +228,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         raw_email = response['Body'].read().decode('utf-8')
 
         parsed_data = parse_email(raw_email)
+
+        # ── Unrelated email filter ─────────────────────────────────────────────
+        if filter_unrelated_emails(parsed_data):
+            print(f"Filtered unrelated email from: {redact_pii(parsed_data.get('sender_email', ''))}")
+            return {'statusCode': 200, 'filtered': True, 'reason': 'unrelated_sender'}
 
         email_id = str(uuid.uuid4())
         parsed_data.update({
@@ -839,7 +863,7 @@ def _parse_extraction_json(
         }))
         return {}, 0.5
 
-    raw_conf   = obj.pop("confidence", 0.7)
+    raw_conf   = obj.pop("confidence", 0.7) or 0.7
     confidence = max(0.0, min(1.0, float(raw_conf)))
 
     logger.info(json.dumps({

@@ -1,43 +1,39 @@
 """
 classify_intent_by_biobert Lambda
 ==================================
-Classifies inbound insurance emails using a fine-tuned BioBERT model
-deployed on a SageMaker endpoint.
+Classifies inbound insurance emails using a fine-tuned MultiLabelBioBERT model
+deployed on a SageMaker Serverless endpoint.
 
-Flow:
-  1. Concatenate subject + email body into a single text string.
-  2. POST to the SageMaker endpoint: {"instances": [text]}
-  3. Receive softmax probabilities over the 17 intent classes.
-  4. argmax → intent label → route team mapping.
-  5. Return the same classification schema as classify_intent_by_llm.
+The endpoint (sagemaker/inference.py) returns:
+    {
+      "predictions": [{
+        "intent":        str,           # top intent or "other" if ambiguous
+        "score":         float,         # top class probability
+        "multi_intents": [str, ...],    # labels above threshold (≥ 0.3)
+        "route_team":    str,           # mapped from intent
+        "all_scores":    {label: float} # per-class sigmoid probabilities
+      }]
+    }
 
 Environment variables:
     SAGEMAKER_ENDPOINT_NAME  — name of the deployed BioBERT SageMaker endpoint
 
-Input event keys (from Step Functions Parameters):
+Input event keys (from Step Functions):
     email_id    (str) — trace ID
-    email_body  (str) — plain-text email body
+    email_body  (str) — plain-text email body  (also accepts body_text)
     subject     (str) — email subject line
 
-Output (stored at ResultPath in Step Functions):
+Output:
     statusCode          (int)
     email_id            (str)
-    classification      (dict)
-        customer_intent       (str) — one of the 17 valid intents
-        secondary_intent      (str) — always "" (BioBERT is single-label)
-        business_line         (str) — always "health_insurance"
-        urgency               (str) — "low" | "medium" | "high"
-        sentiment             (str) — "neutral" (BioBERT does not predict sentiment)
-        gold_route_team       (str) — mapped from customer_intent
-        gold_priority         (str) — "normal" | "high" | "urgent"
-        requires_human_review (bool)
-    confidence          (float) — softmax probability of the top intent
-    model               (str)   — "biobert"
+    classification      (dict) — same schema as classify_intent_by_llm
+    confidence          (float)
+    model               (str)  — "biobert"
 """
 import json
 import logging
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
@@ -52,56 +48,14 @@ sagemaker_runtime = boto3.client("sagemaker-runtime")
 # ── Environment ───────────────────────────────────────────────────────────────
 SAGEMAKER_ENDPOINT_NAME = os.environ.get("SAGEMAKER_ENDPOINT_NAME", "")
 
-# ── Intent label mapping ──────────────────────────────────────────────────────
-# 17 labels in alphabetical order — must match the order used during BioBERT training.
-BIOBERT_LABELS: List[str] = [
-    "broker_query",
-    "cancellation_request",
-    "claim_reimbursement_query",
-    "claim_status",
-    "claim_submission",
-    "complaint",
-    "coverage_query",
-    "dependent_addition",
-    "document_followup",
-    "enrollment_new_policy",
-    "hospital_network_query",
-    "id_verification",
-    "other",
-    "payment_issue",
-    "policy_change",
-    "pre_authorisation",
-    "renewal_query",
-]
-
-INTENT_TO_ROUTE: Dict[str, str] = {
-    "coverage_query":            "customer_support_team",
-    "claim_submission":          "claims_team",
-    "claim_status":              "claims_team",
-    "claim_reimbursement_query": "claims_team",
-    "pre_authorisation":         "medical_review_team",
-    "payment_issue":             "finance_support_team",
-    "policy_change":             "policy_admin_team",
-    "renewal_query":             "renewals_team",
-    "cancellation_request":      "retention_team",
-    "enrollment_new_policy":     "sales_enrollment_team",
-    "dependent_addition":        "policy_admin_team",
-    "complaint":                 "complaints_team",
-    "document_followup":         "operations_team",
-    "hospital_network_query":    "provider_support_team",
-    "id_verification":           "operations_team",
-    "broker_query":              "general_support_team",
-    "other":                     "general_support_team",
-}
+# ── Urgency / priority heuristics ────────────────────────────────────────────
+_HIGH_URGENCY  = {"complaint", "pre_authorisation", "claim_submission"}
+_URGENT_PRIO   = {"complaint", "pre_authorisation"}
 
 
 # ── Lambda handler ─────────────────────────────────────────────────────────────
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
-    Classify a single email using the BioBERT SageMaker endpoint.
-    Returns a classification dict compatible with classify_intent_by_llm.
-    """
     email_id   = event.get("email_id", "")
     email_body = event.get("email_body") or event.get("body_text", "")
     subject    = event.get("subject", "")
@@ -141,23 +95,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 def _classify(
     email_id: str, subject: str, email_body: str
 ) -> Tuple[Dict[str, Any], float]:
-    """
-    Send text to the SageMaker BioBERT endpoint and decode the result.
-    Returns (classification_dict, confidence_score).
-    """
-    # Combine subject + body for richer context (max 512 tokens handled by model)
     text = f"{subject} {email_body}".strip() if subject else email_body
+    prediction = _invoke_endpoint(email_id, text)
 
-    probabilities = _invoke_endpoint(email_id, text)
-    intent, confidence = _decode_predictions(probabilities)
+    intent     = prediction.get("intent", "other")
+    confidence = round(float(prediction.get("score", 0.0)), 4)
+    route      = prediction.get("route_team") or "general_support_team"
 
-    route = INTENT_TO_ROUTE.get(intent, "general_support_team")
-
-    # Apply urgency heuristic: high-priority intents get "high" urgency
-    high_urgency_intents = {"complaint", "pre_authorisation", "claim_submission"}
-    urgency   = "high"   if intent in high_urgency_intents else "medium"
-    priority  = "urgent" if intent in {"complaint", "pre_authorisation"} else "normal"
-    requires_human_review = intent in {"complaint", "pre_authorisation"} or priority == "urgent"
+    urgency  = "high"   if intent in _HIGH_URGENCY else "medium"
+    priority = "urgent" if intent in _URGENT_PRIO  else "normal"
+    requires_human_review = intent in _URGENT_PRIO or priority == "urgent"
 
     return {
         "customer_intent":       intent,
@@ -168,33 +115,30 @@ def _classify(
         "gold_route_team":       route,
         "gold_priority":         priority,
         "requires_human_review": requires_human_review,
+        "all_scores":            prediction.get("all_scores", {}),
+        "multi_intents":         prediction.get("multi_intents", [intent]),
     }, confidence
 
 
-def _invoke_endpoint(email_id: str, text: str) -> List[float]:
+# ── Endpoint invocation ────────────────────────────────────────────────────────
+
+def _invoke_endpoint(email_id: str, text: str) -> Dict[str, Any]:
     """
-    POST text to the SageMaker endpoint.
-    Returns the list of per-class probabilities (softmax output).
-    Raises on any SageMaker error.
+    POST text to the SageMaker MultiLabelBioBERT endpoint.
+    Returns the first prediction dict from {"predictions": [...]}.
+    Raises on SageMaker errors.
     """
-    payload = json.dumps({"instances": [text]})
+    payload = json.dumps({"text": text[:2000]})   # truncate to 2000 chars
 
     try:
         response = sagemaker_runtime.invoke_endpoint(
-            EndpointName = SAGEMAKER_ENDPOINT_NAME,
-            ContentType  = "application/json",
-            Accept       = "application/json",
-            Body         = payload.encode("utf-8"),
+            EndpointName=SAGEMAKER_ENDPOINT_NAME,
+            ContentType="application/json",
+            Accept="application/json",
+            Body=payload.encode("utf-8"),
         )
         raw = json.loads(response["Body"].read().decode("utf-8"))
 
-    except sagemaker_runtime.exceptions.ModelNotReadyException:
-        logger.error(json.dumps({
-            "trace_id": email_id,
-            "error":    "sagemaker_endpoint_not_ready",
-            "endpoint": SAGEMAKER_ENDPOINT_NAME,
-        }))
-        raise
     except ClientError as exc:
         logger.error(json.dumps({
             "trace_id": email_id,
@@ -203,42 +147,24 @@ def _invoke_endpoint(email_id: str, text: str) -> List[float]:
         }))
         raise
 
-    # HuggingFace DLC wraps output as [json_string, "application/json"]
+    # Unwrap HuggingFace DLC double-encoding: [json_string, "application/json"]
     if isinstance(raw, list) and len(raw) == 2 and isinstance(raw[0], str):
         raw = json.loads(raw[0])
 
-    predictions = raw.get("predictions", raw) if isinstance(raw, dict) else raw
+    predictions = raw.get("predictions") if isinstance(raw, dict) else None
+    if not predictions or not isinstance(predictions, list):
+        raise ValueError(f"Unexpected response format from endpoint: {raw}")
 
-    # predictions shape: [[p0, p1, ..., p16]]  — one row per input instance
-    if isinstance(predictions, list) and predictions and isinstance(predictions[0], list):
-        return predictions[0]
+    pred = predictions[0]
+    if not isinstance(pred, dict) or "intent" not in pred:
+        raise ValueError(f"Prediction missing 'intent' key: {pred}")
 
-    # Flat list (single instance, some model configs)
-    if isinstance(predictions, list) and predictions and isinstance(predictions[0], (int, float)):
-        return predictions
+    logger.info(json.dumps({
+        "trace_id":      email_id,
+        "op":            "biobert_prediction",
+        "intent":        pred.get("intent"),
+        "score":         pred.get("score"),
+        "multi_intents": pred.get("multi_intents"),
+    }))
 
-    raise ValueError(f"Unexpected predictions format from SageMaker: {type(predictions)}")
-
-
-def _decode_predictions(probabilities: List[float]) -> Tuple[str, float]:
-    """
-    Map softmax probability vector → (intent_label, confidence).
-    Falls back to 'other' if the label count doesn't match.
-    """
-    if len(probabilities) != len(BIOBERT_LABELS):
-        logger.warning(json.dumps({
-            "warning":        "biobert_label_count_mismatch",
-            "expected":       len(BIOBERT_LABELS),
-            "received":       len(probabilities),
-        }))
-        # Best-effort: map up to the available labels
-        labels = BIOBERT_LABELS[:len(probabilities)]
-        if not labels:
-            return "other", 0.0
-    else:
-        labels = BIOBERT_LABELS
-
-    max_idx    = probabilities.index(max(probabilities))
-    intent     = labels[max_idx] if max_idx < len(labels) else "other"
-    confidence = round(float(probabilities[max_idx]), 4)
-    return intent, confidence
+    return pred
