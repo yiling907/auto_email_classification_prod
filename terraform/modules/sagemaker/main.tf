@@ -114,7 +114,7 @@ resource "aws_sagemaker_endpoint_configuration" "pytorch" {
     # Cost: ~$0.20/million inference + $0.20/GB-s compute (vs ml.g5.xlarge $1.41/hr always-on)
     # Cold start: ~60-90s if idle; warm requests ~2-5s on CPU
     serverless_config {
-      memory_size_in_mb = 4096   # enough for 413MB BERT model + tokenizer overhead
+      memory_size_in_mb = 3072   # account quota limit is 3072 MB
       max_concurrency   = 5      # matches assessment script --concurrency default
     }
   }
