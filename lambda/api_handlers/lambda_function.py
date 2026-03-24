@@ -70,6 +70,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             response = get_settings()
         elif path == '/api/settings' and method == 'POST':
             response = update_settings(event)
+        elif path == '/api/metrics/intent-eval':
+            response = get_eval_report('intent_eval_latest.json')
+        elif path == '/api/metrics/entity-eval':
+            response = get_eval_report('entity_eval_latest.json')
+        elif path == '/api/metrics/rag-eval':
+            response = get_eval_report('rag_eval_latest.json')
+        elif path == '/api/metrics/response-eval':
+            response = get_eval_report('response_eval_latest.json')
+        elif path == '/api/metrics/claim-extraction':
+            response = get_eval_report('claim_extraction_latest.json')
         else:
             response = {
                 'statusCode': 404,
@@ -537,6 +547,25 @@ def get_assessment() -> Dict[str, Any]:
     except Exception as e:
         print(f"Error in get_assessment: {e}")
         raise
+
+
+def get_eval_report(s3_key_name: str) -> Dict[str, Any]:
+    """Fetch an eval report JSON from s3://{LOGS_BUCKET_NAME}/eval_reports/{key}."""
+    try:
+        obj = s3_client.get_object(Bucket=LOGS_BUCKET_NAME, Key=f'eval_reports/{s3_key_name}')
+        data = json.loads(obj['Body'].read().decode('utf-8'))
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps(data, cls=DecimalEncoder),
+        }
+    except Exception as e:
+        code = 404 if 'NoSuchKey' in type(e).__name__ else 500
+        return {
+            'statusCode': code,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'error': str(e)}),
+        }
 
 
 def run_assessment() -> Dict[str, Any]:

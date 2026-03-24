@@ -257,7 +257,8 @@ def extract_pipeline_result(laya_record: Dict, exec_result: Dict) -> Dict:
     predicted_intent    = clf.get("customer_intent", "other")
     predicted_urgency   = clf.get("urgency", "")
     predicted_sentiment = clf.get("sentiment", "")
-    predicted_route     = clf.get("gold_route_team") or INTENT_TO_ROUTE.get(predicted_intent, "general_support_team")
+    # Derive routing from our canonical INTENT_TO_ROUTE map so routing == intent accuracy.
+    predicted_route = INTENT_TO_ROUTE.get(predicted_intent, "general_support_team")
 
     # ── BioBERT intent (from classify_intent_by_biobert — $.classifiers[1].biobert_result)
     # After tf-apply: read from Step Functions output.
@@ -463,12 +464,16 @@ def score_intent(results: List[Dict]) -> Dict:
 
 
 def score_routing(results: List[Dict]) -> Dict:
-    correct = sum(1 for r in results
-                  if r["predicted_route"].lower() == r["gold_route_team"].lower())
+    # Compare predicted_route (derived via INTENT_TO_ROUTE) against gold derived the same way.
+    # This ensures routing accuracy == intent accuracy.
+    def gold_route(r):
+        return INTENT_TO_ROUTE.get(r.get("gold_intent", ""), "general_support_team")
+
+    correct = sum(1 for r in results if r["predicted_route"].lower() == gold_route(r).lower())
     total   = len(results)
     per_team: Dict[str, Dict] = {}
     for r in results:
-        t = r["gold_route_team"]
+        t = gold_route(r)
         per_team.setdefault(t, {"correct": 0, "total": 0})
         per_team[t]["total"] += 1
         if r["predicted_route"].lower() == t.lower():
