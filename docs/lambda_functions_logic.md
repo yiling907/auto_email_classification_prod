@@ -12,7 +12,7 @@ gmail_imap_poller ──► S3 (.eml) ──► Step Functions state machine
                                             │
                                             ▼
                                       email_parser        ← RFC 2822 parse + PII redact
-                                      + entity extraction    Textract + Claude (inline)
+                                      + entity extraction    Textract + Mistral 7B (inline)
                                             │
                               ┌─────────────┴─────────────┐
                               ▼                           ▼
@@ -34,7 +34,6 @@ gmail_imap_poller ──► S3 (.eml) ──► Step Functions state machine
 Side paths (not in Step Functions):
   rag_ingestion       — offline document ingestion (S3 trigger)
   api_handlers        — REST API for React dashboard
-  sagemaker_inference — POST /api/model/inference proxy
 ```
 
 ---
@@ -159,8 +158,8 @@ Side paths (not in Step Functions):
               │       §4 Accidents          §5 Emergency Dental §6 Receipts
               │       §7 Payment details    §8 Meta/confidence
               │     Combine up to first 3 attachment chunks, truncate to 8000 chars
-              ├─ bedrock.invoke_model(Claude 3 Haiku, max_tokens=2048, temperature=0)
-              ├─ _parse_extraction_json(text_out)
+              ├─ bedrock.invoke_model(Mistral 7B, prompt=[INST]…[/INST], max_tokens=2048, temperature=0)
+              ├─ _parse_extraction_json(text_out)   ← parses outputs[0].text
               │     regex find first {...} block
               │     Pop 'confidence' field (0–1, clamped)
               │     Strip null/empty scalar values; keep arrays + booleans
@@ -332,11 +331,11 @@ Checks 30 terms including: `hospital`, `clinic`, `gp`, `doctor`, `mri`, `x-ray`,
         Truncate to 8000 chars
 
 2. _hyde_expand(clean_query)   [Hypothetical Document Embedding]
-        Prompt Claude 3 Haiku:
+        Prompt Mistral 7B ([INST]…[/INST]):
           "Write a 2-3 sentence factual answer as it would appear in Laya Healthcare docs"
         Embeds the ANSWER, not the question
         → lands in the same embedding space as real KB documents
-        Fallback: return raw query if Haiku call fails
+        Fallback: return raw query if Mistral call fails
 
 3. _embed(hyde_doc)
         Titan Embeddings V2 → 1024-dim normalized vector
@@ -364,8 +363,8 @@ Checks 30 terms including: `hospital`, `clinic`, `gp`, `doctor`, `mri`, `x-ray`,
         Take top 12 candidates from RRF
         Drop any with vec_score < 0.25
 
-8. _cross_encoder_rerank(query, candidates)   [6 parallel Haiku workers]
-        For each candidate, Claude 3 Haiku scores (query, doc) pair jointly:
+8. _cross_encoder_rerank(query, candidates)   [6 parallel Mistral 7B workers]
+        For each candidate, Mistral 7B scores (query, doc) pair jointly:
           "Rate relevance 0-10" → JSON {"score": N}
         Fallback on failure: rrf_score × 5
 
@@ -660,7 +659,7 @@ SES error handling:
 | POST | `/api/email/{id}/send` | `send_email_response()` | Invoke `email_sender` Lambda synchronously |
 | GET | `/api/metrics/models` | `get_model_metrics()` | Aggregate by task_type and model_name; includes per-field accuracy + eval scores |
 | GET | `/api/metrics/rag` | `get_rag_metrics()` | Total chunks, source files, chunks-per-file (paginated scan) |
-| GET | `/api/metrics/evaluations` | `get_evaluations()` | Reference eval report from S3 + Claude eval records from model_metrics |
+| GET | `/api/metrics/evaluations` | `get_evaluations()` | Reference eval report from S3 + model eval records from model_metrics |
 | GET | `/api/assessment` | `get_assessment()` | Latest assessment JSON from S3 `assessment/latest.json` |
 | POST | `/api/assessment/run` | `run_assessment()` | Fire-and-forget async Lambda invoke |
 | GET | `/api/settings` | `get_settings()` | Read `ACTIVE_MODEL` env var from classify_intent_by_llm + llm_response Lambdas |
@@ -694,43 +693,6 @@ Also group by model_name:
 
 ---
 
-## 12. `sagemaker_inference`
-
-**Trigger:** POST `/api/model/inference` via API Gateway.
-
-### Flow
-
-```
-1. OPTIONS request → 200 with CORS headers (preflight, no body)
-
-2. Parse request body (two accepted formats):
-        { "instances": ["text1", "text2", ...] }   ← list of strings
-        { "text": "single string" }                 ← normalized to ["single string"]
-        Neither present → 400 error
-
-3. sagemaker_runtime.invoke_endpoint(
-        EndpointName = SAGEMAKER_ENDPOINT_NAME,
-        ContentType  = 'application/json',
-        Accept       = 'application/json',
-        Body         = json.dumps({"instances": instances})
-   )
-
-4. HuggingFace DLC response unwrapping:
-        HF container serialises output_fn result as [json_string, "application/json"]
-        Detect this shape (list of 2, first element is str) →
-          json.loads(result[0]) to get real predictions dict
-
-5. Return { statusCode:200, predictions: [...] }
-
-Error responses:
-  400 → bad/missing request body or invalid JSON
-  503 → ModelNotReadyException (endpoint still warming up)
-  502 → ClientError from SageMaker (upstream inference failure)
-  500 → unexpected exception
-```
-
----
-
 ## Environment Variables Summary
 
 | Lambda | Key env vars |
@@ -746,7 +708,6 @@ Error responses:
 | `save_result` | `PIPELINE_RESULTS_TABLE_NAME` |
 | `rag_ingestion` | `EMBEDDINGS_TABLE_NAME` |
 | `api_handlers` | `EMAIL_TABLE_NAME`, `MODEL_METRICS_TABLE_NAME`, `EMBEDDINGS_TABLE_NAME`, `LOGS_BUCKET_NAME`, `EMAIL_SENDER_FUNCTION_NAME`, `CLASSIFY_INTENT_FUNCTION_NAME`, `LLM_RESPONSE_FUNCTION_NAME` |
-| `sagemaker_inference` | `SAGEMAKER_ENDPOINT_NAME` |
 
 ---
 
@@ -754,8 +715,9 @@ Error responses:
 
 | Model | ID | Used by |
 |---|---|---|
-| Claude 3 Haiku | `anthropic.claude-3-haiku-20240307-v1:0` | `email_parser` (entity extraction), `rag_retrieval` (HyDE + rerank) |
-| Claude 3 Sonnet | `anthropic.claude-3-sonnet-20240229-v1:0` | (referenced in config, available as override) |
-| Mistral 7B | `mistral.mistral-7b-instruct-v0:2` | `classify_intent_by_llm`, `llm_response`, `crm_validation` |
+| Mistral 7B | `mistral.mistral-7b-instruct-v0:2` | `email_parser` (entity extraction), `rag_retrieval` (HyDE + rerank), `classify_intent_by_llm`, `llm_response`, `crm_validation` |
 | Llama 3.1 8B | `meta.llama3-8b-instruct-v1:0` | `classify_intent_by_llm`, `llm_response` (alternate/judge) |
 | Titan Embeddings V2 | `amazon.titan-embed-text-v2:0` | `rag_retrieval`, `rag_ingestion` |
+
+**Mistral request format:** `{"prompt": "<s>[INST] {prompt} [/INST]", "max_tokens": N, "temperature": 0.0}` → parse `outputs[0].text`
+**Llama request format:** `{"prompt": "<|begin_of_text|>…<|eot_id|>", "max_gen_len": N}` → parse `generation`

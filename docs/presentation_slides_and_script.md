@@ -105,7 +105,7 @@ This is exactly the problem InsureMail AI solves. Fully automated, intelligent, 
 - All infrastructure managed with **Terraform** (IaC)
 
 **6-Step Pipeline (Step Functions state machine):**
-1. `email_parser` — RFC 2822 parse, PII redact, attachment extraction + inline entity extraction (Textract + Claude Haiku)
+1. `email_parser` — RFC 2822 parse, PII redact, attachment extraction + inline entity extraction (Textract + Mistral 7B)
 2. `classify_intent_by_llm` ∥ `classify_intent_by_biobert` — parallel dual-classifier execution
 3. `rag_retrieval` — hybrid search + reranking
 4. `crm_validation` — customer/policy lookup
@@ -127,7 +127,7 @@ At the top level, InsureMail AI is a fully serverless system on AWS. Emails arri
 
 Why serverless? Because email volume for an insurance company is highly variable — quiet overnight, heavy Monday morning. Serverless Lambda functions scale to zero when idle and to thousands of concurrent executions during peaks, with no infrastructure changes needed.
 
-The six pipeline steps are: first, email parsing — we extract text, redact PII, pull content from attachments, and run inline entity extraction using AWS Textract and Claude Haiku. Second, intent classification runs two models in parallel: a Bedrock LLM classifier and a fine-tuned BioBERT model on SageMaker — both fire simultaneously, saving latency. Third, RAG retrieval grounds the response in real policy documents. Fourth, CRM validation confirms the customer exists and their policy is active. Fifth, response generation produces a draft reply. And sixth, the email sender routes it based on confidence.
+The six pipeline steps are: first, email parsing — we extract text, redact PII, pull content from attachments, and run inline entity extraction using AWS Textract and Mistral 7B on Bedrock. Second, intent classification runs two models in parallel: a Bedrock LLM classifier and a fine-tuned BioBERT model on SageMaker — both fire simultaneously, saving latency. Third, RAG retrieval grounds the response in real policy documents. Fourth, CRM validation confirms the customer exists and their policy is active. Fifth, response generation produces a draft reply. And sixth, the email sender routes it based on confidence.
 
 For evaluation, we built a live assessment harness that runs the full pipeline end-to-end against the Laya synthetic dataset — 1000 labelled insurance emails with known intents, route teams, and expected entities. We ran 20-email batches and measured five dimensions: intent accuracy, routing accuracy, entity extraction precision and recall, CRM hit rate, and a composite score. Our composite score came back at 0.7776 — above our passing threshold of 0.70. Every single email processed successfully. Zero failures.
 
@@ -217,7 +217,7 @@ The end result: zero human involvement in getting emails into the pipeline. The 
 - RFC 2822 parsing: multipart MIME, HTML/plain text, nested parts
 - PII redaction: names, emails, phone numbers scrubbed from all logs
 - Attachment extraction: PDF → pypdf text-layer → Textract OCR fallback; DOCX → python-docx; TXT → direct read
-- **Inline entity extraction:** Textract text chunks → Claude 3 Haiku → structured fields: `policy_number`, `claim_amount`, `date_of_service`, `membership_no` (Laya claim form §1–§8 schema)
+- **Inline entity extraction:** Textract text chunks → Mistral 7B ([INST] prompt format) → structured fields: `policy_number`, `claim_amount`, `date_of_service`, `membership_no` (Laya claim form §1–§8 schema)
 - `_dynamo_safe()`: float → Decimal conversion before DynamoDB write
 
 **Step 2 — classify_intent_by_llm ∥ classify_intent_by_biobert (parallel):**
@@ -227,9 +227,9 @@ The end result: zero human involvement in getting emails into the pipeline. The 
 - LLM result is authoritative (`$.classifiers[0].llm_result`); BioBERT result available for comparison
 
 **Step 3 — rag_retrieval:**
-- HyDE: Haiku generates hypothetical answer → embed for better semantic match
+- HyDE: Mistral 7B generates hypothetical answer → embed for better semantic match
 - Hybrid search: BM25 keyword + Titan V2 cosine vector (1024-dim)
-- RRF fusion + cross-encoder reranking → top 3–5 relevant policy doc chunks
+- RRF fusion + Mistral 7B cross-encoder reranking → top 3–5 relevant policy doc chunks
 
 **Step 4 — crm_validation:**
 - Mistral 7B Text-to-SQL → DynamoDB customer/policy lookup
@@ -253,11 +253,11 @@ The end result: zero human involvement in getting emails into the pipeline. The 
 
 This is the full Gmail processing pipeline — six steps inside one Step Functions state machine, each one a Lambda function, running from raw email bytes to a routed response.
 
-Step one: email_parser. It handles the full complexity of RFC 2822 MIME format — multipart bodies, HTML and plain text alternatives, and nested attachments of any type. It redacts PII from all log output before anything touches DynamoDB or CloudWatch. PDFs go through a two-stage extraction: first we try pypdf for the text layer, then fall back to AWS Textract for scanned or image-based PDFs. After extraction, the email_parser calls Claude 3 Haiku inline to structure the raw text into named fields from the Laya Out-patient Claim Form schema — policy number, claim amount, date of service, and 30-plus other fields. Entity extraction happens inside email_parser, in a single Lambda, before the pipeline branches.
+Step one: email_parser. It handles the full complexity of RFC 2822 MIME format — multipart bodies, HTML and plain text alternatives, and nested attachments of any type. It redacts PII from all log output before anything touches DynamoDB or CloudWatch. PDFs go through a two-stage extraction: first we try pypdf for the text layer, then fall back to AWS Textract for scanned or image-based PDFs. After extraction, the email_parser calls Mistral 7B on Bedrock inline to structure the raw text into named fields from the Laya Out-patient Claim Form schema — policy number, claim amount, date of service, and 30-plus other fields. Entity extraction happens inside email_parser, in a single Lambda, before the pipeline branches.
 
 Step two fires two Lambdas in parallel. classify_intent_by_llm sends the email body to Mistral 7B on Bedrock and returns one of 17 insurance-specific intent classes, mapped to one of 12 route teams — and a second model then evaluates the accuracy. Simultaneously, classify_intent_by_biobert sends the same email to our fine-tuned BioBERT endpoint on SageMaker and returns its own intent prediction with a confidence score. Both classifiers run at the same time. If BioBERT's endpoint is unavailable, the pipeline catches the error gracefully and continues with just the LLM result. The LLM classification is authoritative downstream, and BioBERT's output is preserved for comparison and analysis.
 
-Step three is RAG retrieval. Instead of embedding the raw email, we use HyDE — we first ask Claude Haiku to generate a hypothetical answer, then embed that. We run BM25 keyword search and Titan vector search simultaneously, fuse the two ranked lists with Reciprocal Rank Fusion, and rescore the top candidates with a cross-encoder. The output is the most relevant policy document excerpts for this specific email.
+Step three is RAG retrieval. Instead of embedding the raw email, we use HyDE — we first ask Mistral 7B to generate a hypothetical answer, then embed that. We run BM25 keyword search and Titan vector search simultaneously, fuse the two ranked lists with Reciprocal Rank Fusion, and rescore the top candidates with a Mistral 7B cross-encoder. The output is the most relevant policy document excerpts for this specific email.
 
 Step four is CRM validation. Mistral 7B translates the customer context into a DynamoDB query, looks up the customer record, confirms their policy is active, and checks that their coverage is in scope for the declared intent. If the lookup fails, the pipeline injects empty CRM context and continues — it never hard-stops.
 
@@ -315,27 +315,30 @@ This is the foundation that makes Yiling's retrieval step work well. The quality
 
 ### Slide Content (Bullet Points for PPT)
 
-- **Endpoint:** AWS SageMaker real-time inference endpoint
-- **Instance:** `ml.g5.xlarge` — NVIDIA A10G GPU, 24 GB VRAM
-- **Container:** HuggingFace PyTorch DLC (transformers 4.37, PyTorch 2.1)
-- **Model artifact:** `model.tar.gz` packaged with `inference.py` + model weights + tokenizer
+- **Endpoint:** AWS SageMaker Serverless Inference — pay per invocation, zero idle cost
+- **Memory:** 4096 MB, max concurrency 5 (no GPU; CPU inference)
+- **Container:** HuggingFace PyTorch DLC (transformers 4.37, PyTorch 2.1, CPU)
+- **Model artifact:** `model.tar.gz` packaged with `inference.py` + model weights + tokenizer + `mlb.pkl`
   - Uploaded to S3 → registered as SageMaker Model
-- **Invocation path:** API Gateway → Lambda → `sagemaker:invoke_endpoint` → JSON response
-- **Response payload:** `intent`, `confidence_score`, `route_team`
+- **Invocation path:** Step Functions → `classify_intent_by_biobert` Lambda → `sagemaker:invoke_endpoint` → JSON response
+- **Response payload:** `intent`, `confidence`, `multi_intents`, `route_team`, `all_scores`
 - **Lifecycle:** fully managed by Terraform — create, update, destroy
-- **Cold start:** ~45 seconds (endpoint always on during demo)
+- **Cold start:** ~60–90s if idle; warm requests ~2–5s on CPU
+- **Cost:** ~$0/idle vs ~$1.41/hr for ml.g5.xlarge always-on
 
 ---
 
 ### Speaking Script
 
-Hi everyone, I'm Vihang, and I handled the SageMaker model deployment. Let me walk you through how we got a fine-tuned transformer model running as a live GPU endpoint on AWS.
+Hi everyone, I'm Vihang, and I handled the SageMaker model deployment. Let me walk you through how we got a fine-tuned transformer model running as a live serverless endpoint on AWS.
 
-The deployment target is an ml.g5.xlarge instance — that's an NVIDIA A10G GPU with 24 gigabytes of VRAM. We use the HuggingFace PyTorch Deep Learning Container from AWS, which comes pre-installed with transformers and PyTorch, so we only need to supply our model artifacts.
+We chose SageMaker Serverless Inference rather than a dedicated GPU instance. Serverless means we pay only per invocation — no idle billing — which makes it the right choice for a classifier that runs in bursts alongside Step Functions executions rather than continuously. The trade-off is a cold start of up to 90 seconds when the endpoint has been idle, but warm requests resolve in 2–5 seconds on CPU.
 
-The model artifact is a tar.gz file containing three things: the fine-tuned weights, the tokenizer, and a custom inference.py script. That script handles the pre-processing — tokenizing the input email text — and the post-processing — mapping the predicted label index back to a human-readable intent name and looking up the corresponding route team.
+We use the HuggingFace PyTorch CPU Deep Learning Container from AWS, which comes pre-installed with transformers and PyTorch, so we only need to supply our model artifacts.
 
-We upload the tar.gz to S3, register it as a SageMaker Model object, create an endpoint configuration, and deploy it. The invocation path is: API Gateway receives the request, a Lambda function calls SageMaker's invoke_endpoint API with the email text, and gets back a JSON payload containing the intent, a confidence score, and the route team.
+The model artifact is a tar.gz file containing four things: the fine-tuned BioBERT weights in safetensors format, the tokenizer, a custom inference.py script, and an mlb.pkl label binarizer file. The inference script handles multi-label sigmoid inference — rather than a simple argmax, it applies a threshold of 0.3 and a smart multi-detection rule: if the top two probabilities are within 0.15 of each other, the prediction is flagged as ambiguous and returns "other."
+
+We upload the tar.gz to S3, register it as a SageMaker Model object, create a serverless endpoint configuration with 4 GB memory, and deploy it. The invocation path is: Step Functions triggers the classify_intent_by_biobert Lambda, which calls SageMaker's invoke_endpoint API with the email text, and gets back a JSON payload containing the final intent, multi-label candidates, confidence score, and route team.
 
 The entire lifecycle — create endpoint, update model, delete on teardown — is managed by Terraform. No manual console steps.
 
