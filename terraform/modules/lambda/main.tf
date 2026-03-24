@@ -56,7 +56,7 @@ resource "aws_lambda_function" "email_parser" {
   environment {
     variables = {
       EMAIL_TABLE_NAME = var.email_table_name
-      ENTITY_MODEL_ID  = "anthropic.claude-3-haiku-20240307-v1:0"
+      ENTITY_MODEL_ID  = "mistral.mistral-7b-instruct-v0:2"
     }
   }
 

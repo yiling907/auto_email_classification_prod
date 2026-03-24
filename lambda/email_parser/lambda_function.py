@@ -644,14 +644,24 @@ def _extract_pdf_text(
             Bucket=bucket, Key=temp_key, Body=payload, ContentType="application/pdf"
         )
         t0   = time.monotonic()
-        resp = textract.detect_document_text(
-            Document={"S3Object": {"Bucket": bucket, "Name": temp_key}}
+        # Use async API — supports multi-page PDFs (detect_document_text only handles single-page)
+        start_resp = textract.start_document_text_detection(
+            DocumentLocation={"S3Object": {"Bucket": bucket, "Name": temp_key}}
         )
-        lines      = [b["Text"] for b in resp.get("Blocks", []) if b["BlockType"] == "LINE"]
+        job_id = start_resp["JobId"]
+        # Poll until complete (max 60s)
+        for _ in range(30):
+            time.sleep(2)
+            result = textract.get_document_text_detection(JobId=job_id)
+            if result["JobStatus"] in ("SUCCEEDED", "FAILED"):
+                break
+        if result["JobStatus"] != "SUCCEEDED":
+            raise RuntimeError(f"Textract job {job_id} status: {result['JobStatus']}")
+        lines      = [b["Text"] for b in result.get("Blocks", []) if b["BlockType"] == "LINE"]
         latency_ms = int((time.monotonic() - t0) * 1000)
         logger.info(json.dumps({
             "trace_id":   email_id,
-            "op":         "textract_pdf_s3",
+            "op":         "textract_pdf_async",
             "filename":   filename,
             "lines":      len(lines),
             "latency_ms": latency_ms,
@@ -817,8 +827,10 @@ def _parse_extraction_json(
         }))
         return {}, 0.5
 
+    # Mistral sometimes escapes underscores as \_ which is invalid JSON — strip the backslash
+    json_str = match.group().replace("\\_", "_")
     try:
-        obj = json.loads(match.group())
+        obj = json.loads(json_str)
     except json.JSONDecodeError as exc:
         logger.warning(json.dumps({
             "trace_id": email_id,
