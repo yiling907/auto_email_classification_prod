@@ -172,29 +172,10 @@ def process_email(email_message, raw_email):
         # Trigger Step Functions
         execution_name = f"gmail-{email_id}"
 
-        # Create input matching SNS format (for compatibility)
+        # Send bucket/key directly — format expected by email_parser
         sf_input = {
-            "Records": [{
-                "eventSource": "gmail:imap",
-                "Sns": {
-                    "Message": json.dumps({
-                        "notificationType": "Received",
-                        "mail": {
-                            "messageId": message_id,
-                            "timestamp": datetime.utcnow().isoformat(),
-                            "source": from_addr,
-                            "destination": [to_addr]
-                        },
-                        "receipt": {
-                            "action": {
-                                "type": "S3",
-                                "bucketName": S3_BUCKET,
-                                "objectKey": s3_key
-                            }
-                        }
-                    })
-                }
-            }]
+            "bucket": S3_BUCKET,
+            "key":    s3_key,
         }
 
         response = stepfunctions_client.start_execution(
