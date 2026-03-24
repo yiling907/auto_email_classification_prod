@@ -2,7 +2,7 @@
 inference.py — SageMaker serving script for MultiLabelBioBERT insurance intent classifier.
 
 Model: fine-tuned BioBERT, multi-label sigmoid classifier
-Labels: loaded from mlb.pkl (MultiLabelBinarizer)
+Labels: loaded from labels.json (avoids numpy._core pickle dependency)
 Routing: hardcoded INTENT_TO_ROUTE map
 
 Packaged inside model.tar.gz alongside model files.
@@ -11,11 +11,10 @@ Packaged inside model.tar.gz alongside model files.
 import json
 import logging
 import os
-import pickle
 
 import torch
 from torch import nn
-from transformers import BertConfig, BertModel, BertPreTrainedModel, BertTokenizer
+from transformers import AutoTokenizer, BertConfig, BertModel, BertPreTrainedModel
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -76,12 +75,12 @@ def model_fn(model_dir: str, context=None):
     """
     logger.info("Loading model from %s on %s", model_dir, DEVICE)
 
-    # Load MLB first to get num_labels
-    mlb_path = os.path.join(model_dir, "mlb.pkl")
-    with open(mlb_path, "rb") as f:
-        mlb = pickle.load(f)
-    num_labels = len(mlb.classes_)
-    logger.info("MLB classes (%d): %s", num_labels, list(mlb.classes_))
+    # Load labels from JSON (avoids numpy._core pickle dependency from mlb.pkl)
+    labels_path = os.path.join(model_dir, "labels.json")
+    with open(labels_path) as f:
+        classes = json.load(f)
+    num_labels = len(classes)
+    logger.info("Label classes (%d): %s", num_labels, classes)
 
     # Patch config with num_labels before loading model weights
     config = BertConfig.from_pretrained(model_dir)
@@ -91,13 +90,13 @@ def model_fn(model_dir: str, context=None):
     model.to(DEVICE)
     model.eval()
 
-    tokenizer = BertTokenizer.from_pretrained(model_dir)
+    tokenizer = AutoTokenizer.from_pretrained(model_dir)
 
     logger.info("MultiLabelBioBERT loaded — %d labels", num_labels)
     return {
         "model":     model,
         "tokenizer": tokenizer,
-        "mlb":       mlb,
+        "classes":   classes,
     }
 
 
@@ -131,7 +130,7 @@ def input_fn(request_body: bytes, content_type: str = "application/json"):
 
 # ─── 3. predict_fn ───────────────────────────────────────────────────────────
 
-def _predict_one(text: str, model, tokenizer, mlb) -> dict:
+def _predict_one(text: str, model, tokenizer, classes) -> dict:
     """Run multi-label sigmoid inference on a single text."""
     inputs = tokenizer(
         text,
@@ -147,7 +146,6 @@ def _predict_one(text: str, model, tokenizer, mlb) -> dict:
         logits = model(**inputs)
 
     probs = torch.sigmoid(logits).cpu().numpy()[0]
-    classes = mlb.classes_
 
     # Top-2 indices by probability
     top_indices = probs.argsort()[-2:][::-1]
@@ -180,8 +178,8 @@ def _predict_one(text: str, model, tokenizer, mlb) -> dict:
 def predict_fn(texts: list, model_artifacts: dict) -> list:
     model     = model_artifacts["model"]
     tokenizer = model_artifacts["tokenizer"]
-    mlb       = model_artifacts["mlb"]
-    return [_predict_one(t, model, tokenizer, mlb) for t in texts]
+    classes   = model_artifacts["classes"]
+    return [_predict_one(t, model, tokenizer, classes) for t in texts]
 
 
 # ─── 4. output_fn ────────────────────────────────────────────────────────────
