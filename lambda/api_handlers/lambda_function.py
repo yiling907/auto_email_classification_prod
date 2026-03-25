@@ -72,8 +72,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             response = update_settings(event)
         elif path == '/api/metrics/intent-eval':
             response = get_eval_report('intent_eval_latest.json')
-        elif path == '/api/metrics/entity-eval':
-            response = get_eval_report('entity_eval_latest.json')
         elif path == '/api/metrics/rag-eval':
             response = get_eval_report('rag_eval_latest.json')
         elif path == '/api/metrics/response-eval':

@@ -77,7 +77,6 @@ const TABS = [
   { key: 'pipeline',  label: 'E2E Pipeline'       },
   { key: 'intent',    label: 'Intent & Routing'    },
   { key: 'claim',     label: 'Attachment Parsing'  },
-  { key: 'entity',    label: 'Entity Extraction'   },
   { key: 'rag',       label: 'RAG Retrieval'       },
   { key: 'response',  label: 'Response Generation' },
   { key: 'reference', label: 'Reference Eval'      },
@@ -102,7 +101,6 @@ function Evaluations({ apiUrl }) {
       {tab === 'pipeline'  && <Assessment apiUrl={apiUrl} />}
       {tab === 'intent'    && <IntentEval   apiUrl={apiUrl} activeTab={tab} />}
       {tab === 'claim'     && <ClaimEval    apiUrl={apiUrl} activeTab={tab} />}
-      {tab === 'entity'    && <EntityEval   apiUrl={apiUrl} activeTab={tab} />}
       {tab === 'rag'       && <RagEval      apiUrl={apiUrl} activeTab={tab} />}
       {tab === 'response'  && <ResponseEval apiUrl={apiUrl} activeTab={tab} />}
       {tab === 'reference' && <ReferenceEval apiUrl={apiUrl} activeTab={tab} />}
@@ -289,82 +287,6 @@ function ClaimEvalContent({ data }) {
             { label: 'Records', value: dep.records_with_dependants ?? '—' },
           ]} />
         )}
-      </div>
-    </div>
-  )
-}
-
-// ── Entity Extraction ─────────────────────────────────────────────────────────
-
-function EntityEval({ apiUrl, activeTab }) {
-  const { data, loading, error } = useLazyFetch(`${apiUrl}/api/metrics/entity-eval`, 'entity', activeTab)
-
-  return (
-    <LoadState loading={loading} error={error}>
-      {data ? <EntityEvalContent data={data} /> : <NoData script="run_entity_eval.py" />}
-    </LoadState>
-  )
-}
-
-function EntityEvalContent({ data }) {
-  const rs      = data.run_summary    || {}
-  const os      = data.overall_score  ?? null
-  const pf      = data.per_field      || {}
-  const pc      = data.per_category   || {}
-  const passed  = (os || 0) >= 0.70
-
-  const catData = Object.entries(pc)
-    .map(([cat, f1]) => ({ cat: cat.replace(/_/g, ' '), f1: +(f1 * 100).toFixed(1) }))
-    .sort((a, b) => b.f1 - a.f1)
-
-  return (
-    <div className="card">
-      <h3 className="card-title">Entity Extraction Evaluation</h3>
-
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
-        <div style={BADGE(passed)}>
-          Score: {os != null ? os.toFixed(4) : '—'} {passed ? '✓ PASS' : '✗ FAIL'}
-        </div>
-        <span style={{ color: '#7f8c8d', fontSize: '0.875rem' }}>threshold: 0.70</span>
-        <StatCard label="Records"    value={rs.n_records || '—'} />
-        <StatCard label="Succeeded"  value={rs.n_succeeded || '—'} />
-        <StatCard label="Avg Latency" value={rs.avg_latency_ms ? `${rs.avg_latency_ms}ms` : '—'} />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-        <div>
-          <h4 style={{ marginBottom: '0.75rem' }}>Per-Category Avg F1</h4>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={catData} layout="vertical" margin={{ left: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} />
-              <YAxis type="category" dataKey="cat" width={160} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={v => `${v}%`} />
-              <Bar dataKey="f1" fill="#28a745" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div>
-          <h4 style={{ marginBottom: '0.75rem' }}>Per-Field Detail</h4>
-          <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-            <table>
-              <thead>
-                <tr><th>Field</th><th>GP</th><th>F1(E)</th><th>F1(P)</th></tr>
-              </thead>
-              <tbody>
-                {Object.entries(pf).filter(([,s]) => s.gold_present > 0).sort((a,b) => b[1].gold_present - a[1].gold_present).map(([fname, s]) => (
-                  <tr key={fname}>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{fname}</td>
-                    <td>{s.gold_present}</td>
-                    <td><F1Badge v={s.f1_exact} /></td>
-                    <td><F1Badge v={s.f1_partial} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
     </div>
   )

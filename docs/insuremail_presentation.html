@@ -1,0 +1,1675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsureMail AI — Team Presentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   VIEWPORT BASE (from viewport-base.css)
+   ============================================================ */
+html, body { height: 100%; overflow-x: hidden; margin: 0; padding: 0; }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+body { background: #0d1117; font-family: 'Space Grotesk', system-ui, sans-serif; color: #f0f6fc; }
+
+.slide {
+  width: 100vw; height: 100vh; height: 100dvh;
+  overflow: hidden; scroll-snap-align: start;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+
+/* ============================================================
+   DESIGN TOKENS — Bold Signal / AWS Dark
+   ============================================================ */
+:root {
+  --orange:  #FF9900;
+  --teal:    #00BCD4;
+  --green:   #3fb950;
+  --purple:  #8C4FFF;
+  --pink:    #E7157B;
+  --red:     #f85149;
+  --yellow:  #d29922;
+  --bg:      #0d1117;
+  --card:    #161b22;
+  --card2:   #1c2128;
+  --border:  #30363d;
+  --text:    #f0f6fc;
+  --muted:   #8b949e;
+  --title-size:  clamp(1.8rem, 5vw, 4rem);
+  --h2-size:     clamp(1.2rem, 2.8vw, 2rem);
+  --h3-size:     clamp(0.95rem, 2vw, 1.4rem);
+  --body-size:   clamp(0.72rem, 1.2vw, 0.95rem);
+  --small-size:  clamp(0.6rem, 0.9vw, 0.78rem);
+  --pad:         clamp(1.5rem, 3.5vw, 3.5rem);
+  --gap:         clamp(0.4rem, 1.2vw, 1rem);
+}
+
+/* ============================================================
+   GLOBAL ELEMENTS
+   ============================================================ */
+h1 { font-family: 'Syne', sans-serif; font-weight: 800; margin: 0; }
+h2 { font-family: 'Syne', sans-serif; font-weight: 700; margin: 0 0 var(--gap); }
+h3 { font-family: 'Syne', sans-serif; font-weight: 700; margin: 0 0 calc(var(--gap)*0.5); }
+p, li { margin: 0; line-height: 1.55; }
+ul { padding-left: 1.2em; margin: 0; }
+li { margin-bottom: 0.3em; }
+strong { color: var(--orange); }
+
+.slide-content {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center;
+  padding: var(--pad) var(--pad) calc(var(--pad)*0.6);
+  max-height: 100%; overflow: hidden;
+}
+
+/* Orange accent bar at top */
+.slide::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--orange), var(--teal));
+}
+
+/* Slide label (speaker + slide number) */
+.slide-label {
+  position: absolute; bottom: 1rem; right: 1.5rem;
+  font-size: var(--small-size); color: var(--muted);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.speaker-tag {
+  background: var(--card2); border: 1px solid var(--border);
+  padding: 0.2rem 0.6rem; border-radius: 20px;
+  font-size: var(--small-size); color: var(--muted);
+}
+
+/* Metric card */
+.metric-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: var(--gap);
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.metric-value {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(1.4rem, 3vw, 2.4rem); color: var(--orange); line-height: 1;
+}
+.metric-label { font-size: var(--small-size); color: var(--muted); }
+
+/* Pass/fail badge */
+.badge {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.2rem 0.7rem; border-radius: 20px;
+  font-size: var(--small-size); font-weight: 600;
+}
+.badge-pass { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid rgba(63,185,80,.4); }
+.badge-warn { background: rgba(210,153,34,.15); color: var(--yellow); border: 1px solid rgba(210,153,34,.4); }
+.badge-info { background: rgba(0,188,212,.15); color: var(--teal); border: 1px solid rgba(0,188,212,.4); }
+
+/* Grid helpers */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); }
+
+/* AWS service chip */
+.svc {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0.2rem 0.55rem; border-radius: 4px;
+  font-size: var(--small-size); font-weight: 600; white-space: nowrap;
+  border: 1px solid; text-align: center;
+}
+.svc.lmb { background: rgba(255,153,0,.12); color: #FF9900; border-color: rgba(255,153,0,.35); }
+.svc.s3  { background: rgba(122,161,22,.12); color: #7AA116; border-color: rgba(122,161,22,.35); }
+.svc.db  { background: rgba(199,19,31,.12);  color: #E65D68; border-color: rgba(199,19,31,.35); }
+.svc.br  { background: rgba(1,168,141,.12);  color: #01A88D; border-color: rgba(1,168,141,.35); }
+.svc.sm  { background: rgba(1,168,141,.12);  color: #01A88D; border-color: rgba(1,168,141,.35); }
+.svc.sf  { background: rgba(231,21,123,.12); color: #E7157B; border-color: rgba(231,21,123,.35); }
+.svc.eb  { background: rgba(231,21,123,.12); color: #E7157B; border-color: rgba(231,21,123,.35); }
+.svc.ag  { background: rgba(140,79,255,.12); color: #8C4FFF; border-color: rgba(140,79,255,.35); }
+.svc.cf  { background: rgba(140,79,255,.12); color: #8C4FFF; border-color: rgba(140,79,255,.35); }
+.svc.ses { background: rgba(255,153,0,.12);  color: #FF9900; border-color: rgba(255,153,0,.35); }
+
+/* Section number accent */
+.section-num {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(3rem, 8vw, 7rem); line-height: 1;
+  background: var(--card); border-radius: 12px;
+  padding: 0.1em 0.3em;
+  color: var(--orange); display: inline-block;
+}
+
+/* Divider */
+.divider { width: 3rem; height: 3px; background: var(--orange); border-radius: 2px; margin: 0.5rem 0; }
+
+/* Step chip in pipeline */
+.step-chip {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.4rem 0.7rem;
+  display: flex; flex-direction: column; gap: 0.2rem;
+}
+.step-chip .step-n { font-size: var(--small-size); color: var(--orange); font-weight: 700; }
+.step-chip .step-t { font-size: var(--small-size); color: var(--text); font-weight: 600; }
+.step-chip .step-d { font-size: clamp(0.58rem, 0.85vw, 0.72rem); color: var(--muted); }
+
+/* Bullet list */
+.bullet-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.bullet-list li { display: flex; align-items: flex-start; gap: 0.5rem; font-size: var(--body-size); }
+.bullet-list li::before { content: '▸'; color: var(--orange); flex-shrink: 0; margin-top: 0.05em; }
+
+/* ============================================================
+   REVEAL ANIMATIONS — blur + translate + scale
+   ============================================================ */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px) scale(0.97);
+  filter: blur(5px);
+  transition:
+    opacity   0.65s cubic-bezier(.22,1,.36,1),
+    transform 0.65s cubic-bezier(.22,1,.36,1),
+    filter    0.55s ease;
+}
+.slide.visible .reveal        { opacity:1; transform:none; filter:blur(0); }
+.slide.visible .reveal:nth-child(1) { transition-delay:0.04s; }
+.slide.visible .reveal:nth-child(2) { transition-delay:0.14s; }
+.slide.visible .reveal:nth-child(3) { transition-delay:0.24s; }
+.slide.visible .reveal:nth-child(4) { transition-delay:0.34s; }
+.slide.visible .reveal:nth-child(5) { transition-delay:0.44s; }
+.slide.visible .reveal:nth-child(6) { transition-delay:0.54s; }
+.slide.visible .reveal:nth-child(n+7) { transition-delay:0.60s; }
+
+/* ============================================================
+   NAVIGATION DOTS
+   ============================================================ */
+#nav-dots {
+  position: fixed; right: 1.2rem; top: 50%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 0.45rem; z-index: 100;
+}
+.nav-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--border); cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.nav-dot.active { background: var(--orange); transform: scale(1.4); }
+
+/* Progress bar */
+#progress-bar {
+  position: fixed; top: 0; left: 0; height: 3px;
+  background: var(--orange); transition: width 0.3s; z-index: 200;
+  pointer-events: none;
+}
+
+/* ============================================================
+   SLIDE 1 — TITLE
+   ============================================================ */
+#s1 { background: radial-gradient(ellipse at 30% 40%, #1a2332 0%, #0d1117 60%); }
+#s1 .hero-title {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(2.5rem, 7vw, 5.5rem); line-height: 1.05;
+  background: linear-gradient(135deg, #FF9900, #00BCD4);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; margin-bottom: 0.2em;
+}
+#s1 .subtitle { font-size: var(--h3-size); color: var(--muted); margin-bottom: 1.5rem; }
+#s1 .team-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 0.6rem; margin-top: 1rem;
+}
+#s1 .team-member {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.6rem 0.5rem; text-align: center;
+}
+#s1 .team-name { font-weight: 700; font-size: var(--body-size); color: var(--text); }
+#s1 .team-role { font-size: var(--small-size); color: var(--muted); margin-top: 0.2rem; }
+#s1 .aws-stack {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; align-items: center;
+}
+
+/* ============================================================
+   SLIDE 3 — ARCHITECTURE (drawio-based)
+   ============================================================ */
+.arch-grid {
+  display: grid;
+  grid-template-columns: 1fr 2.2fr 1.1fr 1.1fr 1.1fr;
+  gap: 0.5rem;
+  width: 100%;
+  height: min(62vh, 500px);
+}
+.arch-col {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.55rem 0.4rem;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 0.3rem; overflow: hidden;
+  position: relative;
+}
+.arch-col-title {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: clamp(0.6rem, 1vw, 0.8rem); color: var(--text);
+  text-align: center; margin-bottom: 0.2rem; line-height: 1.3;
+}
+.arch-arrow-v {
+  color: var(--muted); font-size: 0.7rem; line-height: 1;
+  flex-shrink: 0;
+}
+.arch-col .svc { font-size: clamp(0.55rem, 0.85vw, 0.7rem); }
+.parallel-box {
+  border: 1px dashed var(--border); border-radius: 6px;
+  padding: 0.3rem; display: flex; gap: 0.3rem;
+  align-items: center; width: 100%; justify-content: center;
+}
+.arch-connector {
+  position: absolute; right: -0.9rem; top: 50%;
+  transform: translateY(-50%); z-index: 10;
+  color: var(--muted); font-size: 0.9rem;
+}
+
+/* ============================================================
+   SLIDE 5b — PIPELINE DETAIL
+   ============================================================ */
+.pipeline-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-height: 700px) {
+  :root {
+    --title-size: clamp(1.3rem, 4vw, 2.8rem);
+    --h2-size: clamp(1rem, 2.5vw, 1.6rem);
+    --pad: clamp(0.8rem, 2.5vw, 2rem);
+    --gap: clamp(0.3rem, 0.8vw, 0.7rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+}
+
+/* ============================================================
+   CUSTOM CURSOR + DRAG TRAIL
+   ============================================================ */
+* { cursor: none !important; }
+
+#cursor-ring {
+  position: fixed; pointer-events: none; z-index: 9999;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 2px solid rgba(255,153,0,0.85);
+  transform: translate(-50%,-50%);
+  transition:
+    width 0.25s ease, height 0.25s ease,
+    border-color 0.25s ease, background 0.25s ease,
+    box-shadow 0.25s ease;
+  mix-blend-mode: screen;
+}
+#cursor-ring.dragging {
+  width: 52px; height: 52px;
+  border-color: rgba(0,188,212,0.9);
+  background: rgba(0,188,212,0.08);
+  box-shadow: 0 0 20px rgba(0,188,212,0.35);
+}
+#cursor-ring.hovering {
+  width: 46px; height: 46px;
+  border-color: rgba(255,153,0,1);
+  box-shadow: 0 0 16px rgba(255,153,0,0.4);
+}
+
+#cursor-dot {
+  position: fixed; pointer-events: none; z-index: 10000;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #FF9900;
+  transform: translate(-50%,-50%);
+  transition: transform 0.1s ease;
+  box-shadow: 0 0 6px rgba(255,153,0,0.8);
+}
+
+.cursor-trail {
+  position: fixed; pointer-events: none; z-index: 9997;
+  border-radius: 50%;
+  transform: translate(-50%,-50%);
+  background: rgba(255,153,0,0.55);
+  transition: background 0.3s;
+}
+
+/* Click ripple burst */
+.cursor-ripple {
+  position: fixed; pointer-events: none; z-index: 9996;
+  width: 0; height: 0; border-radius: 50%;
+  border: 2px solid rgba(0,188,212,0.7);
+  transform: translate(-50%,-50%);
+  animation: rippleBurst 0.65s cubic-bezier(.22,1,.36,1) forwards;
+}
+@keyframes rippleBurst {
+  from { width:0; height:0; opacity:0.9; }
+  to   { width:80px; height:80px; border-color:rgba(0,188,212,0); opacity:0; }
+}
+
+/* ============================================================
+   PARTICLE CANVAS — slides 1 & 9
+   ============================================================ */
+.particle-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 0;
+}
+.slide-content { position: relative; z-index: 1; }
+
+/* ============================================================
+   TOP ACCENT BAR — animated sweep on slide entry
+   ============================================================ */
+.slide::before {
+  content: ''; position: absolute; top: 0; left: 0; height: 3px;
+  background: linear-gradient(90deg, var(--orange), var(--teal), var(--purple));
+  background-size: 200% 100%;
+  width: 0;
+  transition: width 0.7s cubic-bezier(.22,1,.36,1) 0.1s;
+  z-index: 10;
+}
+.slide.visible::before { width: 100%; }
+/* Remove old static ::before on slide (width was 'right:0') */
+
+/* ============================================================
+   AMBIENT SHIMMER — slow gradient pulse on all slides
+   ============================================================ */
+.slide {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255,153,0,0.03) 0%, transparent 70%);
+  animation: ambientShift 8s ease-in-out infinite alternate;
+}
+@keyframes ambientShift {
+  0%   { background-position: 30% 40%; }
+  100% { background-position: 70% 60%; }
+}
+
+/* ============================================================
+   METRIC VALUE — glow pulse on reveal
+   ============================================================ */
+.metric-value {
+  animation: none;
+  transition: text-shadow 0.4s ease;
+}
+.slide.visible .metric-value {
+  animation: metricGlow 2.5s ease-in-out 0.5s infinite alternate;
+}
+@keyframes metricGlow {
+  from { text-shadow: 0 0 8px rgba(255,153,0,0.3); }
+  to   { text-shadow: 0 0 22px rgba(255,153,0,0.7), 0 0 40px rgba(255,153,0,0.2); }
+}
+
+/* ============================================================
+   SECTION NUMBER — scale-in on reveal
+   ============================================================ */
+.section-num {
+  transform-origin: left center;
+  transition: transform 0.5s cubic-bezier(.34,1.56,.64,1), box-shadow 0.3s ease;
+}
+.slide.visible .section-num {
+  animation: sectionPop 0.6s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes sectionPop {
+  from { transform: scale(0.7) rotate(-3deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* ============================================================
+   SERVICE CHIPS — float animation on title slide
+   ============================================================ */
+#s1 .aws-stack .svc {
+  animation: chipFloat 4s ease-in-out infinite alternate;
+}
+#s1 .aws-stack .svc:nth-child(2)  { animation-delay: 0.3s; }
+#s1 .aws-stack .svc:nth-child(3)  { animation-delay: 0.6s; }
+#s1 .aws-stack .svc:nth-child(4)  { animation-delay: 0.9s; }
+#s1 .aws-stack .svc:nth-child(5)  { animation-delay: 1.2s; }
+#s1 .aws-stack .svc:nth-child(6)  { animation-delay: 1.5s; }
+#s1 .aws-stack .svc:nth-child(7)  { animation-delay: 1.8s; }
+#s1 .aws-stack .svc:nth-child(8)  { animation-delay: 2.1s; }
+#s1 .aws-stack .svc:nth-child(9)  { animation-delay: 2.4s; }
+@keyframes chipFloat {
+  from { transform: translateY(0);    box-shadow: none; }
+  to   { transform: translateY(-4px); box-shadow: 0 4px 14px rgba(255,153,0,0.25); }
+}
+
+/* ============================================================
+   CARD 3D TILT — CSS base (transform applied by JS)
+   ============================================================ */
+.metric-card, .step-chip {
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.2s ease;
+  will-change: transform;
+}
+.metric-card:hover, .step-chip:hover {
+  border-color: rgba(255,153,0,0.45);
+}
+
+/* ============================================================
+   BADGE PULSE
+   ============================================================ */
+.badge-pass {
+  animation: badgePulse 3s ease-in-out infinite;
+}
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.4); }
+  50%       { box-shadow: 0 0 8px 3px rgba(63,185,80,0.15); }
+}
+
+/* ============================================================
+   HERO TITLE — gradient shift animation
+   ============================================================ */
+#s1 .hero-title {
+  background: linear-gradient(135deg, #FF9900 0%, #00BCD4 40%, #8C4FFF 70%, #FF9900 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: heroGradient 5s ease-in-out infinite;
+}
+@keyframes heroGradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ============================================================
+   COUNTER — number element styling
+   ============================================================ */
+[data-count] { display: inline-block; }
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div id="progress-bar"></div>
+
+<!-- Navigation dots -->
+<nav id="nav-dots"></nav>
+
+<!-- ================================================================
+     SLIDE 1: TITLE
+     ================================================================ -->
+<section class="slide" id="s1" data-slide="1">
+  <div class="slide-content" style="justify-content:center;">
+    <div class="reveal">
+      <h1 class="hero-title">InsureMail AI</h1>
+      <p class="subtitle">Automated Email Classification &amp; Response Pipeline for Insurance</p>
+      <div class="divider"></div>
+    </div>
+    <div class="reveal" style="margin-top:0.8rem;">
+      <div class="aws-stack">
+        <span class="svc sf">Step Functions</span>
+        <span class="svc lmb">Lambda ×10</span>
+        <span class="svc db">DynamoDB</span>
+        <span class="svc s3">S3</span>
+        <span class="svc br">Bedrock</span>
+        <span class="svc sm">SageMaker</span>
+        <span class="svc ses">SES</span>
+        <span class="svc ag">API Gateway</span>
+        <span class="svc cf">CloudFront</span>
+      </div>
+    </div>
+    <div class="reveal" style="margin-top:1.2rem;">
+      <div id="s1" class="team-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.6rem;">
+        <div class="team-member">
+          <div class="team-name">Pawan</div>
+          <div class="team-role">Problem Statement · RAG Ingestion · Business Value</div>
+        </div>
+        <div class="team-member">
+          <div class="team-name">Yiling Lei</div>
+          <div class="team-role">Architecture · Pipeline · Evaluation · Future Work</div>
+        </div>
+        <div class="team-member">
+          <div class="team-name">Vihang</div>
+          <div class="team-role">SageMaker Deployment · BioBERT Fine-tuning</div>
+        </div>
+        <div class="team-member">
+          <div class="team-name">Amit</div>
+          <div class="team-role">Gmail Poller Scheduled Task</div>
+        </div>
+        <div class="team-member">
+          <div class="team-name">Ramya</div>
+          <div class="team-role">React Dashboard</div>
+        </div>
+      </div>
+    </div>
+    <div class="reveal" style="margin-top:1.2rem;color:var(--muted);font-size:var(--small-size);">
+      March 2026 &nbsp;·&nbsp; AWS Serverless &nbsp;·&nbsp; Terraform IaC
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Pawan</span><span>1 / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 2: PROBLEM STATEMENT
+     ================================================================ -->
+<section class="slide" id="s2" data-slide="2">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">02</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">Problem Statement</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">Why Insurance Email Triage Needs AI</p>
+      </div>
+    </div>
+
+    <div class="reveal grid-2" style="gap:0.8rem;flex:1;align-content:start;">
+      <div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.5rem;">The Reality Today</h3>
+        <ul class="bullet-list">
+          <li>Insurance companies receive <strong>thousands of emails daily</strong> — claims, pre-auth, policy queries, complaints, renewals</li>
+          <li>Staff manually read, classify, and forward every single email</li>
+          <li>Wrong team assignment is common — <strong>delayed, frustrated customers</strong></li>
+          <li>PDFs, DOCX, scanned images — each attachment needs human review</li>
+          <li>Response SLA stretches from <strong>hours to days</strong></li>
+          <li>Dedicated triage headcount required 24/7</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="color:var(--teal);font-size:var(--h3-size);margin-bottom:0.5rem;">The Cost of Manual Triage</h3>
+        <div class="grid-2" style="gap:0.5rem;margin-bottom:0.6rem;">
+          <div class="metric-card">
+            <div class="metric-value" style="color:var(--red);">Hours</div>
+            <div class="metric-label">to sort a morning's inbox manually</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value" style="color:var(--red);">Days</div>
+            <div class="metric-label">average response SLA without automation</div>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div style="font-size:var(--body-size);color:var(--text);">
+            <strong>InsureMail AI solves this:</strong> intelligent, automated, compliant triage
+            from inbox to response — in <strong style="color:var(--green);">under 30 seconds</strong>.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Pawan</span><span>2 / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 3: SYSTEM ARCHITECTURE (from insuremail_architecture.drawio)
+     ================================================================ -->
+<section class="slide" id="s3" data-slide="3">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.6rem;">
+      <div class="section-num">03</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">System Architecture</h2>
+        <p style="color:var(--muted);font-size:var(--small-size);">InsureMail AI — AWS Serverless Stack · All infrastructure managed with Terraform</p>
+      </div>
+    </div>
+
+    <!-- Architecture diagram — recreated from insuremail_architecture.drawio -->
+    <div class="reveal arch-grid">
+
+      <!-- C1: Gmail Poller -->
+      <div class="arch-col" style="border-color: rgba(231,21,123,0.4);">
+        <div class="arch-col-title">Gmail Poller<br>Scheduled Task</div>
+        <span class="svc eb">EventBridge</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc lmb">gmail_imap_poller</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc s3">S3 .eml</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc sf">Step Functions Trigger</span>
+        <div class="arch-connector">→</div>
+      </div>
+
+      <!-- C2: Processing Pipeline -->
+      <div class="arch-col" style="border-color: rgba(255,153,0,0.4);">
+        <div class="arch-col-title">Gmail Processing (Step Functions Pipeline)</div>
+        <span class="svc sf">Step Functions Orchestrator</span>
+        <div class="arch-arrow-v">↓</div>
+        <div style="display:flex;gap:0.3rem;align-items:center;">
+          <span class="svc lmb">email_parser</span>
+          <span class="svc br">Mistral 7B</span>
+        </div>
+        <div class="arch-arrow-v">↓</div>
+        <div class="parallel-box">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0.2rem;">
+            <span style="font-size:clamp(0.5rem,0.8vw,0.65rem);color:var(--muted);">Parallel</span>
+            <span class="svc lmb" style="font-size:clamp(0.52rem,0.78vw,0.65rem);">classify_llm</span>
+          </div>
+          <span style="color:var(--muted);font-size:0.7rem;">‖</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:0.2rem;">
+            <span style="font-size:clamp(0.5rem,0.8vw,0.65rem);color:var(--muted);">SageMaker</span>
+            <span class="svc sm" style="font-size:clamp(0.52rem,0.78vw,0.65rem);">BioBERT</span>
+          </div>
+        </div>
+        <div class="arch-arrow-v">↓</div>
+        <div style="display:flex;gap:0.3rem;align-items:center;">
+          <span class="svc lmb">rag_retrieval</span>
+          <span class="svc db">DynamoDB KB</span>
+        </div>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc lmb">crm_validation</span>
+        <div class="arch-arrow-v">↓</div>
+        <div style="display:flex;gap:0.3rem;align-items:center;">
+          <span class="svc lmb">llm_response</span>
+          <span class="svc ses">email_sender</span>
+        </div>
+        <div class="arch-arrow-v" style="color:var(--orange);">↓</div>
+        <div style="display:flex;gap:0.25rem;flex-wrap:wrap;justify-content:center;">
+          <span style="font-size:clamp(0.52rem,0.78vw,0.65rem);background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.4);padding:0.1rem 0.4rem;border-radius:4px;">≥0.8 Auto</span>
+          <span style="font-size:clamp(0.52rem,0.78vw,0.65rem);background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.4);padding:0.1rem 0.4rem;border-radius:4px;">0.5–0.8 Review</span>
+          <span style="font-size:clamp(0.52rem,0.78vw,0.65rem);background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.4);padding:0.1rem 0.4rem;border-radius:4px;">&lt;0.5 Escalate</span>
+        </div>
+      </div>
+
+      <!-- C3: Knowledge Base Ingestion -->
+      <div class="arch-col" style="border-color: rgba(1,168,141,0.4);">
+        <div class="arch-col-title">Knowledge Base Ingestion</div>
+        <span class="svc lmb">crawl_laya</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc s3">S3 Docs</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc lmb">rag_ingestion</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc br">Titan V2 1024-dim</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc db">kb_embeddings</span>
+        <div style="margin-top:auto;font-size:clamp(0.5rem,0.75vw,0.62rem);color:var(--muted);text-align:center;">500-token chunks<br>MD5 dedup</div>
+      </div>
+
+      <!-- C4: Dashboard Display -->
+      <div class="arch-col" style="border-color: rgba(140,79,255,0.4);">
+        <div class="arch-col-title">Dashboard Display</div>
+        <span class="svc cf">CloudFront CDN</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc s3">S3 React App</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc ag">API Gateway</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc lmb">api_handlers</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc db">email_processing</span>
+        <div style="margin-top:auto;font-size:clamp(0.5rem,0.75vw,0.62rem);color:var(--muted);text-align:center;">React + Vite<br>Real-time data</div>
+      </div>
+
+      <!-- C5: BioBERT Deployment -->
+      <div class="arch-col" style="border-color: rgba(1,168,141,0.4);">
+        <div class="arch-col-title">Model Deployment<br>(BioBERT)</div>
+        <span class="svc s3">model.tar.gz</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc sm">SageMaker<br>Serverless</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc ag">Inference API</span>
+        <div class="arch-arrow-v">↓</div>
+        <span class="svc lmb">sagemaker_inference</span>
+        <div style="margin-top:auto;font-size:clamp(0.5rem,0.75vw,0.62rem);color:var(--muted);text-align:center;">4096 MB memory<br>Pay-per-invocation</div>
+      </div>
+    </div>
+
+    <div class="reveal" style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <span class="badge badge-pass">✓ E2E Composite 0.7776 — PASSED</span>
+      <span class="badge badge-pass">✓ Intent 100%</span>
+      <span class="badge badge-pass">✓ CRM Hit 100%</span>
+      <span class="badge badge-info">Terraform IaC</span>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Yiling Lei</span><span>3 / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 4: SOLUTION OVERVIEW — END-TO-END FLOW
+     ================================================================ -->
+<section class="slide" id="s4" data-slide="4">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">04</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">Overall Solution Overview</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">End-to-End Flow — from Gmail Inbox to Routed Response</p>
+      </div>
+    </div>
+
+    <div class="reveal" style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:1rem;">
+      <span class="svc eb" style="font-size:var(--small-size);">Gmail Inbox</span>
+      <span style="color:var(--muted);">→</span>
+      <span class="svc lmb" style="font-size:var(--small-size);">IMAP Poller</span>
+      <span style="color:var(--muted);">→</span>
+      <span class="svc s3" style="font-size:var(--small-size);">S3 .eml</span>
+      <span style="color:var(--muted);">→</span>
+      <span class="svc sf" style="font-size:var(--small-size);">Step Functions</span>
+      <span style="color:var(--muted);">→ 6 steps →</span>
+      <span class="svc ses" style="font-size:var(--small-size);">SES / Human Review</span>
+    </div>
+
+    <div class="reveal grid-2" style="gap:0.8rem;">
+      <div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.5rem;">3-Tier Confidence Routing</h3>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          <div class="metric-card" style="border-color:rgba(63,185,80,0.4);">
+            <div style="font-size:var(--body-size);color:var(--green);font-weight:700;">≥ 0.80 → Auto-Response</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Sent automatically via Amazon SES. Zero human involvement.</div>
+          </div>
+          <div class="metric-card" style="border-color:rgba(210,153,34,0.4);">
+            <div style="font-size:var(--body-size);color:var(--yellow);font-weight:700;">0.50 – 0.80 → Human Review</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Queued for agent review with AI draft pre-filled.</div>
+          </div>
+          <div class="metric-card" style="border-color:rgba(248,81,73,0.4);">
+            <div style="font-size:var(--body-size);color:var(--red);font-weight:700;">&lt; 0.50 → Escalate</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Forwarded to specialist team with partial context.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="color:var(--teal);font-size:var(--h3-size);margin-bottom:0.5rem;">Graceful Fallbacks</h3>
+        <ul class="bullet-list">
+          <li><strong>FallbackBioBERT</strong> — if SageMaker unavailable, LLM result used downstream</li>
+          <li><strong>SetEmptyRAG</strong> — if retrieval times out, continue with empty context</li>
+          <li><strong>SetEmptyCRM</strong> — if customer lookup fails, pipeline continues</li>
+          <li>Pipeline <strong>never hard-fails</strong> mid-run — worst case is escalation with partial data</li>
+        </ul>
+        <div style="margin-top:0.8rem;">
+          <h3 style="color:var(--purple);font-size:var(--h3-size);margin-bottom:0.4rem;">Infrastructure as Code</h3>
+          <ul class="bullet-list">
+            <li>Every Lambda, DynamoDB table, API Gateway route defined in <strong>Terraform</strong></li>
+            <li>Reproducible, auditable, deploy with one command</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Yiling Lei</span><span>4 / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 5a: GMAIL POLLER SCHEDULED TASK
+     ================================================================ -->
+<section class="slide" id="s5a" data-slide="5">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">5a</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">Gmail Poller Scheduled Task</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">At-Least-Once Email Delivery · Fully Autonomous</p>
+      </div>
+    </div>
+
+    <div class="reveal grid-2" style="gap:0.8rem;">
+      <div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.5rem;">How It Works</h3>
+        <ul class="bullet-list">
+          <li><strong>EventBridge</strong> scheduled rule fires every 5 minutes</li>
+          <li>Opens <strong>IMAP SSL</strong> to Gmail using App Password auth</li>
+          <li><code style="background:var(--card);padding:0.1rem 0.3rem;border-radius:3px;font-size:var(--small-size);">SEARCH UNSEEN</code> — only new, unprocessed emails</li>
+          <li>Downloads raw <strong>RFC 2822 .eml</strong> (full headers + body)</li>
+          <li>Uploads to <span class="svc s3">S3</span> key <code style="font-size:var(--small-size);">incoming/gmail-{uuid}.eml</code></li>
+          <li>Fires <span class="svc sf">Step Functions</span> execution with S3 key in payload</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="color:var(--teal);font-size:var(--h3-size);margin-bottom:0.5rem;">Reliability Guarantees</h3>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--green);">At-Least-Once Delivery</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Email only marked <code>\Seen</code> after successful S3 upload + trigger. Failure = stays unread = retried next poll.</div>
+          </div>
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--orange);">No Manual Intervention</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Zero human steps to get emails into the pipeline. Self-waking and autonomous.</div>
+          </div>
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--teal);">Future: Gmail Push API</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Replace IMAP polling with real-time push notifications — &lt;1 second latency.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Amit</span><span>5a / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 5b: GMAIL PROCESSING — FULL PIPELINE
+     ================================================================ -->
+<section class="slide" id="s5b" data-slide="6">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.6rem;">
+      <div class="section-num" style="font-size:clamp(2rem,5vw,4rem);">5b</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">Gmail Processing — Full Step Functions Pipeline</h2>
+        <p style="color:var(--muted);font-size:var(--small-size);">6 Lambda steps · Parallel dual-classifier · Graceful fallbacks at every stage</p>
+      </div>
+    </div>
+
+    <div class="reveal pipeline-grid">
+      <div class="step-chip">
+        <div class="step-n">STEP 1</div>
+        <div class="step-t">email_parser <span class="svc lmb" style="font-size:0.58rem;">Lambda</span></div>
+        <div class="step-d">RFC 2822 MIME parse · PII redact · PDF→Textract OCR · DOCX/TXT extract · Mistral 7B inline entity extraction (policy_number, claim_amount, membership_no, 30+ Laya form fields)</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">STEP 2 — PARALLEL</div>
+        <div class="step-t">
+          <span class="svc lmb" style="font-size:0.58rem;">classify_intent_by_llm</span>
+          <span style="font-size:0.7rem;color:var(--muted);"> ‖ </span>
+          <span class="svc sm" style="font-size:0.58rem;">classify_intent_by_biobert</span>
+        </div>
+        <div class="step-d">LLM: Mistral 7B → 17 intents → 12 teams · BioBERT: SageMaker serverless endpoint, hardcoded alphabetical labels · FallbackBioBERT on timeout</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">STEP 3</div>
+        <div class="step-t">rag_retrieval <span class="svc lmb" style="font-size:0.58rem;">Lambda</span></div>
+        <div class="step-d">HyDE: Mistral 7B generates hypothetical answer → embed · BM25 keyword + Titan V2 vector (1024-dim) · RRF fusion · Mistral 7B cross-encoder rerank → top 3–5 policy doc chunks</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">STEP 4</div>
+        <div class="step-t">crm_validation <span class="svc lmb" style="font-size:0.58rem;">Lambda</span></div>
+        <div class="step-d">Mistral 7B Text-to-SQL → DynamoDB customers/policy lookup · Validates: customer exists, policy active, coverage in scope · SetEmptyCRM fallback on error</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">STEP 5</div>
+        <div class="step-t">llm_response <span class="svc lmb" style="font-size:0.58rem;">Lambda</span></div>
+        <div class="step-d">Mistral 7B / Llama 3.1 8B (fallback) generates personalised reply grounded in RAG docs + CRM context · 8-dim quality judge scores output → final confidence_score</div>
+      </div>
+      <div class="step-chip" style="border-color:rgba(255,153,0,0.4);">
+        <div class="step-n">STEP 6</div>
+        <div class="step-t">email_sender <span class="svc ses" style="font-size:0.58rem;">SES</span></div>
+        <div class="step-d">≥0.8 → auto via Amazon SES · 0.5–0.8 → human review queue · &lt;0.5 → escalate · Result → DynamoDB email_processing → Dashboard</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Yiling Lei</span><span>5b / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 5c: KNOWLEDGE BASE INGESTION
+     ================================================================ -->
+<section class="slide" id="s5c" data-slide="7">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">5c</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">Knowledge Base Ingestion</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">The Memory of InsureMail AI — Grounding Every Response in Real Policy Documents</p>
+      </div>
+    </div>
+
+    <div class="reveal grid-2" style="gap:0.8rem;">
+      <div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.5rem;">Data Source — Laya Healthcare Crawler</h3>
+        <ul class="bullet-list">
+          <li><code style="background:var(--card);padding:0.1rem 0.3rem;border-radius:3px;font-size:var(--small-size);">scripts/crawl_laya.py</code> — targets public Laya Healthcare website</li>
+          <li>Extracts: <strong>policy terms</strong>, coverage guides, claim procedures, pre-auth requirements, FAQs, network provider info</li>
+          <li>Output: structured <code style="font-size:var(--small-size);">.jsonl</code> knowledge documents</li>
+          <li>Loaded via <code style="font-size:var(--small-size);">scripts/load_knowledge_docs.py</code></li>
+        </ul>
+        <div style="margin-top:0.8rem;">
+          <h3 style="color:var(--teal);font-size:var(--h3-size);margin-bottom:0.4rem;">Why This Matters</h3>
+          <p style="font-size:var(--body-size);color:var(--muted);">Without a populated KB, the response generator produces plausible but <strong style="color:var(--red);">generic answers</strong>. With it, every reply is grounded in the actual policy documents that apply to that customer's specific query.</p>
+        </div>
+      </div>
+      <div>
+        <h3 style="color:var(--purple);font-size:var(--h3-size);margin-bottom:0.5rem;">Ingestion Pipeline</h3>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--orange);">500-Token Chunking, 50-Token Overlap</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">No sentence cut at boundaries. Semantic continuity preserved.</div>
+          </div>
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--teal);">MD5 Hash Deduplication</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Never re-embeds identical content. Idempotent — safe to re-run on website updates.</div>
+          </div>
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--purple);">Titan Embeddings V2 — 1024-dim</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">14 document categories stored in DynamoDB <code style="font-size:var(--small-size);">kb_embeddings</code>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Pawan</span><span>5c / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 5d: SAGEMAKER DEPLOYMENT
+     ================================================================ -->
+<section class="slide" id="s5d" data-slide="8">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">5d</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">Model Deployment on SageMaker</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">Serverless BioBERT Inference Endpoint — Pay Per Invocation</p>
+      </div>
+    </div>
+
+    <div class="reveal grid-2" style="gap:0.8rem;">
+      <div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.5rem;">Endpoint Configuration</h3>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          <div class="metric-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-size:var(--body-size);font-weight:600;">SageMaker Serverless Inference</div>
+              <span class="badge badge-pass">Active</span>
+            </div>
+            <div style="font-size:var(--small-size);color:var(--muted);">4096 MB · max concurrency 5 · CPU inference · HuggingFace PyTorch DLC</div>
+          </div>
+          <div class="metric-card">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-size:var(--small-size);color:var(--muted);">Cold start</span>
+              <span style="font-size:var(--body-size);color:var(--yellow);font-weight:600;">60–90s</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-size:var(--small-size);color:var(--muted);">Warm request</span>
+              <span style="font-size:var(--body-size);color:var(--green);font-weight:600;">2–5s</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-size:var(--small-size);color:var(--muted);">Cost idle</span>
+              <span style="font-size:var(--body-size);color:var(--green);font-weight:600;">$0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="color:var(--teal);font-size:var(--h3-size);margin-bottom:0.5rem;">Deployment Flow</h3>
+        <ul class="bullet-list">
+          <li><strong>model.tar.gz</strong> contains: BioBERT weights (safetensors) + tokenizer + <code style="font-size:var(--small-size);">inference.py</code> + <code style="font-size:var(--small-size);">mlb.pkl</code> label binarizer</li>
+          <li>Uploaded to <span class="svc s3">S3</span> → registered as SageMaker Model → Serverless endpoint config deployed</li>
+          <li>Invocation path: Step Functions → <span class="svc lmb">classify_intent_by_biobert</span> → <code style="font-size:var(--small-size);">sagemaker:invoke_endpoint</code> → JSON response</li>
+          <li>Response payload: <code style="font-size:var(--small-size);">intent, confidence, multi_intents, route_team, all_scores</code></li>
+          <li>Full lifecycle managed by <strong>Terraform</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Vihang</span><span>5d / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 5e: BIOBERT FINE-TUNING
+     ================================================================ -->
+<section class="slide" id="s5e" data-slide="9">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">5e</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">BioBERT Fine-tuning for Insurance Intent</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">Base: dmis-lab/biobert-base-cased-v1.2 — Pre-trained on PubMed + PMC</p>
+      </div>
+    </div>
+
+    <div class="reveal grid-2" style="gap:0.8rem;">
+      <div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.5rem;">Why BioBERT?</h3>
+        <ul class="bullet-list">
+          <li>Insurance language contains <strong>medical terminology</strong> — ICD codes, drug names, clinical phrases like "pre-authorisation"</li>
+          <li>BioBERT pre-trained on biomedical literature gives a head start vs general BERT</li>
+          <li>Fine-tuned on <strong>17-class insurance intent taxonomy</strong> — aligns exactly with LLM classifier set</li>
+        </ul>
+        <div style="margin-top:0.8rem;">
+          <h3 style="color:var(--teal);font-size:var(--h3-size);margin-bottom:0.4rem;">Key Engineering Lesson</h3>
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--yellow);">Label Order = Hardcoded Alphabetical</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">BIOBERT_LABELS list fixed in alphabetical order in Lambda. If order changes between training and inference, every prediction is wrong. Version-safe by design.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="color:var(--purple);font-size:var(--h3-size);margin-bottom:0.5rem;">17 Intent Classes (Alphabetical)</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.25rem;">
+          <!-- 17 intent labels, two columns -->
+          <span style="font-size:var(--small-size);color:var(--muted);">broker_query</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">cancellation_request</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">claim_reimburse_query</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">claim_status</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">claim_submission</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">complaint</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">coverage_query</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">dependent_addition</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">document_followup</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">enrollment_new_policy</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">hospital_network_query</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">id_verification</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">other</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">payment_issue</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">policy_change</span>
+          <span style="font-size:var(--small-size);color:var(--muted);">pre_authorisation</span>
+          <span style="font-size:var(--small-size);color:var(--orange);font-weight:600;">renewal_query</span>
+        </div>
+        <div style="margin-top:0.8rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <span class="badge badge-pass">100% accuracy — 20-email eval</span>
+          <span class="badge badge-info">Runs parallel with LLM on every email</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Vihang</span><span>5e / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 5f: DASHBOARD DISPLAY
+     ================================================================ -->
+<section class="slide" id="s5f" data-slide="10">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">5f</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">Dashboard Display</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">React + Vite · S3 + CloudFront · Real-time pipeline visibility</p>
+      </div>
+    </div>
+
+    <div class="reveal grid-2" style="gap:0.8rem;">
+      <div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.5rem;">6 Dashboard Pages</h3>
+        <div style="display:flex;flex-direction:column;gap:0.35rem;">
+          <div class="metric-card" style="padding:0.4rem 0.6rem;">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--orange);">Dashboard</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">KPI summary: total emails, auto-response rate, avg confidence, composite score</div>
+          </div>
+          <div class="metric-card" style="padding:0.4rem 0.6rem;">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--teal);">EmailsList + EmailDetail</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Paginated table · full pipeline trace per email: intent, entities, RAG context, CRM match, response preview</div>
+          </div>
+          <div class="metric-card" style="padding:0.4rem 0.6rem;">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--purple);">Evaluations — 7 Tabs</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">E2E Pipeline · Intent &amp; Routing · Attachment Parsing · Entity Extraction · RAG Retrieval · Response Generation · Reference</div>
+          </div>
+          <div class="metric-card" style="padding:0.4rem 0.6rem;">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--green);">ModelMetrics + RAGMetrics</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Per-model latency · accuracy breakdown · knowledge base coverage stats</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="color:var(--teal);font-size:var(--h3-size);margin-bottom:0.5rem;">Architecture</h3>
+        <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.8rem;">
+          <span class="svc cf">CloudFront</span>
+          <span style="color:var(--muted);">→</span>
+          <span class="svc s3">S3 React App</span>
+          <span style="color:var(--muted);">→</span>
+          <span class="svc ag">API GW</span>
+          <span style="color:var(--muted);">→</span>
+          <span class="svc lmb">api_handlers</span>
+          <span style="color:var(--muted);">→</span>
+          <span class="svc db">DynamoDB</span>
+        </div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.4rem;">Real-Time Control Tower</h3>
+        <ul class="bullet-list">
+          <li>Every pipeline result written to DynamoDB → <strong>immediately visible</strong> in UI</li>
+          <li>Teams monitor every AI decision in real time</li>
+          <li>Manual override routing when confidence signals human needed</li>
+          <li>Evaluation results uploaded to S3 → API → dashboard tabs (lazy-fetch on tab activation)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Ramya</span><span>5f / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 6: BUSINESS VALUE & IMPACT
+     ================================================================ -->
+<section class="slide" id="s6" data-slide="11">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">06</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">Business Value &amp; Impact</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">From manual triage taking hours — to automated triage taking 30 seconds</p>
+      </div>
+    </div>
+
+    <div class="reveal grid-4" style="margin-bottom:0.8rem;">
+      <div class="metric-card">
+        <div class="metric-value">100%</div>
+        <div class="metric-label">Intent accuracy (20-email eval)</div>
+        <span class="badge badge-pass" style="margin-top:0.3rem;">PASSED</span>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" style="color:var(--teal);">= Intent</div>
+        <div class="metric-label">Routing accuracy (deterministic INTENT_TO_ROUTE)</div>
+        <span class="badge badge-info" style="margin-top:0.3rem;">Exact match</span>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" style="color:var(--green);">100%</div>
+        <div class="metric-label">CRM hit rate (customer + policy validated)</div>
+        <span class="badge badge-pass" style="margin-top:0.3rem;">PASSED</span>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" style="color:var(--orange);">&lt;30s</div>
+        <div class="metric-label">End-to-end pipeline: inbox to routed response</div>
+        <span class="badge badge-pass" style="margin-top:0.3rem;">vs. hours manual</span>
+      </div>
+    </div>
+
+    <div class="reveal grid-2" style="gap:0.8rem;">
+      <div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.4rem;">Evaluation Results Summary</h3>
+        <div style="display:flex;flex-direction:column;gap:0.3rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:var(--body-size);">Attachment parsing weighted F1</span>
+            <span class="badge badge-pass">0.877</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:var(--body-size);">Entity extraction F1 (14 doc categories)</span>
+            <span class="badge badge-pass">~0.85</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:var(--body-size);">Response LLM judge avg (Mistral 7B)</span>
+            <span class="badge badge-warn">0.635</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;">
+            <span style="font-size:var(--body-size);">E2E composite score</span>
+            <span class="badge badge-pass">0.7776 ✓</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="color:var(--teal);font-size:var(--h3-size);margin-bottom:0.4rem;">Operational Benefits</h3>
+        <ul class="bullet-list">
+          <li><strong>Scale:</strong> serverless — 10 or 10,000 emails with identical infrastructure</li>
+          <li><strong>Cost:</strong> pay-per-invocation replaces dedicated triage headcount</li>
+          <li><strong>Compliance:</strong> PII redacted before any log storage; full audit trail in DynamoDB</li>
+          <li><strong>Zero failures</strong> across all evaluation runs — graceful fallbacks guarantee delivery</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Pawan</span><span>6 / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 7: FUTURE WORK — ROADMAP
+     ================================================================ -->
+<section class="slide" id="s7" data-slide="12">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">07</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">Future Work — Roadmap</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">The foundation is solid. The roadmap is clear.</p>
+      </div>
+    </div>
+
+    <div class="reveal grid-2" style="gap:0.8rem;">
+      <div>
+        <h3 style="color:var(--orange);font-size:var(--h3-size);margin-bottom:0.5rem;">Immediate Priorities</h3>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--teal);">RAG Embedding Quality</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Current Titan cosine similarity ~0.82 (below 0.95 target). Re-embed with domain-specific chunking or fine-tuned embeddings.</div>
+          </div>
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--orange);">Response Quality → 0.75+</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Improve RAG grounding and response prompt engineering. LLM judge avg currently 0.635.</div>
+          </div>
+          <div class="metric-card">
+            <div style="font-size:var(--body-size);font-weight:600;color:var(--green);">Active Learning Loop</div>
+            <div style="font-size:var(--small-size);color:var(--muted);">Human-corrected routing labels → BioBERT periodic re-fine-tuning. Continuous improvement from production data.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 style="color:var(--purple);font-size:var(--h3-size);margin-bottom:0.5rem;">Medium-Term Enhancements</h3>
+        <ul class="bullet-list">
+          <li><strong>Ensemble voting:</strong> BioBERT + LLM confidence-weighted selection (both already run in parallel)</li>
+          <li><strong>Gmail Push API:</strong> replace IMAP polling — &lt;1 sec email-to-pipeline latency</li>
+          <li><strong>Cognito authentication:</strong> secure the dashboard (prerequisite for production)</li>
+          <li><strong>Extended entities:</strong> ICD codes, CPT procedure codes, drug names from claim forms</li>
+          <li><strong>Multi-language:</strong> Arabic, Spanish, French insurance markets</li>
+          <li><strong>Fraud detection:</strong> anomaly scoring on claim_submission emails</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Yiling Lei</span><span>7 / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 8: END-TO-END DEMO SHOWCASE
+     ================================================================ -->
+<section class="slide" id="s8" data-slide="13">
+  <div class="slide-content">
+    <div class="reveal" style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+      <div class="section-num">08</div>
+      <div>
+        <h2 style="font-size:var(--h2-size);">End-to-End Demo Showcase</h2>
+        <p style="color:var(--muted);font-size:var(--body-size);">Email: "Claim Submission — Outpatient Visit" + PDF claim form attached</p>
+      </div>
+    </div>
+
+    <div class="reveal" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.5rem;flex:1;align-content:start;">
+      <div class="step-chip" style="border-color:rgba(231,21,123,0.4);">
+        <div class="step-n" style="color:var(--pink);">① INBOX</div>
+        <div class="step-t">Gmail receives email</div>
+        <div class="step-d">Subject: "Claim Submission — Outpatient Visit" · PDF claim form attached</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">② POLLER</div>
+        <div class="step-t">EventBridge fires</div>
+        <div class="step-d">IMAP poller finds UNSEEN email · downloads RFC 2822 .eml · uploads to S3 · marks as seen · triggers Step Functions</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">③ PARSE</div>
+        <div class="step-t">email_parser Lambda</div>
+        <div class="step-d">PII redacted · PDF → pypdf → Textract OCR · Mistral 7B extracts: policy_number, claim_amount, date_of_service</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">④ CLASSIFY</div>
+        <div class="step-t">Parallel classifiers</div>
+        <div class="step-d">LLM → claim_submission (0.94) ‖ BioBERT → claim_submission (0.91) · Both agree → strong signal</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">⑤ RAG</div>
+        <div class="step-t">rag_retrieval</div>
+        <div class="step-d">HyDE expansion → BM25 + Titan vector → RRF → 3 policy doc chunks about outpatient claim procedure</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">⑥ CRM</div>
+        <div class="step-t">crm_validation</div>
+        <div class="step-d">Customer found · policy active · outpatient coverage validated in scope</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">⑦ RESPONSE</div>
+        <div class="step-t">llm_response</div>
+        <div class="step-d">Personalised acknowledgement with processing time · grounded in retrieved policy docs · quality judge scores 0.82</div>
+      </div>
+      <div class="step-chip" style="border-color:rgba(63,185,80,0.4);">
+        <div class="step-n" style="color:var(--green);">⑧ SENT</div>
+        <div class="step-t">email_sender → Auto</div>
+        <div class="step-d">Confidence 0.82 ≥ 0.80 → auto-response via Amazon SES · Customer has reply in under 30 seconds</div>
+      </div>
+      <div class="step-chip">
+        <div class="step-n">⑨ DASHBOARD</div>
+        <div class="step-t">EmailDetail</div>
+        <div class="step-d">Full pipeline trace: intent, extracted entities, RAG docs used, CRM match, sent reply text — all visible in real time</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">Yiling Lei</span><span>8 / 14</span></div>
+</section>
+
+<!-- ================================================================
+     SLIDE 9: THANK YOU — Q&A
+     ================================================================ -->
+<section class="slide" id="s9" data-slide="14" style="background:radial-gradient(ellipse at 70% 60%, #1a2332 0%, #0d1117 60%);">
+  <div class="slide-content" style="justify-content:center;align-items:center;text-align:center;">
+    <div class="reveal">
+      <h1 style="font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(2rem,6vw,4.5rem);background:linear-gradient(135deg,#FF9900,#00BCD4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.3em;">
+        Thank You
+      </h1>
+      <p style="color:var(--muted);font-size:var(--h3-size);margin-bottom:1.5rem;">InsureMail AI — Automated Email Classification &amp; Response Pipeline</p>
+      <div class="divider" style="margin:0 auto 1.5rem;"></div>
+    </div>
+
+    <div class="reveal" style="display:flex;justify-content:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+      <span class="badge badge-pass">✓ Composite 0.7776 — PASSED</span>
+      <span class="badge badge-pass">✓ Intent 100%</span>
+      <span class="badge badge-pass">✓ CRM Hit 100%</span>
+      <span class="badge badge-pass">✓ Attachment F1 0.877</span>
+      <span class="badge badge-pass">✓ 0 Pipeline Failures</span>
+    </div>
+
+    <div class="reveal" style="display:flex;justify-content:center;gap:0.6rem;flex-wrap:wrap;">
+      <div class="metric-card" style="text-align:left;min-width:140px;">
+        <div style="font-weight:700;font-size:var(--body-size);">Yiling Lei</div>
+        <div style="font-size:var(--small-size);color:var(--muted);">Architecture · Pipeline · Evaluation</div>
+      </div>
+      <div class="metric-card" style="text-align:left;min-width:140px;">
+        <div style="font-weight:700;font-size:var(--body-size);">Pawan</div>
+        <div style="font-size:var(--small-size);color:var(--muted);">RAG · Knowledge Base · Business Value</div>
+      </div>
+      <div class="metric-card" style="text-align:left;min-width:140px;">
+        <div style="font-weight:700;font-size:var(--body-size);">Vihang</div>
+        <div style="font-size:var(--small-size);color:var(--muted);">SageMaker · BioBERT Fine-tuning</div>
+      </div>
+      <div class="metric-card" style="text-align:left;min-width:140px;">
+        <div style="font-weight:700;font-size:var(--body-size);">Amit</div>
+        <div style="font-size:var(--small-size);color:var(--muted);">Gmail Poller Scheduled Task</div>
+      </div>
+      <div class="metric-card" style="text-align:left;min-width:140px;">
+        <div style="font-weight:700;font-size:var(--body-size);">Ramya</div>
+        <div style="font-size:var(--small-size);color:var(--muted);">React Dashboard</div>
+      </div>
+    </div>
+
+    <div class="reveal" style="margin-top:1.5rem;color:var(--muted);font-size:var(--small-size);">
+      We welcome questions on any module — architecture, models, RAG, evaluation, or the dashboard.
+    </div>
+  </div>
+  <div class="slide-label"><span class="speaker-tag">All</span><span>9 / 14</span></div>
+</section>
+
+
+<!-- ================================================================
+     JAVASCRIPT: Navigation + Cursor Trail + Particles + Animations
+     ================================================================ -->
+<script>
+/* ================================================================
+   1. SLIDE NAVIGATION
+   ================================================================ */
+(function() {
+  const slides = document.querySelectorAll('.slide');
+  const totalSlides = slides.length;
+  let current = 0;
+
+  const dotsContainer = document.getElementById('nav-dots');
+  slides.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    dot.title = 'Slide ' + (i + 1);
+    dot.addEventListener('click', () => scrollToSlide(i));
+    dotsContainer.appendChild(dot);
+  });
+
+  function updateUI(idx) {
+    current = idx;
+    document.querySelectorAll('.nav-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === idx);
+    });
+    const pct = totalSlides > 1 ? (idx / (totalSlides - 1)) * 100 : 100;
+    document.getElementById('progress-bar').style.width = pct + '%';
+  }
+
+  function scrollToSlide(idx) {
+    slides[idx].scrollIntoView({ behavior: 'smooth' });
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const idx = Array.from(slides).indexOf(entry.target);
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        updateUI(idx);
+        triggerCounters(entry.target);
+      }
+    });
+  }, { threshold: 0.5 });
+
+  slides.forEach(s => observer.observe(s));
+
+  document.addEventListener('keydown', (e) => {
+    if (['ArrowDown', 'ArrowRight', 'Space', 'PageDown'].includes(e.code)) {
+      e.preventDefault();
+      if (current < totalSlides - 1) scrollToSlide(current + 1);
+    } else if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.code)) {
+      e.preventDefault();
+      if (current > 0) scrollToSlide(current - 1);
+    } else if (e.code === 'Home') { e.preventDefault(); scrollToSlide(0); }
+      else if (e.code === 'End')  { e.preventDefault(); scrollToSlide(totalSlides - 1); }
+  });
+
+  let touchStartY = 0;
+  document.addEventListener('touchstart', (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    const delta = touchStartY - e.changedTouches[0].clientY;
+    if (Math.abs(delta) > 50) {
+      if (delta > 0 && current < totalSlides - 1) scrollToSlide(current + 1);
+      else if (delta < 0 && current > 0) scrollToSlide(current - 1);
+    }
+  });
+
+  let wheelLock = false;
+  document.addEventListener('wheel', (e) => {
+    if (wheelLock) return;
+    wheelLock = true;
+    setTimeout(() => { wheelLock = false; }, 800);
+    if (e.deltaY > 0 && current < totalSlides - 1) scrollToSlide(current + 1);
+    else if (e.deltaY < 0 && current > 0) scrollToSlide(current - 1);
+  }, { passive: true });
+
+  updateUI(0);
+})();
+
+/* ================================================================
+   2. CUSTOM CURSOR WITH DRAG TRAIL
+   ================================================================ */
+(function() {
+  const TRAIL_COUNT = 14;
+  let mx = window.innerWidth / 2, my = window.innerHeight / 2;
+  let cx = mx, cy = my;
+  let isDragging = false;
+
+  // Main ring
+  const ring = document.createElement('div');
+  ring.id = 'cursor-ring';
+  document.body.appendChild(ring);
+
+  // Precise dot
+  const dot = document.createElement('div');
+  dot.id = 'cursor-dot';
+  document.body.appendChild(dot);
+
+  // Trail particles — each follows the previous with diminishing speed
+  const trail = Array.from({ length: TRAIL_COUNT }, (_, i) => {
+    const size = Math.max(2.5, 9.5 - i * 0.52);
+    const opacity = (1 - i / TRAIL_COUNT) * 0.62;
+    const el = document.createElement('div');
+    el.className = 'cursor-trail';
+    el.style.cssText = `width:${size}px;height:${size}px;opacity:${opacity};`;
+    document.body.appendChild(el);
+    return { el, x: mx, y: my };
+  });
+
+  // Track mouse
+  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+  // Drag state — ring expands on mousedown
+  document.addEventListener('mousedown', e => {
+    isDragging = true;
+    ring.classList.add('dragging');
+    // Click ripple
+    const r = document.createElement('div');
+    r.className = 'cursor-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top  = e.clientY + 'px';
+    document.body.appendChild(r);
+    setTimeout(() => r.remove(), 700);
+  });
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+    ring.classList.remove('dragging');
+  });
+
+  // Hover state — ring enlarges on interactive elements
+  const hoverSel = 'a,button,.nav-dot,.metric-card,.step-chip,.svc,.badge,.arch-col,.team-member';
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest(hoverSel)) ring.classList.add('hovering');
+  });
+  document.addEventListener('mouseout', e => {
+    if (e.target.closest(hoverSel)) ring.classList.remove('hovering');
+  });
+
+  // When dragging across slide content, color trail teal
+  document.addEventListener('mousemove', () => {
+    if (isDragging) {
+      trail.forEach(t => { t.el.style.background = 'rgba(0,188,212,0.65)'; });
+    } else {
+      trail.forEach(t => { t.el.style.background = 'rgba(255,153,0,0.55)'; });
+    }
+  });
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  (function tick() {
+    // Ring follows mouse with smooth lag
+    cx = lerp(cx, mx, 0.11);
+    cy = lerp(cy, my, 0.11);
+    ring.style.left = cx + 'px';
+    ring.style.top  = cy + 'px';
+
+    // Dot snaps to exact mouse position
+    dot.style.left = mx + 'px';
+    dot.style.top  = my + 'px';
+
+    // Each trail node follows the node ahead of it — creates comet tail
+    let px = cx, py = cy;
+    trail.forEach((t, i) => {
+      const speed = Math.max(0.035, 0.30 - i * 0.018);
+      t.x = lerp(t.x, px, speed);
+      t.y = lerp(t.y, py, speed);
+      t.el.style.left = t.x + 'px';
+      t.el.style.top  = t.y + 'px';
+      px = t.x; py = t.y;
+    });
+
+    requestAnimationFrame(tick);
+  })();
+})();
+
+/* ================================================================
+   3. PARTICLE CANVAS BACKGROUNDS — slides 1 & 9
+   ================================================================ */
+(function() {
+  const PALETTE = [
+    [255,153,  0],   // orange
+    [  0,188,212],   // teal
+    [140, 79,255],   // purple
+    [ 63,185, 80],   // green
+    [231, 21,123],   // pink
+  ];
+
+  function spawnCanvas(slideEl) {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'particle-canvas';
+    slideEl.prepend(canvas);
+
+    const ctx = canvas.getContext('2d');
+    const N = 60;
+    let W, H;
+
+    const particles = Array.from({ length: N }, () => ({
+      x: 0, y: 0, vx: 0, vy: 0, r: 0, c: null, a: 0
+    }));
+
+    function init() {
+      W = canvas.width  = slideEl.offsetWidth;
+      H = canvas.height = slideEl.offsetHeight;
+      particles.forEach(p => resetParticle(p, true));
+    }
+
+    function resetParticle(p, initial) {
+      p.x  = Math.random() * W;
+      p.y  = initial ? Math.random() * H : (Math.random() > 0.5 ? -5 : H + 5);
+      p.vx = (Math.random() - 0.5) * 0.45;
+      p.vy = (Math.random() - 0.5) * 0.45;
+      p.r  = Math.random() * 1.8 + 0.4;
+      p.c  = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+      p.a  = Math.random() * 0.45 + 0.07;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+
+      // Connection lines
+      for (let i = 0; i < N; i++) {
+        for (let j = i + 1; j < N; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const d  = Math.sqrt(dx*dx + dy*dy);
+          if (d < 130) {
+            const alpha = (1 - d/130) * 0.12;
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(255,153,0,${alpha})`;
+            ctx.lineWidth   = 0.6;
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Dots
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < -10 || p.x > W + 10 || p.y < -10 || p.y > H + 10) resetParticle(p, false);
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${p.c[0]},${p.c[1]},${p.c[2]},${p.a})`;
+        ctx.fill();
+      });
+
+      requestAnimationFrame(draw);
+    }
+
+    init();
+    draw();
+    window.addEventListener('resize', init);
+  }
+
+  // Attach to title slide and Q&A slide
+  const s1 = document.getElementById('s1');
+  const s9 = document.getElementById('s9');
+  if (s1) spawnCanvas(s1);
+  if (s9) spawnCanvas(s9);
+})();
+
+/* ================================================================
+   4. METRIC COUNTER ANIMATION (count-up on slide enter)
+   ================================================================ */
+function triggerCounters(slideEl) {
+  slideEl.querySelectorAll('.metric-value').forEach(el => {
+    if (el.dataset.counted) return;
+    el.dataset.counted = '1';
+
+    const raw = el.textContent.trim();
+    // Parse patterns: "0.7776", "100%", "0.877", "0.635"
+    const num = parseFloat(raw);
+    if (isNaN(num) || raw.length > 8) return;   // skip non-numeric / long labels
+    const isPercent = raw.includes('%');
+    const decimals  = (raw.split('.')[1] || '').length;
+    const suffix    = isPercent ? '%' : '';
+    const target    = num;
+
+    const duration = 1100;
+    const start    = performance.now();
+
+    (function update(now) {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);   // ease-out cubic
+      const val  = target * ease;
+      el.textContent = val.toFixed(decimals) + suffix;
+      if (t < 1) requestAnimationFrame(update);
+      else el.textContent = target.toFixed(decimals) + suffix;
+    })(start);
+  });
+}
+
+/* ================================================================
+   5. 3D CARD TILT ON HOVER
+   ================================================================ */
+(function() {
+  const MAX_TILT  = 9;    // degrees
+  const MAX_GLOW  = 0.18;
+
+  document.querySelectorAll('.metric-card, .step-chip').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const r  = card.getBoundingClientRect();
+      const nx = ((e.clientX - r.left) / r.width  - 0.5) * 2;   // -1 → 1
+      const ny = ((e.clientY - r.top)  / r.height - 0.5) * 2;
+      card.style.transform  = `perspective(500px) rotateY(${nx * MAX_TILT}deg) rotateX(${-ny * MAX_TILT}deg) translateZ(6px)`;
+      card.style.boxShadow  = `${-nx*6}px ${ny*6}px 24px rgba(255,153,0,${MAX_GLOW * Math.abs(nx + ny)})`;
+      card.style.borderColor = 'rgba(255,153,0,0.5)';
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.transform  = '';
+      card.style.boxShadow  = '';
+      card.style.borderColor = '';
+    });
+  });
+})();
+
+/* ================================================================
+   6. ARCH-COL HOVER GLOW
+   ================================================================ */
+document.querySelectorAll('.arch-col').forEach(col => {
+  col.addEventListener('mouseenter', () => {
+    col.style.boxShadow = '0 0 24px rgba(255,153,0,0.15)';
+    col.style.transform = 'translateY(-3px)';
+    col.style.transition = 'transform 0.25s ease, box-shadow 0.25s ease';
+  });
+  col.addEventListener('mouseleave', () => {
+    col.style.boxShadow = '';
+    col.style.transform = '';
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1600" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1500" pageHeight="800" math="0" shadow="0" background="#212529">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ===== DIAGRAM TITLE ===== -->
+    <mxCell id="title" value="InsureMail AI — System Architecture" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#FFFFFF;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="0" y="8" width="1500" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- ================================================================
+         COMPONENT 1 : Gmail Poller / Scheduled Task
+         x=20  y=60  w=200  h=500
+         ================================================================ -->
+    <mxCell id="c1_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2c3038;strokeColor=#495057;strokeWidth=2;arcSize=5;" vertex="1" parent="1">
+      <mxGeometry x="20" y="60" width="200" height="500" as="geometry" />
+    </mxCell>
+    <mxCell id="c1_title" value="Gmail Poller&#xa;Scheduled Task" style="text;html=1;align=center;verticalAlign=top;strokeColor=none;fillColor=none;fontColor=#FFFFFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="20" y="70" width="200" height="44" as="geometry" />
+    </mxCell>
+
+    <!-- EventBridge -->
+    <mxCell id="c1_eb_ann" value="Scheduled Trigger" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="20" y="126" width="200" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c1_eb" value="EventBridge" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#E7157B;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="92" y="148" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Lambda gmail_imap_poller -->
+    <mxCell id="c1_lmb_ann" value="gmail_imap_poller" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="20" y="222" width="200" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c1_lmb" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="92" y="244" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- S3 raw emails -->
+    <mxCell id="c1_s3_ann" value="Raw Email Storage" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="20" y="320" width="200" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c1_s3" value="S3" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#7AA116;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="92" y="342" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Step Functions trigger -->
+    <mxCell id="c1_sf_ann" value="Trigger Workflow" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="20" y="415" width="200" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c1_sf" value="Step Functions" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.step_functions;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#E7157B;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="92" y="437" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- ================================================================
+         COMPONENT 2 : Gmail Processing (Step Functions Pipeline)
+         x=250  y=40  w=400  h=640
+         ================================================================ -->
+    <mxCell id="c2_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2c3038;strokeColor=#495057;strokeWidth=2;arcSize=5;" vertex="1" parent="1">
+      <mxGeometry x="250" y="40" width="400" height="660" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_title" value="Gmail Processing (Step Functions Pipeline)" style="text;html=1;align=center;verticalAlign=top;strokeColor=none;fillColor=none;fontColor=#FFFFFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="250" y="50" width="400" height="44" as="geometry" />
+    </mxCell>
+
+    <!-- Step Functions orchestrator (centered) -->
+    <mxCell id="c2_sf_ann" value="Pipeline Orchestrator" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="250" y="104" width="400" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_sf" value="Step Functions" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.step_functions;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#E7157B;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="422" y="126" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Row 2: email_parser (left) + Bedrock entity extraction (right) -->
+    <mxCell id="c2_ep_ann" value="email_parser + Entity Extract" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="262" y="204" width="170" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_ep" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="302" y="226" width="56" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_br1_ann" value="Mistral 7B / Claude" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="432" y="204" width="170" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_br1" value="Bedrock" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#01A88D;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="532" y="226" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Row 3: Parallel classification box -->
+    <mxCell id="c2_par_ann" value="Intent Classification (Parallel)" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="250" y="306" width="400" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_par_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#343a40;strokeColor=#6C757D;strokeWidth=1;dashed=1;arcSize=5;" vertex="1" parent="1">
+      <mxGeometry x="262" y="327" width="374" height="100" as="geometry" />
+    </mxCell>
+    <!-- LLM classifier -->
+    <mxCell id="c2_llm_ann" value="classify_intent_by_llm" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="262" y="329" width="178" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_llm" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="318" y="350" width="56" height="56" as="geometry" />
+    </mxCell>
+    <!-- BioBERT classifier -->
+    <mxCell id="c2_bio_ann" value="classify_intent_by_biobert" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="446" y="329" width="178" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_bio" value="SageMaker" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sagemaker;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#01A88D;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="502" y="350" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Row 4: rag_retrieval (left) + DynamoDB KB (right) -->
+    <mxCell id="c2_rag_ann" value="rag_retrieval (HyDE + BM25 + RRF)" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="262" y="442" width="170" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_rag" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="302" y="464" width="56" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_db1_ann" value="KB Embeddings + CRM" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="432" y="442" width="170" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_db1" value="DynamoDB" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#C7131F;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="532" y="464" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Row 5: llm_response (left) + email_sender / SES (right) -->
+    <mxCell id="c2_llmr_ann" value="llm_response (Mistral/Llama)" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="262" y="542" width="170" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_llmr" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="302" y="564" width="56" height="56" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_ses_ann" value="email_sender → auto / review / escalate" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="432" y="542" width="170" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c2_ses" value="SES" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ses;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="532" y="564" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- ================================================================
+         COMPONENT 3 : Knowledge Base Ingestion
+         x=680  y=60  w=210  h=560
+         ================================================================ -->
+    <mxCell id="c3_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2c3038;strokeColor=#495057;strokeWidth=2;arcSize=5;" vertex="1" parent="1">
+      <mxGeometry x="680" y="60" width="210" height="560" as="geometry" />
+    </mxCell>
+    <mxCell id="c3_title" value="Knowledge Base&#xa;Ingestion" style="text;html=1;align=center;verticalAlign=top;strokeColor=none;fillColor=none;fontColor=#FFFFFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="680" y="70" width="210" height="44" as="geometry" />
+    </mxCell>
+
+    <!-- Lambda crawl_laya -->
+    <mxCell id="c3_cr_ann" value="Laya Website Crawler" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="680" y="126" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c3_cr" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="752" y="148" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- S3 knowledge docs -->
+    <mxCell id="c3_s3_ann" value="Knowledge Documents" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="680" y="222" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c3_s3" value="S3" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#7AA116;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="752" y="244" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Lambda rag_ingestion -->
+    <mxCell id="c3_ri_ann" value="rag_ingestion (Chunk + Dedup)" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="680" y="318" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c3_ri" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="752" y="340" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Bedrock Titan Embeddings -->
+    <mxCell id="c3_ti_ann" value="Titan V2 Embeddings (1024-dim)" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="680" y="414" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c3_ti" value="Bedrock" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#01A88D;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="752" y="436" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- DynamoDB kb_embeddings -->
+    <mxCell id="c3_db_ann" value="kb_embeddings Store" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="680" y="510" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c3_db" value="DynamoDB" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#C7131F;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="752" y="532" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- ================================================================
+         COMPONENT 4 : Dashboard Display
+         x=920  y=60  w=210  h=560
+         ================================================================ -->
+    <mxCell id="c4_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2c3038;strokeColor=#495057;strokeWidth=2;arcSize=5;" vertex="1" parent="1">
+      <mxGeometry x="920" y="60" width="210" height="560" as="geometry" />
+    </mxCell>
+    <mxCell id="c4_title" value="Dashboard Display" style="text;html=1;align=center;verticalAlign=top;strokeColor=none;fillColor=none;fontColor=#FFFFFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="920" y="70" width="210" height="44" as="geometry" />
+    </mxCell>
+
+    <!-- CloudFront -->
+    <mxCell id="c4_cf_ann" value="CDN Distribution" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="920" y="126" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c4_cf" value="CloudFront" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudfront;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#8C4FFF;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="992" y="148" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- S3 React app -->
+    <mxCell id="c4_s3_ann" value="React App (Vite)" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="920" y="222" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c4_s3" value="S3" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#7AA116;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="992" y="244" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- API Gateway -->
+    <mxCell id="c4_ag_ann" value="REST API Gateway" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="920" y="318" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c4_ag" value="API Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.api_gateway;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#8C4FFF;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="992" y="340" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Lambda api_handlers -->
+    <mxCell id="c4_lmb_ann" value="api_handlers Lambda" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="920" y="414" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c4_lmb" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="992" y="436" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- DynamoDB email_processing -->
+    <mxCell id="c4_db_ann" value="Email Processing Data" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="920" y="510" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c4_db" value="DynamoDB" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#C7131F;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="992" y="532" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- ================================================================
+         COMPONENT 5 : Deployment of Model (BioBERT)
+         x=1160  y=60  w=210  h=460
+         ================================================================ -->
+    <mxCell id="c5_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2c3038;strokeColor=#495057;strokeWidth=2;arcSize=5;" vertex="1" parent="1">
+      <mxGeometry x="1160" y="60" width="210" height="460" as="geometry" />
+    </mxCell>
+    <mxCell id="c5_title" value="Deployment of Model&#xa;(BioBERT Inference)" style="text;html=1;align=center;verticalAlign=top;strokeColor=none;fillColor=none;fontColor=#FFFFFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1160" y="70" width="210" height="44" as="geometry" />
+    </mxCell>
+
+    <!-- S3 model artifacts -->
+    <mxCell id="c5_s3_ann" value="Model Artifacts (model.tar.gz)" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1160" y="126" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c5_s3" value="S3" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#7AA116;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="1232" y="148" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- SageMaker Serverless endpoint -->
+    <mxCell id="c5_sm_ann" value="Serverless Inference Endpoint" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1160" y="222" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c5_sm" value="SageMaker" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sagemaker;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#01A88D;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="1232" y="244" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- API Gateway inference endpoint -->
+    <mxCell id="c5_ag_ann" value="Inference API (/api/model/inference)" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1160" y="318" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c5_ag" value="API Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.api_gateway;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#8C4FFF;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="1232" y="340" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- Lambda sagemaker_inference -->
+    <mxCell id="c5_lmb_ann" value="sagemaker_inference Lambda" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#ADB5BD;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1160" y="414" width="210" height="18" as="geometry" />
+    </mxCell>
+    <mxCell id="c5_lmb" value="Lambda" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;sketch=0;labelBackgroundColor=none;labelFontColor=#ADB5BD;fillColor=#FF9900;strokeColor=none;gradientColor=none;fontSize=9;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="1232" y="436" width="56" height="56" as="geometry" />
+    </mxCell>
+
+    <!-- ================================================================
+         ARROWS / DATA FLOW
+         ================================================================ -->
+
+    <!-- Arrow C1 → C2: Gmail Poller triggers processing pipeline -->
+    <mxCell id="arr1" value="Trigger" style="rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#6C757D;strokeWidth=2;fillColor=none;endArrow=block;endFill=1;fontColor=#6C757D;fontSize=10;" edge="1" source="c1_box" target="c2_box" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow C3 → C2: KB data feeds RAG retrieval (route below components) -->
+    <mxCell id="arr2" value="KB Data" style="rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=1;entryY=0.8;entryDx=0;entryDy=0;strokeColor=#6C757D;strokeWidth=2;fillColor=none;endArrow=block;endFill=1;fontColor=#6C757D;fontSize=10;" edge="1" source="c3_box" target="c2_box" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="670" y="720" />
+          <mxPoint x="660" y="720" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Arrow C2 → C4: Results stored / read by dashboard (route below C3) -->
+    <mxCell id="arr3" value="Pipeline Results" style="rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.9;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=1;entryDx=0;entryDy=0;strokeColor=#6C757D;strokeWidth=2;fillColor=none;endArrow=block;endFill=1;fontColor=#6C757D;fontSize=10;" edge="1" source="c2_box" target="c4_box" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="618" y="740" />
+          <mxPoint x="939" y="740" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Arrow C5 → C2: SageMaker endpoint used by BioBERT classifier (route above) -->
+    <mxCell id="arr4" value="BioBERT API" style="rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.1;exitY=0;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;strokeColor=#01A88D;strokeWidth=2;fillColor=none;endArrow=block;endFill=1;fontColor=#01A88D;fontSize=10;dashed=1;" edge="1" source="c5_box" target="c2_box" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1181" y="28" />
+          <mxPoint x="610" y="28" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+  </root>
+</mxGraphModel>
