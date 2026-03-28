@@ -108,13 +108,24 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 
 def get_dashboard_overview() -> Dict[str, Any]:
-    """Get overview statistics for dashboard"""
+    """Get overview statistics for dashboard with paginated scan"""
     try:
-        # Get email statistics
-        email_response = email_table.scan()
-        emails = email_response.get('Items', [])
+        # Paginated scan to fetch all emails for accurate statistics
+        all_emails = []
+        scan_kwargs: Dict[str, Any] = {}
 
-        total_emails = len(emails)
+        while True:
+            email_response = email_table.scan(**scan_kwargs)
+            all_emails.extend(email_response.get('Items', []))
+
+            # Check if there are more items to scan
+            last_evaluated_key = email_response.get('LastEvaluatedKey')
+            if not last_evaluated_key:
+                break
+
+            scan_kwargs['ExclusiveStartKey'] = last_evaluated_key
+
+        total_emails = len(all_emails)
 
         # Count by confidence level
         confidence_counts = {
@@ -124,20 +135,20 @@ def get_dashboard_overview() -> Dict[str, Any]:
             'pending': 0
         }
 
-        for email in emails:
+        for email in all_emails:
             level = email.get('confidence_level', 'pending')
             confidence_counts[level] = confidence_counts.get(level, 0) + 1
 
         # Calculate average confidence
-        scores = [float(e.get('confidence_score', 0)) for e in emails if e.get('confidence_score')]
+        scores = [float(e.get('confidence_score', 0)) for e in all_emails if e.get('confidence_score')]
         avg_confidence = sum(scores) / len(scores) if scores else 0
 
         # Count auto-responses
-        auto_responses = len([e for e in emails if e.get('action') == 'auto_response'])
+        auto_responses = len([e for e in all_emails if e.get('action') == 'auto_response'])
         auto_response_rate = (auto_responses / total_emails * 100) if total_emails > 0 else 0
 
-        # Get recent emails
-        recent_emails = sorted(emails, key=lambda x: x.get('timestamp', ''), reverse=True)[:10]
+        # Get recent emails - sort by received_at (preferred) then timestamp (fallback)
+        recent_emails = sorted(all_emails, key=lambda x: x.get('received_at') or x.get('timestamp') or '', reverse=True)[:10]
 
         overview = {
             'total_emails': total_emails,
@@ -148,6 +159,7 @@ def get_dashboard_overview() -> Dict[str, Any]:
                 {
                     'email_id': e.get('email_id'),
                     'subject': e.get('subject', 'No subject'),
+                    'received_at': e.get('received_at'),
                     'timestamp': e.get('timestamp'),
                     'confidence_level': e.get('confidence_level'),
                     'action': e.get('action', 'pending')
@@ -168,7 +180,7 @@ def get_dashboard_overview() -> Dict[str, Any]:
 
 
 def get_emails_list(event: Dict[str, Any]) -> Dict[str, Any]:
-    """Get paginated list of emails with optional filters."""
+    """Get paginated list of emails with optional filters, ordered by most recent first."""
     try:
         from boto3.dynamodb.conditions import Attr
         params = event.get('queryStringParameters') or {}
@@ -177,7 +189,7 @@ def get_emails_list(event: Dict[str, Any]) -> Dict[str, Any]:
         action_filter     = params.get('action')
         status_filter     = params.get('processing_status')
 
-        # Build combined FilterExpression — boto3 Attr() handles reserved words internally
+        # Build combined FilterExpression
         filters = []
         if confidence_level:
             filters.append(Attr('confidence_level').eq(confidence_level))
@@ -186,21 +198,39 @@ def get_emails_list(event: Dict[str, Any]) -> Dict[str, Any]:
         if status_filter:
             filters.append(Attr('processing_status').eq(status_filter))
 
-        scan_kwargs: Dict[str, Any] = {'Limit': limit}
+        # Paginated scan to fetch ALL items (DynamoDB scans return max 1MB per call)
+        scan_kwargs: Dict[str, Any] = {}
         if filters:
             fe = filters[0]
             for f in filters[1:]:
                 fe = fe & f
             scan_kwargs['FilterExpression'] = fe
 
-        response = email_table.scan(**scan_kwargs)
-        emails = response.get('Items', [])
-        emails.sort(key=lambda x: x.get('received_at', ''), reverse=True)
+        all_emails = []
+        while True:
+            response = email_table.scan(**scan_kwargs)
+            all_emails.extend(response.get('Items', []))
+
+            # Check if there are more items to scan
+            last_evaluated_key = response.get('LastEvaluatedKey')
+            if not last_evaluated_key:
+                break
+
+            scan_kwargs['ExclusiveStartKey'] = last_evaluated_key
+
+        # Sort by received_at (preferred) or timestamp (fallback), most recent first
+        all_emails.sort(
+            key=lambda x: x.get('received_at') or x.get('timestamp') or '',
+            reverse=True
+        )
+
+        # Apply limit after sorting to get the latest emails
+        limited_emails = all_emails[:limit]
 
         return {
             'statusCode': 200,
             'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'emails': emails, 'count': len(emails)}, cls=DecimalEncoder),
+            'body': json.dumps({'emails': limited_emails, 'count': len(limited_emails), 'total': len(all_emails)}, cls=DecimalEncoder),
         }
 
     except Exception as e:
