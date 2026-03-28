@@ -40,7 +40,7 @@ REGION      = os.environ.get("AWS_REGION", "us-east-1")
 LOGS_BUCKET = os.environ.get("RESULTS_BUCKET", "insuremail-ai-dev-logs")
 LAMBDA_NAME = os.environ.get("RAG_LAMBDA", "insuremail-ai-dev-rag-retrieval")
 CONCURRENCY         = 5
-SIMILARITY_THRESHOLD = 0.95   # minimum cosine similarity to count as a relevant hit
+SIMILARITY_THRESHOLD = 0.70   # minimum cosine similarity to count as a relevant hit
 
 lambda_client = boto3.client("lambda", region_name=REGION)
 s3_client     = boto3.client("s3",     region_name=REGION)

@@ -1,0 +1,578 @@
+{
+  "evaluation_timestamp": "2026-03-24T16:29:13.564403Z",
+  "dataset_path": "/Users/leiyiling/IdeaProjects/auto_email_classification_prod/tests/test_data/claim_forms/claim_form_gold_dataset.jsonl",
+  "model_versions": {
+    "entity_extractor": "mistral.mistral-7b-instruct-v0:2",
+    "aws_region": "us-east-1"
+  },
+  "run_summary": {
+    "total_records": 30,
+    "successful": 30,
+    "failed": 0,
+    "avg_confidence": 0.8483,
+    "avg_latency_ms": 6205.8
+  },
+  "overall_score": 0.8608,
+  "field_results": {
+    "membership_no": {
+      "gold_present": 29,
+      "gold_absent": 1,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7586,
+      "f1_exact": 0.8627,
+      "f1_partial": 0.8627,
+      "null_accuracy": 1.0
+    },
+    "title": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7667,
+      "f1_exact": 0.8679,
+      "f1_partial": 0.8679,
+      "null_accuracy": 1.0
+    },
+    "surname": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7667,
+      "f1_exact": 0.8679,
+      "f1_partial": 0.8679,
+      "null_accuracy": 1.0
+    },
+    "forenames": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7667,
+      "f1_exact": 0.8679,
+      "f1_partial": 0.8679,
+      "null_accuracy": 1.0
+    },
+    "date_of_birth": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.6667,
+      "f1_exact": 0.8,
+      "f1_partial": 0.8,
+      "null_accuracy": 1.0
+    },
+    "telephone": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7667,
+      "f1_exact": 0.8679,
+      "f1_partial": 0.8679,
+      "null_accuracy": 1.0
+    },
+    "correspondence_address": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7667,
+      "f1_exact": 0.8679,
+      "f1_partial": 0.8679,
+      "null_accuracy": 1.0
+    },
+    "mri_date": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "mri_reason_for_referral": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "mri_centre": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "mri_procedure": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "mri_referring_gp": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.4,
+      "f1_exact": 0.5714,
+      "f1_partial": 0.7273,
+      "null_accuracy": 1.0
+    },
+    "mri_consultant_code": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "accident_date": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 0.8,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8,
+      "f1_partial": 0.8,
+      "null_accuracy": 0.96
+    },
+    "accident_description": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 0.8333,
+      "recall_exact": 1.0,
+      "f1_exact": 0.9091,
+      "f1_partial": 0.9091,
+      "null_accuracy": 0.96
+    },
+    "third_party_details": {
+      "gold_present": 3,
+      "gold_absent": 27,
+      "precision_exact": 1.0,
+      "recall_exact": 1.0,
+      "f1_exact": 1.0,
+      "f1_partial": 1.0,
+      "null_accuracy": 1.0
+    },
+    "dental_injury_date": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "dental_injury_place": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "dental_injury_description": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "dental_treatment_start": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "dental_treatment_end": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "account_holder_name": {
+      "gold_present": 29,
+      "gold_absent": 1,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7586,
+      "f1_exact": 0.8627,
+      "f1_partial": 0.8627,
+      "null_accuracy": 1.0
+    },
+    "account_number": {
+      "gold_present": 29,
+      "gold_absent": 1,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7586,
+      "f1_exact": 0.8627,
+      "f1_partial": 0.8627,
+      "null_accuracy": 1.0
+    },
+    "bank_sort_code": {
+      "gold_present": 28,
+      "gold_absent": 2,
+      "precision_exact": 1.0,
+      "recall_exact": 0.75,
+      "f1_exact": 0.8571,
+      "f1_partial": 0.8571,
+      "null_accuracy": 1.0
+    },
+    "bank_name_address": {
+      "gold_present": 28,
+      "gold_absent": 2,
+      "precision_exact": 1.0,
+      "recall_exact": 0.75,
+      "f1_exact": 0.8571,
+      "f1_partial": 0.8571,
+      "null_accuracy": 1.0
+    },
+    "declaration_date": {
+      "gold_present": 29,
+      "gold_absent": 1,
+      "precision_exact": 1.0,
+      "recall_exact": 0.5172,
+      "f1_exact": 0.6818,
+      "f1_partial": 0.6818,
+      "null_accuracy": 1.0
+    },
+    "expenses_recoverable": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "null_accuracy": 1.0
+    },
+    "recovery_via_solicitor": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "null_accuracy": 1.0
+    },
+    "recovery_via_piab": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "null_accuracy": 1.0
+    }
+  },
+  "numeric_field_results": {
+    "receipts_total_cost": {
+      "gold_present": 30,
+      "accuracy_within_5pct": 0.7667,
+      "mae": 0.0
+    },
+    "dental_cost": {
+      "gold_present": 5,
+      "accuracy_within_5pct": 0.8,
+      "mae": 0.0
+    }
+  },
+  "receipts_results": {
+    "total_gold_rows": 63,
+    "treatment_type_f1": 0.885,
+    "cost_within_5pct_accuracy": 0.7937
+  },
+  "dependants_results": {
+    "records_with_dependants": 3,
+    "detection_recall": 1.0,
+    "name_match_f1": 1.0
+  },
+  "scenario_breakdown": {
+    "gp_physio_receipts": {
+      "n": 10,
+      "errors": 0,
+      "avg_confidence": 0.75,
+      "avg_latency_ms": 5896.0
+    },
+    "accident_section": {
+      "n": 5,
+      "errors": 0,
+      "avg_confidence": 0.82,
+      "avg_latency_ms": 6632.0
+    },
+    "dental_emergency": {
+      "n": 5,
+      "errors": 0,
+      "avg_confidence": 0.9,
+      "avg_latency_ms": 6135.0
+    },
+    "mri_scan": {
+      "n": 5,
+      "errors": 0,
+      "avg_confidence": 0.9,
+      "avg_latency_ms": 6721.0
+    },
+    "dependant_claim": {
+      "n": 3,
+      "errors": 0,
+      "avg_confidence": 1.0,
+      "avg_latency_ms": 6306.0
+    },
+    "incomplete_form": {
+      "n": 2,
+      "errors": 0,
+      "avg_confidence": 0.925,
+      "avg_latency_ms": 5427.0
+    }
+  },
+  "record_details": [
+    {
+      "test_id": "CF-001",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 6125,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-002",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5699,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-003",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5663,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-004",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5732,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-005",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5769,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-006",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5819,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-007",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 6244,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-008",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 6130,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-009",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5841,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-010",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5942,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-011",
+      "scenario": "accident_section",
+      "latency_ms": 6757,
+      "bedrock_called": true,
+      "extraction_confidence": 0.7,
+      "error": null
+    },
+    {
+      "test_id": "CF-012",
+      "scenario": "accident_section",
+      "latency_ms": 6851,
+      "bedrock_called": true,
+      "extraction_confidence": 0.7,
+      "error": null
+    },
+    {
+      "test_id": "CF-013",
+      "scenario": "accident_section",
+      "latency_ms": 5937,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-014",
+      "scenario": "accident_section",
+      "latency_ms": 6856,
+      "bedrock_called": true,
+      "extraction_confidence": 0.7,
+      "error": null
+    },
+    {
+      "test_id": "CF-015",
+      "scenario": "accident_section",
+      "latency_ms": 6758,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-016",
+      "scenario": "dental_emergency",
+      "latency_ms": 5934,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-017",
+      "scenario": "dental_emergency",
+      "latency_ms": 6203,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-018",
+      "scenario": "dental_emergency",
+      "latency_ms": 5991,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-019",
+      "scenario": "dental_emergency",
+      "latency_ms": 6194,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-020",
+      "scenario": "dental_emergency",
+      "latency_ms": 6352,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-021",
+      "scenario": "mri_scan",
+      "latency_ms": 6684,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-022",
+      "scenario": "mri_scan",
+      "latency_ms": 6452,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-023",
+      "scenario": "mri_scan",
+      "latency_ms": 6427,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-024",
+      "scenario": "mri_scan",
+      "latency_ms": 7194,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-025",
+      "scenario": "mri_scan",
+      "latency_ms": 6850,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-026",
+      "scenario": "dependant_claim",
+      "latency_ms": 6557,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-027",
+      "scenario": "dependant_claim",
+      "latency_ms": 6141,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-028",
+      "scenario": "dependant_claim",
+      "latency_ms": 6219,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-029",
+      "scenario": "incomplete_form",
+      "latency_ms": 5566,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-030",
+      "scenario": "incomplete_form",
+      "latency_ms": 5288,
+      "bedrock_called": true,
+      "extraction_confidence": 0.85,
+      "error": null
+    }
+  ]
+}

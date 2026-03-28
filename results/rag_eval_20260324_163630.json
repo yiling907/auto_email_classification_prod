@@ -1,0 +1,303 @@
+{
+  "evaluation_timestamp": "2026-03-24T16:36:30.701683Z",
+  "dataset_path": "/Users/leiyiling/IdeaProjects/auto_email_classification_prod/tests/test_data/laya_synthetic_dataset_starter/emails.jsonl",
+  "lambda_name": "insuremail-ai-dev-rag-retrieval",
+  "run_summary": {
+    "n_emails": 30,
+    "n_succeeded": 30,
+    "n_failed": 0,
+    "avg_latency_ms": 19788.5
+  },
+  "rag_retrieval": {
+    "hit_rate": 1.0,
+    "empty_retrieval_rate": 0.0,
+    "avg_docs_retrieved": 5.0,
+    "avg_doc_precision": 0.0,
+    "hits": 30,
+    "total": 30,
+    "per_intent": {
+      "pre_authorisation": 1.0,
+      "document_followup": 1.0,
+      "coverage_query": 1.0,
+      "payment_issue": 1.0,
+      "claim_submission": 1.0,
+      "claim_status": 1.0,
+      "id_verification": 1.0,
+      "renewal_query": 1.0,
+      "policy_change": 1.0,
+      "dependent_addition": 1.0
+    }
+  },
+  "per_email_results": [
+    {
+      "email_id": "EML-000002",
+      "intent": "pre_authorisation",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 7958,
+      "error": null
+    },
+    {
+      "email_id": "EML-000005",
+      "intent": "document_followup",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 8069,
+      "error": null
+    },
+    {
+      "email_id": "EML-000001",
+      "intent": "coverage_query",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 8074,
+      "error": null
+    },
+    {
+      "email_id": "EML-000003",
+      "intent": "payment_issue",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 8719,
+      "error": null
+    },
+    {
+      "email_id": "EML-000004",
+      "intent": "payment_issue",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 9052,
+      "error": null
+    },
+    {
+      "email_id": "EML-000007",
+      "intent": "payment_issue",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 5697,
+      "error": null
+    },
+    {
+      "email_id": "EML-000006",
+      "intent": "claim_submission",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 12646,
+      "error": null
+    },
+    {
+      "email_id": "EML-000009",
+      "intent": "claim_status",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 16642,
+      "error": null
+    },
+    {
+      "email_id": "EML-000008",
+      "intent": "claim_submission",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 24278,
+      "error": null
+    },
+    {
+      "email_id": "EML-000010",
+      "intent": "claim_submission",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 25390,
+      "error": null
+    },
+    {
+      "email_id": "EML-000012",
+      "intent": "coverage_query",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 17446,
+      "error": null
+    },
+    {
+      "email_id": "EML-000011",
+      "intent": "id_verification",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 25301,
+      "error": null
+    },
+    {
+      "email_id": "EML-000013",
+      "intent": "claim_submission",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 22837,
+      "error": null
+    },
+    {
+      "email_id": "EML-000014",
+      "intent": "claim_status",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 21477,
+      "error": null
+    },
+    {
+      "email_id": "EML-000017",
+      "intent": "payment_issue",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 19579,
+      "error": null
+    },
+    {
+      "email_id": "EML-000015",
+      "intent": "claim_status",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 25827,
+      "error": null
+    },
+    {
+      "email_id": "EML-000016",
+      "intent": "claim_submission",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 32054,
+      "error": null
+    },
+    {
+      "email_id": "EML-000018",
+      "intent": "renewal_query",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 24138,
+      "error": null
+    },
+    {
+      "email_id": "EML-000019",
+      "intent": "policy_change",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 23428,
+      "error": null
+    },
+    {
+      "email_id": "EML-000021",
+      "intent": "policy_change",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 19967,
+      "error": null
+    },
+    {
+      "email_id": "EML-000020",
+      "intent": "policy_change",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 24759,
+      "error": null
+    },
+    {
+      "email_id": "EML-000022",
+      "intent": "policy_change",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 21110,
+      "error": null
+    },
+    {
+      "email_id": "EML-000024",
+      "intent": "policy_change",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 17736,
+      "error": null
+    },
+    {
+      "email_id": "EML-000023",
+      "intent": "policy_change",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 27647,
+      "error": null
+    },
+    {
+      "email_id": "EML-000025",
+      "intent": "payment_issue",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 24065,
+      "error": null
+    },
+    {
+      "email_id": "EML-000026",
+      "intent": "claim_submission",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 24673,
+      "error": null
+    },
+    {
+      "email_id": "EML-000028",
+      "intent": "claim_status",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 23438,
+      "error": null
+    },
+    {
+      "email_id": "EML-000027",
+      "intent": "dependent_addition",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 27404,
+      "error": null
+    },
+    {
+      "email_id": "EML-000030",
+      "intent": "id_verification",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 19008,
+      "error": null
+    },
+    {
+      "email_id": "EML-000029",
+      "intent": "coverage_query",
+      "num_docs": 5,
+      "doc_precision": 0.0,
+      "hit": true,
+      "latency_ms": 25235,
+      "error": null
+    }
+  ]
+}

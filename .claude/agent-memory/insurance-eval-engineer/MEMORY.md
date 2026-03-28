@@ -38,3 +38,15 @@
 ## Detailed Findings Reference
 See scripts/run_e2e_assessment.py `_assess_code_quality()` for 8 findings:
 ARCH-01 (HIGH), ARCH-02 (HIGH), ARCH-03 (MEDIUM), ENTITY-01 (LOW), ENTITY-02 (MEDIUM), EVAL-01 (MEDIUM), LOGIC-01 (LOW), PERF-01 (MEDIUM)
+
+## Claim Form Test Dataset & Eval Script
+- Gold dataset: tests/test_data/claim_forms/claim_form_gold_dataset.jsonl (30 records, 6 scenarios)
+- Eval script: scripts/run_claim_extraction_eval.py — imports _extract_via_bedrock directly
+- Scenarios: gp_physio_receipts(10), accident_section(5), dental_emergency(5), mri_scan(5), dependant_claim(3), incomplete_form(2)
+- Membership number format in claim forms: LH-XXXXXX (NOT POL-IE- or MEM- prefix)
+- Irish phone formats: 087/086/083/089 + space + 3 digits + space + 4 digits
+- Irish bank sort codes: XX-XX-XX format (e.g. 90-21-34)
+- _extract_via_bedrock returns (fields_dict, confidence, was_called) — fields dict has `doc_category` popped by _parse_extraction_json before returning
+- NOT_COMPLETED placeholder text in pdf_text maps to null in gold_fields (incomplete form scenario)
+- Partial match uses substring containment (either direction) after normalize_string(); normalise strips apostrophes and hyphens to handle Irish names
+- Overall score weights: core_identity 30%, payment 20%, receipts 20%, specialist_sections 20%, dependants+booleans 10%

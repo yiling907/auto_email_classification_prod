@@ -1,0 +1,232 @@
+{
+  "evaluation_timestamp": "2026-03-24T16:37:25.796638Z",
+  "assessment_source": "/Users/leiyiling/IdeaProjects/auto_email_classification_prod/results/stepfn_assessment_20260322_170314.json",
+  "run_summary": {
+    "assessment_source": "/Users/leiyiling/IdeaProjects/auto_email_classification_prod/results/stepfn_assessment_20260322_170314.json",
+    "assessment_run_id": "32956d897b84",
+    "n_pipeline_emails": 20
+  },
+  "response_generation": {
+    "avg_token_overlap_f1": 0.2982,
+    "hedge_rate": 1.0,
+    "escalation_agreement": 1.0,
+    "response_coverage_rate": 1.0,
+    "n_evaluated": 20,
+    "n_with_response": 20,
+    "n_with_gold_pair": 20,
+    "n_human_review_gold": 6,
+    "per_intent_f1": {
+      "payment_issue": 0.324,
+      "pre_authorisation": 0.3404,
+      "document_followup": 0.3656,
+      "coverage_query": 0.2792,
+      "claim_submission": 0.2527,
+      "claim_status": 0.2692,
+      "id_verification": 0.3516,
+      "policy_change": 0.3118,
+      "renewal_query": 0.3579
+    }
+  },
+  "per_email_results": [
+    {
+      "email_id": "EML-000003",
+      "intent": "payment_issue",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.3617,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000002",
+      "intent": "pre_authorisation",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.3404,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000004",
+      "intent": "payment_issue",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2581,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000005",
+      "intent": "document_followup",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.3656,
+      "hedge": true,
+      "action": "auto_response",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000001",
+      "intent": "coverage_query",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2727,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000006",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2045,
+      "hedge": true,
+      "action": "auto_response",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000008",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2826,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000007",
+      "intent": "payment_issue",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.3146,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000012",
+      "intent": "coverage_query",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2857,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000009",
+      "intent": "claim_status",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2588,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000010",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2366,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000013",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2979,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000011",
+      "intent": "id_verification",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.3516,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000015",
+      "intent": "claim_status",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2791,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000014",
+      "intent": "claim_status",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2697,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000016",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.2418,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000019",
+      "intent": "policy_change",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.3011,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000017",
+      "intent": "payment_issue",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.3614,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000018",
+      "intent": "renewal_query",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.3579,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000020",
+      "intent": "policy_change",
+      "has_response": true,
+      "has_gold": true,
+      "token_overlap_f1": 0.3226,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    }
+  ]
+}

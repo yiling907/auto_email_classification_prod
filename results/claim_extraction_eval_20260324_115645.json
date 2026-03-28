@@ -1,0 +1,578 @@
+{
+  "evaluation_timestamp": "2026-03-24T11:56:45.239721Z",
+  "dataset_path": "/Users/leiyiling/IdeaProjects/auto_email_classification_prod/tests/test_data/claim_forms/claim_form_gold_dataset.jsonl",
+  "model_versions": {
+    "entity_extractor": "mistral.mistral-7b-instruct-v0:2",
+    "aws_region": "us-east-1"
+  },
+  "run_summary": {
+    "total_records": 30,
+    "successful": 30,
+    "failed": 0,
+    "avg_confidence": 0.86,
+    "avg_latency_ms": 5908.4
+  },
+  "overall_score": 0.8769,
+  "field_results": {
+    "membership_no": {
+      "gold_present": 29,
+      "gold_absent": 1,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7931,
+      "f1_exact": 0.8846,
+      "f1_partial": 0.8846,
+      "null_accuracy": 1.0
+    },
+    "title": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "surname": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "forenames": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "date_of_birth": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7,
+      "f1_exact": 0.8235,
+      "f1_partial": 0.8235,
+      "null_accuracy": 1.0
+    },
+    "telephone": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "correspondence_address": {
+      "gold_present": 30,
+      "gold_absent": 0,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "mri_date": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "mri_reason_for_referral": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "mri_centre": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "mri_procedure": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "mri_referring_gp": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.4,
+      "f1_exact": 0.5714,
+      "f1_partial": 0.7273,
+      "null_accuracy": 1.0
+    },
+    "mri_consultant_code": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "accident_date": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 0.8,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8,
+      "f1_partial": 0.8,
+      "null_accuracy": 0.96
+    },
+    "accident_description": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 0.8333,
+      "recall_exact": 1.0,
+      "f1_exact": 0.9091,
+      "f1_partial": 0.9091,
+      "null_accuracy": 0.96
+    },
+    "third_party_details": {
+      "gold_present": 3,
+      "gold_absent": 27,
+      "precision_exact": 1.0,
+      "recall_exact": 1.0,
+      "f1_exact": 1.0,
+      "f1_partial": 1.0,
+      "null_accuracy": 1.0
+    },
+    "dental_injury_date": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "dental_injury_place": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "dental_injury_description": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "dental_treatment_start": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "dental_treatment_end": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision_exact": 1.0,
+      "recall_exact": 0.8,
+      "f1_exact": 0.8889,
+      "f1_partial": 0.8889,
+      "null_accuracy": 1.0
+    },
+    "account_holder_name": {
+      "gold_present": 29,
+      "gold_absent": 1,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7931,
+      "f1_exact": 0.8846,
+      "f1_partial": 0.8846,
+      "null_accuracy": 1.0
+    },
+    "account_number": {
+      "gold_present": 29,
+      "gold_absent": 1,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7931,
+      "f1_exact": 0.8846,
+      "f1_partial": 0.8846,
+      "null_accuracy": 1.0
+    },
+    "bank_sort_code": {
+      "gold_present": 28,
+      "gold_absent": 2,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7857,
+      "f1_exact": 0.88,
+      "f1_partial": 0.88,
+      "null_accuracy": 1.0
+    },
+    "bank_name_address": {
+      "gold_present": 28,
+      "gold_absent": 2,
+      "precision_exact": 1.0,
+      "recall_exact": 0.7857,
+      "f1_exact": 0.88,
+      "f1_partial": 0.88,
+      "null_accuracy": 1.0
+    },
+    "declaration_date": {
+      "gold_present": 29,
+      "gold_absent": 1,
+      "precision_exact": 1.0,
+      "recall_exact": 0.5517,
+      "f1_exact": 0.7111,
+      "f1_partial": 0.7111,
+      "null_accuracy": 1.0
+    },
+    "expenses_recoverable": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "null_accuracy": 1.0
+    },
+    "recovery_via_solicitor": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "null_accuracy": 1.0
+    },
+    "recovery_via_piab": {
+      "gold_present": 5,
+      "gold_absent": 25,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "null_accuracy": 1.0
+    }
+  },
+  "numeric_field_results": {
+    "receipts_total_cost": {
+      "gold_present": 30,
+      "accuracy_within_5pct": 0.8,
+      "mae": 0.0
+    },
+    "dental_cost": {
+      "gold_present": 5,
+      "accuracy_within_5pct": 0.8,
+      "mae": 0.0
+    }
+  },
+  "receipts_results": {
+    "total_gold_rows": 63,
+    "treatment_type_f1": 0.9043,
+    "cost_within_5pct_accuracy": 0.8254
+  },
+  "dependants_results": {
+    "records_with_dependants": 3,
+    "detection_recall": 1.0,
+    "name_match_f1": 1.0
+  },
+  "scenario_breakdown": {
+    "gp_physio_receipts": {
+      "n": 10,
+      "errors": 0,
+      "avg_confidence": 0.8,
+      "avg_latency_ms": 5552.0
+    },
+    "accident_section": {
+      "n": 5,
+      "errors": 0,
+      "avg_confidence": 0.82,
+      "avg_latency_ms": 6484.0
+    },
+    "dental_emergency": {
+      "n": 5,
+      "errors": 0,
+      "avg_confidence": 0.9,
+      "avg_latency_ms": 5880.0
+    },
+    "mri_scan": {
+      "n": 5,
+      "errors": 0,
+      "avg_confidence": 0.9,
+      "avg_latency_ms": 6328.0
+    },
+    "dependant_claim": {
+      "n": 3,
+      "errors": 0,
+      "avg_confidence": 1.0,
+      "avg_latency_ms": 5878.0
+    },
+    "incomplete_form": {
+      "n": 2,
+      "errors": 0,
+      "avg_confidence": 0.85,
+      "avg_latency_ms": 5318.0
+    }
+  },
+  "record_details": [
+    {
+      "test_id": "CF-001",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5853,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-002",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5422,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-003",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5203,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-004",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5420,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-005",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5334,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-006",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5542,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-007",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 6033,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-008",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5884,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-009",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5395,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-010",
+      "scenario": "gp_physio_receipts",
+      "latency_ms": 5436,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-011",
+      "scenario": "accident_section",
+      "latency_ms": 6322,
+      "bedrock_called": true,
+      "extraction_confidence": 0.7,
+      "error": null
+    },
+    {
+      "test_id": "CF-012",
+      "scenario": "accident_section",
+      "latency_ms": 6653,
+      "bedrock_called": true,
+      "extraction_confidence": 0.7,
+      "error": null
+    },
+    {
+      "test_id": "CF-013",
+      "scenario": "accident_section",
+      "latency_ms": 5999,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-014",
+      "scenario": "accident_section",
+      "latency_ms": 6793,
+      "bedrock_called": true,
+      "extraction_confidence": 0.7,
+      "error": null
+    },
+    {
+      "test_id": "CF-015",
+      "scenario": "accident_section",
+      "latency_ms": 6651,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-016",
+      "scenario": "dental_emergency",
+      "latency_ms": 5941,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-017",
+      "scenario": "dental_emergency",
+      "latency_ms": 6144,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-018",
+      "scenario": "dental_emergency",
+      "latency_ms": 5638,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-019",
+      "scenario": "dental_emergency",
+      "latency_ms": 5813,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-020",
+      "scenario": "dental_emergency",
+      "latency_ms": 5866,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-021",
+      "scenario": "mri_scan",
+      "latency_ms": 6187,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-022",
+      "scenario": "mri_scan",
+      "latency_ms": 6154,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-023",
+      "scenario": "mri_scan",
+      "latency_ms": 6297,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-024",
+      "scenario": "mri_scan",
+      "latency_ms": 6700,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-025",
+      "scenario": "mri_scan",
+      "latency_ms": 6302,
+      "bedrock_called": true,
+      "extraction_confidence": 0.5,
+      "error": null
+    },
+    {
+      "test_id": "CF-026",
+      "scenario": "dependant_claim",
+      "latency_ms": 6023,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-027",
+      "scenario": "dependant_claim",
+      "latency_ms": 5765,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-028",
+      "scenario": "dependant_claim",
+      "latency_ms": 5846,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-029",
+      "scenario": "incomplete_form",
+      "latency_ms": 5327,
+      "bedrock_called": true,
+      "extraction_confidence": 1.0,
+      "error": null
+    },
+    {
+      "test_id": "CF-030",
+      "scenario": "incomplete_form",
+      "latency_ms": 5310,
+      "bedrock_called": true,
+      "extraction_confidence": 0.7,
+      "error": null
+    }
+  ]
+}

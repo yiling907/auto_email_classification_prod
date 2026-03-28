@@ -1,0 +1,583 @@
+{
+  "evaluation_timestamp": "2026-03-24T18:06:48.743669Z",
+  "dataset_path": "/Users/leiyiling/IdeaProjects/auto_email_classification_prod/tests/test_data/laya_synthetic_dataset_starter/emails.jsonl",
+  "lambda_name": "insuremail-ai-dev-classify-intent-by-llm",
+  "run_summary": {
+    "n_emails": 50,
+    "n_succeeded": 50,
+    "n_failed": 0,
+    "avg_latency_ms": 6498.0
+  },
+  "intent_classification": {
+    "accuracy": 0.96,
+    "macro_f1": 0.8364,
+    "n_samples": 50,
+    "n_correct": 48,
+    "per_class": {
+      "pre_authorisation": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 2
+      },
+      "payment_issue": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 5
+      },
+      "document_followup": {
+        "precision": 1.0,
+        "recall": 0.6667,
+        "f1": 0.8,
+        "support": 3
+      },
+      "coverage_query": {
+        "precision": 0.8333,
+        "recall": 1.0,
+        "f1": 0.9091,
+        "support": 5
+      },
+      "claim_submission": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 13
+      },
+      "claim_status": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 6
+      },
+      "id_verification": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 2
+      },
+      "renewal_query": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 2
+      },
+      "policy_change": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 8
+      },
+      "dependent_addition": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 1
+      },
+      "claim_reimbursement_query": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 1
+      },
+      "complaint": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 1
+      },
+      "hospital_network_query": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 1
+      },
+      "other": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      }
+    },
+    "top_confused": [
+      {
+        "true": "hospital_network_query",
+        "predicted": "coverage_query",
+        "count": 1
+      },
+      {
+        "true": "document_followup",
+        "predicted": "other",
+        "count": 1
+      }
+    ]
+  },
+  "routing": {
+    "routing_accuracy": 0.96,
+    "correct": 48,
+    "total": 50,
+    "per_team": {
+      "medical_review_team": 1.0,
+      "finance_support_team": 1.0,
+      "operations_team": 0.8,
+      "customer_support_team": 1.0,
+      "claims_team": 1.0,
+      "renewals_team": 1.0,
+      "policy_admin_team": 1.0,
+      "complaints_team": 1.0,
+      "provider_support_team": 0.0
+    }
+  },
+  "per_email_results": [
+    {
+      "email_id": "EML-000002",
+      "gold_intent": "pre_authorisation",
+      "gold_route": "medical_review_team",
+      "predicted_intent": "pre_authorisation",
+      "predicted_route": "medical_review_team",
+      "latency_ms": 6104,
+      "error": null
+    },
+    {
+      "email_id": "EML-000003",
+      "gold_intent": "payment_issue",
+      "gold_route": "finance_support_team",
+      "predicted_intent": "payment_issue",
+      "predicted_route": "finance_support_team",
+      "latency_ms": 6130,
+      "error": null
+    },
+    {
+      "email_id": "EML-000004",
+      "gold_intent": "payment_issue",
+      "gold_route": "finance_support_team",
+      "predicted_intent": "payment_issue",
+      "predicted_route": "finance_support_team",
+      "latency_ms": 6716,
+      "error": null
+    },
+    {
+      "email_id": "EML-000005",
+      "gold_intent": "document_followup",
+      "gold_route": "operations_team",
+      "predicted_intent": "document_followup",
+      "predicted_route": "operations_team",
+      "latency_ms": 7638,
+      "error": null
+    },
+    {
+      "email_id": "EML-000001",
+      "gold_intent": "coverage_query",
+      "gold_route": "customer_support_team",
+      "predicted_intent": "coverage_query",
+      "predicted_route": "customer_support_team",
+      "latency_ms": 7686,
+      "error": null
+    },
+    {
+      "email_id": "EML-000007",
+      "gold_intent": "payment_issue",
+      "gold_route": "finance_support_team",
+      "predicted_intent": "payment_issue",
+      "predicted_route": "finance_support_team",
+      "latency_ms": 6055,
+      "error": null
+    },
+    {
+      "email_id": "EML-000006",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 6111,
+      "error": null
+    },
+    {
+      "email_id": "EML-000008",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 6144,
+      "error": null
+    },
+    {
+      "email_id": "EML-000009",
+      "gold_intent": "claim_status",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_status",
+      "predicted_route": "claims_team",
+      "latency_ms": 6757,
+      "error": null
+    },
+    {
+      "email_id": "EML-000010",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 6955,
+      "error": null
+    },
+    {
+      "email_id": "EML-000014",
+      "gold_intent": "claim_status",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_status",
+      "predicted_route": "claims_team",
+      "latency_ms": 4198,
+      "error": null
+    },
+    {
+      "email_id": "EML-000012",
+      "gold_intent": "coverage_query",
+      "gold_route": "customer_support_team",
+      "predicted_intent": "coverage_query",
+      "predicted_route": "customer_support_team",
+      "latency_ms": 6892,
+      "error": null
+    },
+    {
+      "email_id": "EML-000011",
+      "gold_intent": "id_verification",
+      "gold_route": "operations_team",
+      "predicted_intent": "id_verification",
+      "predicted_route": "operations_team",
+      "latency_ms": 6922,
+      "error": null
+    },
+    {
+      "email_id": "EML-000013",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 6361,
+      "error": null
+    },
+    {
+      "email_id": "EML-000015",
+      "gold_intent": "claim_status",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_status",
+      "predicted_route": "claims_team",
+      "latency_ms": 6206,
+      "error": null
+    },
+    {
+      "email_id": "EML-000018",
+      "gold_intent": "renewal_query",
+      "gold_route": "renewals_team",
+      "predicted_intent": "renewal_query",
+      "predicted_route": "renewals_team",
+      "latency_ms": 3999,
+      "error": null
+    },
+    {
+      "email_id": "EML-000016",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 6117,
+      "error": null
+    },
+    {
+      "email_id": "EML-000019",
+      "gold_intent": "policy_change",
+      "gold_route": "policy_admin_team",
+      "predicted_intent": "policy_change",
+      "predicted_route": "policy_admin_team",
+      "latency_ms": 6133,
+      "error": null
+    },
+    {
+      "email_id": "EML-000020",
+      "gold_intent": "policy_change",
+      "gold_route": "policy_admin_team",
+      "predicted_intent": "policy_change",
+      "predicted_route": "policy_admin_team",
+      "latency_ms": 6150,
+      "error": null
+    },
+    {
+      "email_id": "EML-000021",
+      "gold_intent": "policy_change",
+      "gold_route": "policy_admin_team",
+      "predicted_intent": "policy_change",
+      "predicted_route": "policy_admin_team",
+      "latency_ms": 7186,
+      "error": null
+    },
+    {
+      "email_id": "EML-000017",
+      "gold_intent": "payment_issue",
+      "gold_route": "finance_support_team",
+      "predicted_intent": "payment_issue",
+      "predicted_route": "finance_support_team",
+      "latency_ms": 11490,
+      "error": null
+    },
+    {
+      "email_id": "EML-000022",
+      "gold_intent": "policy_change",
+      "gold_route": "policy_admin_team",
+      "predicted_intent": "policy_change",
+      "predicted_route": "policy_admin_team",
+      "latency_ms": 7299,
+      "error": null
+    },
+    {
+      "email_id": "EML-000023",
+      "gold_intent": "policy_change",
+      "gold_route": "policy_admin_team",
+      "predicted_intent": "policy_change",
+      "predicted_route": "policy_admin_team",
+      "latency_ms": 7156,
+      "error": null
+    },
+    {
+      "email_id": "EML-000024",
+      "gold_intent": "policy_change",
+      "gold_route": "policy_admin_team",
+      "predicted_intent": "policy_change",
+      "predicted_route": "policy_admin_team",
+      "latency_ms": 7266,
+      "error": null
+    },
+    {
+      "email_id": "EML-000026",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 3941,
+      "error": null
+    },
+    {
+      "email_id": "EML-000025",
+      "gold_intent": "payment_issue",
+      "gold_route": "finance_support_team",
+      "predicted_intent": "payment_issue",
+      "predicted_route": "finance_support_team",
+      "latency_ms": 6172,
+      "error": null
+    },
+    {
+      "email_id": "EML-000027",
+      "gold_intent": "dependent_addition",
+      "gold_route": "policy_admin_team",
+      "predicted_intent": "dependent_addition",
+      "predicted_route": "policy_admin_team",
+      "latency_ms": 6123,
+      "error": null
+    },
+    {
+      "email_id": "EML-000028",
+      "gold_intent": "claim_status",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_status",
+      "predicted_route": "claims_team",
+      "latency_ms": 6136,
+      "error": null
+    },
+    {
+      "email_id": "EML-000029",
+      "gold_intent": "coverage_query",
+      "gold_route": "customer_support_team",
+      "predicted_intent": "coverage_query",
+      "predicted_route": "customer_support_team",
+      "latency_ms": 6157,
+      "error": null
+    },
+    {
+      "email_id": "EML-000030",
+      "gold_intent": "id_verification",
+      "gold_route": "operations_team",
+      "predicted_intent": "id_verification",
+      "predicted_route": "operations_team",
+      "latency_ms": 6012,
+      "error": null
+    },
+    {
+      "email_id": "EML-000032",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 4037,
+      "error": null
+    },
+    {
+      "email_id": "EML-000031",
+      "gold_intent": "policy_change",
+      "gold_route": "policy_admin_team",
+      "predicted_intent": "policy_change",
+      "predicted_route": "policy_admin_team",
+      "latency_ms": 6191,
+      "error": null
+    },
+    {
+      "email_id": "EML-000033",
+      "gold_intent": "policy_change",
+      "gold_route": "policy_admin_team",
+      "predicted_intent": "policy_change",
+      "predicted_route": "policy_admin_team",
+      "latency_ms": 6962,
+      "error": null
+    },
+    {
+      "email_id": "EML-000036",
+      "gold_intent": "renewal_query",
+      "gold_route": "renewals_team",
+      "predicted_intent": "renewal_query",
+      "predicted_route": "renewals_team",
+      "latency_ms": 4700,
+      "error": null
+    },
+    {
+      "email_id": "EML-000035",
+      "gold_intent": "coverage_query",
+      "gold_route": "customer_support_team",
+      "predicted_intent": "coverage_query",
+      "predicted_route": "customer_support_team",
+      "latency_ms": 7027,
+      "error": null
+    },
+    {
+      "email_id": "EML-000034",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 7164,
+      "error": null
+    },
+    {
+      "email_id": "EML-000037",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 6852,
+      "error": null
+    },
+    {
+      "email_id": "EML-000038",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 6267,
+      "error": null
+    },
+    {
+      "email_id": "EML-000039",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 6023,
+      "error": null
+    },
+    {
+      "email_id": "EML-000041",
+      "gold_intent": "claim_status",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_status",
+      "predicted_route": "claims_team",
+      "latency_ms": 6067,
+      "error": null
+    },
+    {
+      "email_id": "EML-000040",
+      "gold_intent": "document_followup",
+      "gold_route": "operations_team",
+      "predicted_intent": "document_followup",
+      "predicted_route": "operations_team",
+      "latency_ms": 6096,
+      "error": null
+    },
+    {
+      "email_id": "EML-000042",
+      "gold_intent": "claim_status",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_status",
+      "predicted_route": "claims_team",
+      "latency_ms": 6119,
+      "error": null
+    },
+    {
+      "email_id": "EML-000043",
+      "gold_intent": "claim_reimbursement_query",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_reimbursement_query",
+      "predicted_route": "claims_team",
+      "latency_ms": 4131,
+      "error": null
+    },
+    {
+      "email_id": "EML-000044",
+      "gold_intent": "coverage_query",
+      "gold_route": "customer_support_team",
+      "predicted_intent": "coverage_query",
+      "predicted_route": "customer_support_team",
+      "latency_ms": 7279,
+      "error": null
+    },
+    {
+      "email_id": "EML-000046",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 7412,
+      "error": null
+    },
+    {
+      "email_id": "EML-000047",
+      "gold_intent": "complaint",
+      "gold_route": "complaints_team",
+      "predicted_intent": "complaint",
+      "predicted_route": "complaints_team",
+      "latency_ms": 7100,
+      "error": null
+    },
+    {
+      "email_id": "EML-000048",
+      "gold_intent": "claim_submission",
+      "gold_route": "claims_team",
+      "predicted_intent": "claim_submission",
+      "predicted_route": "claims_team",
+      "latency_ms": 6720,
+      "error": null
+    },
+    {
+      "email_id": "EML-000045",
+      "gold_intent": "hospital_network_query",
+      "gold_route": "provider_support_team",
+      "predicted_intent": "coverage_query",
+      "predicted_route": "customer_support_team",
+      "latency_ms": 11950,
+      "error": null
+    },
+    {
+      "email_id": "EML-000049",
+      "gold_intent": "document_followup",
+      "gold_route": "operations_team",
+      "predicted_intent": "other",
+      "predicted_route": "general_support_team",
+      "latency_ms": 6243,
+      "error": null
+    },
+    {
+      "email_id": "EML-000050",
+      "gold_intent": "pre_authorisation",
+      "gold_route": "medical_review_team",
+      "predicted_intent": "pre_authorisation",
+      "predicted_route": "medical_review_team",
+      "latency_ms": 6350,
+      "error": null
+    }
+  ]
+}

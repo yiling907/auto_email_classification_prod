@@ -1,0 +1,223 @@
+{
+  "evaluation_timestamp": "2026-03-24T17:04:38.614719Z",
+  "assessment_source": "/Users/leiyiling/IdeaProjects/auto_email_classification_prod/results/stepfn_assessment_20260322_170314.json",
+  "run_summary": {
+    "assessment_source": "/Users/leiyiling/IdeaProjects/auto_email_classification_prod/results/stepfn_assessment_20260322_170314.json",
+    "assessment_run_id": "32956d897b84",
+    "n_pipeline_emails": 20
+  },
+  "response_generation": {
+    "avg_llm_judge_score": null,
+    "judge_model": "anthropic.claude-3-haiku-20240307-v1:0",
+    "hedge_rate": 1.0,
+    "escalation_agreement": 1.0,
+    "response_coverage_rate": 1.0,
+    "n_evaluated": 20,
+    "n_with_response": 20,
+    "n_with_gold_pair": 20,
+    "n_human_review_gold": 6,
+    "per_intent_f1": {}
+  },
+  "per_email_results": [
+    {
+      "email_id": "EML-000003",
+      "intent": "payment_issue",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000002",
+      "intent": "pre_authorisation",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000004",
+      "intent": "payment_issue",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000005",
+      "intent": "document_followup",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "auto_response",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000001",
+      "intent": "coverage_query",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000006",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "auto_response",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000008",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000007",
+      "intent": "payment_issue",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000012",
+      "intent": "coverage_query",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000009",
+      "intent": "claim_status",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000010",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000013",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000011",
+      "intent": "id_verification",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": true
+    },
+    {
+      "email_id": "EML-000015",
+      "intent": "claim_status",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000014",
+      "intent": "claim_status",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000016",
+      "intent": "claim_submission",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000019",
+      "intent": "policy_change",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000017",
+      "intent": "payment_issue",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000018",
+      "intent": "renewal_query",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    },
+    {
+      "email_id": "EML-000020",
+      "intent": "policy_change",
+      "has_response": true,
+      "has_gold": true,
+      "llm_judge_score": null,
+      "hedge": true,
+      "action": "human_review",
+      "gold_human_review": false
+    }
+  ]
+}

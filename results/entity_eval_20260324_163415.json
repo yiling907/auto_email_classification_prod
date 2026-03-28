@@ -1,0 +1,823 @@
+{
+  "evaluation_timestamp": "2026-03-24T16:34:15.255398Z",
+  "dataset_path": "/Users/leiyiling/IdeaProjects/auto_email_classification_prod/tests/test_data/laya_synthetic_dataset_starter/attachment_content.jsonl",
+  "run_summary": {
+    "n_records": 70,
+    "n_succeeded": 70,
+    "n_failed": 0,
+    "avg_latency_ms": 4196.7,
+    "avg_confidence": 0.768
+  },
+  "overall_score": 0.0233,
+  "per_field": {
+    "bank_name": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "iban_masked": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "account_holder": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "claim_reference": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "policy_number": {
+      "gold_present": 10,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "member_name": {
+      "gold_present": 15,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "treatment_type": {
+      "gold_present": 30,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "amount_claimed": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "provider_name": {
+      "gold_present": 25,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "provider_type": {
+      "gold_present": 25,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "invoice_number": {
+      "gold_present": 25,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "invoice_date": {
+      "gold_present": 25,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "treatment_date": {
+      "gold_present": 30,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "patient_name": {
+      "gold_present": 40,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "member_id": {
+      "gold_present": 25,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "diagnosis_text": {
+      "gold_present": 30,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "amount": {
+      "gold_present": 25,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "currency": {
+      "gold_present": 25,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "tax_amount": {
+      "gold_present": 25,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "receipt_present": {
+      "gold_present": 25,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "document_type": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "full_name": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "date_of_birth": {
+      "gold_present": 5,
+      "precision_exact": 1.0,
+      "recall_exact": 1.0,
+      "f1_exact": 1.0,
+      "f1_partial": 1.0
+    },
+    "document_number": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "expiry_date": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "address_present": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "renewal_year": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "old_premium": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "new_premium": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "renewal_date": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "plan_name": {
+      "gold_present": 10,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "member_count": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "form_id": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "consultant_name": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "hospital_name": {
+      "gold_present": 10,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "proposed_treatment": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "estimated_cost": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "urgency_level": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "referrer_name": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "referral_reason": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "referral_date": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "discharge_date": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    },
+    "complaint_topic": {
+      "gold_present": 5,
+      "precision_exact": 0.0,
+      "recall_exact": 0.0,
+      "f1_exact": 0.0,
+      "f1_partial": 0.0
+    }
+  },
+  "per_category": {
+    "bank_proof": 0.0,
+    "claim_form": 0.0,
+    "optical_receipt": 0.0,
+    "dental_invoice": 0.0,
+    "medical_invoice": 0.0,
+    "id_document": 0.1667,
+    "renewal_notice": 0.0,
+    "preauth_form": 0.0,
+    "gp_referral_letter": 0.0,
+    "physiotherapy_invoice": 0.0,
+    "consultant_receipt": 0.0,
+    "membership_certificate": 0.0,
+    "discharge_summary": 0.0,
+    "complaint_letter": 0.0
+  },
+  "record_details": [
+    {
+      "record_id": "OCR-000001",
+      "doc_category": "bank_proof",
+      "latency_ms": 4294,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000002",
+      "doc_category": "bank_proof",
+      "latency_ms": 3827,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000003",
+      "doc_category": "bank_proof",
+      "latency_ms": 3731,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000004",
+      "doc_category": "bank_proof",
+      "latency_ms": 4248,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000005",
+      "doc_category": "bank_proof",
+      "latency_ms": 3788,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000006",
+      "doc_category": "claim_form",
+      "latency_ms": 4510,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000042",
+      "doc_category": "claim_form",
+      "latency_ms": 4088,
+      "confidence": 0.8,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000045",
+      "doc_category": "claim_form",
+      "latency_ms": 4307,
+      "confidence": 0.9,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000095",
+      "doc_category": "claim_form",
+      "latency_ms": 4094,
+      "confidence": 0.9,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000132",
+      "doc_category": "claim_form",
+      "latency_ms": 4092,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000010",
+      "doc_category": "optical_receipt",
+      "latency_ms": 4914,
+      "confidence": 0.85,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000060",
+      "doc_category": "optical_receipt",
+      "latency_ms": 4506,
+      "confidence": 0.85,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000077",
+      "doc_category": "optical_receipt",
+      "latency_ms": 4231,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000080",
+      "doc_category": "optical_receipt",
+      "latency_ms": 5603,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000107",
+      "doc_category": "optical_receipt",
+      "latency_ms": 5626,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000011",
+      "doc_category": "dental_invoice",
+      "latency_ms": 4298,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000013",
+      "doc_category": "dental_invoice",
+      "latency_ms": 3872,
+      "confidence": 0.8,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000016",
+      "doc_category": "dental_invoice",
+      "latency_ms": 3868,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000017",
+      "doc_category": "dental_invoice",
+      "latency_ms": 4035,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000018",
+      "doc_category": "dental_invoice",
+      "latency_ms": 4097,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000012",
+      "doc_category": "medical_invoice",
+      "latency_ms": 5015,
+      "confidence": 0.8,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000019",
+      "doc_category": "medical_invoice",
+      "latency_ms": 4061,
+      "confidence": 0.9,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000020",
+      "doc_category": "medical_invoice",
+      "latency_ms": 4438,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000053",
+      "doc_category": "medical_invoice",
+      "latency_ms": 3907,
+      "confidence": 0.8,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000055",
+      "doc_category": "medical_invoice",
+      "latency_ms": 4010,
+      "confidence": 0.8,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000014",
+      "doc_category": "id_document",
+      "latency_ms": 3959,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000015",
+      "doc_category": "id_document",
+      "latency_ms": 4398,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000024",
+      "doc_category": "id_document",
+      "latency_ms": 3889,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000025",
+      "doc_category": "id_document",
+      "latency_ms": 4505,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000026",
+      "doc_category": "id_document",
+      "latency_ms": 4204,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000023",
+      "doc_category": "renewal_notice",
+      "latency_ms": 3887,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000049",
+      "doc_category": "renewal_notice",
+      "latency_ms": 3796,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000067",
+      "doc_category": "renewal_notice",
+      "latency_ms": 3683,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000085",
+      "doc_category": "renewal_notice",
+      "latency_ms": 4092,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000086",
+      "doc_category": "renewal_notice",
+      "latency_ms": 3783,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000036",
+      "doc_category": "preauth_form",
+      "latency_ms": 4300,
+      "confidence": 0.9,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000037",
+      "doc_category": "preauth_form",
+      "latency_ms": 4106,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000076",
+      "doc_category": "preauth_form",
+      "latency_ms": 3880,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000103",
+      "doc_category": "preauth_form",
+      "latency_ms": 3881,
+      "confidence": 0.8,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000133",
+      "doc_category": "preauth_form",
+      "latency_ms": 4318,
+      "confidence": 0.8,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000038",
+      "doc_category": "gp_referral_letter",
+      "latency_ms": 4094,
+      "confidence": 0.8,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000047",
+      "doc_category": "gp_referral_letter",
+      "latency_ms": 3785,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000048",
+      "doc_category": "gp_referral_letter",
+      "latency_ms": 4001,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000097",
+      "doc_category": "gp_referral_letter",
+      "latency_ms": 4190,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000102",
+      "doc_category": "gp_referral_letter",
+      "latency_ms": 4302,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000050",
+      "doc_category": "physiotherapy_invoice",
+      "latency_ms": 5238,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000062",
+      "doc_category": "physiotherapy_invoice",
+      "latency_ms": 4141,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000106",
+      "doc_category": "physiotherapy_invoice",
+      "latency_ms": 4438,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000151",
+      "doc_category": "physiotherapy_invoice",
+      "latency_ms": 4305,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000177",
+      "doc_category": "physiotherapy_invoice",
+      "latency_ms": 4295,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000052",
+      "doc_category": "consultant_receipt",
+      "latency_ms": 4608,
+      "confidence": 0.95,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000061",
+      "doc_category": "consultant_receipt",
+      "latency_ms": 4466,
+      "confidence": 0.9,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000064",
+      "doc_category": "consultant_receipt",
+      "latency_ms": 4954,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000071",
+      "doc_category": "consultant_receipt",
+      "latency_ms": 4608,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000078",
+      "doc_category": "consultant_receipt",
+      "latency_ms": 4819,
+      "confidence": 1.0,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000063",
+      "doc_category": "membership_certificate",
+      "latency_ms": 3938,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000181",
+      "doc_category": "membership_certificate",
+      "latency_ms": 3846,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000182",
+      "doc_category": "membership_certificate",
+      "latency_ms": 3889,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000183",
+      "doc_category": "membership_certificate",
+      "latency_ms": 4096,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000200",
+      "doc_category": "membership_certificate",
+      "latency_ms": 4058,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000070",
+      "doc_category": "discharge_summary",
+      "latency_ms": 3928,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000135",
+      "doc_category": "discharge_summary",
+      "latency_ms": 3887,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000165",
+      "doc_category": "discharge_summary",
+      "latency_ms": 4199,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000272",
+      "doc_category": "discharge_summary",
+      "latency_ms": 3998,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000363",
+      "doc_category": "discharge_summary",
+      "latency_ms": 4399,
+      "confidence": 0.5,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000113",
+      "doc_category": "complaint_letter",
+      "latency_ms": 3810,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000115",
+      "doc_category": "complaint_letter",
+      "latency_ms": 3661,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000116",
+      "doc_category": "complaint_letter",
+      "latency_ms": 3892,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000117",
+      "doc_category": "complaint_letter",
+      "latency_ms": 3786,
+      "confidence": 0.7,
+      "error": null
+    },
+    {
+      "record_id": "OCR-000118",
+      "doc_category": "complaint_letter",
+      "latency_ms": 3996,
+      "confidence": 0.7,
+      "error": null
+    }
+  ]
+}
