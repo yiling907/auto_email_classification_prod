@@ -18,6 +18,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "vite build && aws s3 sync dist/ s3://insuremail-ai-dashboard --delete --cache-control 'max-age=3600' && echo 'Dashboard deployed to S3' && aws cloudfront create-invalidation --distribution-id $(aws cloudformation describe-stacks --stack-name insuremail-ai-dashboard --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' --output text) --paths '/*' 2>/dev/null || echo 'CloudFront invalidation skipped (optional)'"
   }
 }
