@@ -6,6 +6,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **InsureMail AI** — AWS serverless email classification and auto-response system for insurance companies. Uses AWS Bedrock (Mistral 7B for intent classification and response generation, Llama 3.1 8B as fallback, Titan Embeddings V2 for RAG), Step Functions orchestration, and a React dashboard.
 
+## Environment Setup
+
+### AWS Credentials & Region
+```bash
+export AWS_PROFILE=your-profile  # or set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
+export AWS_REGION=us-east-1      # required by Terraform
+aws sts get-caller-identity       # verify credentials
+```
+
+### Bedrock Model Access
+Enable in AWS Console → Bedrock → Model access (one-time):
+- `amazon.titan-embed-text-v2:0` (Embeddings)
+- `mistral.mistral-7b-instruct-v0:2` (Intent/Response)
+- `meta.llama3-8b-instruct-v1:0` (Fallback)
+
+### Local Development
+```bash
+# Set required env var for tests
+export EMAIL_TABLE_NAME=test-emails
+
+# Dashboard API endpoint (from terraform output)
+export VITE_API_BASE_URL=https://your-api-id.execute-api.us-east-1.amazonaws.com/dev
+```
+
 ## Commands
 
 ### Testing
@@ -46,11 +70,24 @@ make deploy-lambda  # redeploy Lambda functions only
 ### Dashboard (React + Vite)
 ```bash
 cd dashboard/frontend
+
+# Development
 npm install
-npm run dev      # http://localhost:3000
-npm run build    # output to dist/
+npm run dev      # http://localhost:3000 (HMR enabled)
+
+# Production build
+npm run build    # outputs to dist/
+
+# Deploy to S3
+make dashboard-deploy   # builds, syncs dist/ to S3, invalidates CloudFront (if configured)
 ```
-Set `VITE_API_BASE_URL` in `dashboard/frontend/.env` to the API Gateway URL (`terraform output api_gateway_url`).
+
+Set `VITE_API_BASE_URL` in `dashboard/frontend/.env`:
+```
+VITE_API_BASE_URL=https://your-api-id.execute-api.us-east-1.amazonaws.com/dev
+```
+
+Note: Frontend S3 bucket (`insuremail-ai-{env}-frontend`) is auto-created by Terraform. Website endpoint is available in `terraform output frontend_bucket_website_endpoint`.
 
 ### Data Loading & Assessment Scripts
 ```bash
@@ -87,36 +124,100 @@ Graceful fallbacks mean the pipeline never hard-fails mid-run. All errors result
 | Function | Role |
 |---|---|
 | `email_parser` | RFC 2822 parse, PII redact, PDF/DOCX/TXT extraction, `_dynamo_safe()` float→Decimal |
-| `classify_intent` | Mistral 7B → 17 intents → 12 route teams via `INTENT_TO_ROUTE` map |
-| `extract_entity` | AWS Textract + Bedrock Claude for structured field extraction from attachments |
+| `classify_intent_by_llm` | Mistral 7B → 17 intents → 12 route teams via `INTENT_TO_ROUTE` map |
+| `classify_intent_by_biobert` | BioBERT fallback (alternative to LLM classifier) |
+| `extract_entity` | Bedrock Claude for structured field extraction from emails + attachments |
 | `rag_retrieval` | HyDE (Haiku) + Titan vector + BM25 + RRF fusion + cross-encoder rerank |
-| `crm_validation` | Text-to-SQL (Mistral 7B) → DynamoDB customer/policy lookup, no `Limit=` on Scan |
-| `claude_response` | Mistral/Llama response gen + 8-dim quality judge |
-| `email_sender` | Confidence-based routing + Amazon SES |
+| `crm_validation` | Text-to-SQL (Mistral 7B) → DynamoDB customer/policy lookup |
+| `claude_response` | Mistral/Llama response generation + 8-dimension quality judge |
+| `email_sender` | Confidence-based routing (auto ≥0.8, review 0.5-0.8, escalate <0.5) + SES |
 | `rag_ingestion` | 500-token chunks, 50-token overlap, MD5 dedup → Titan embed → DynamoDB |
-| `api_handlers` | REST API for dashboard; uses FilterExpression on DynamoDB Scan (no GSI) |
-| `gmail_imap_poller` | Scheduled Gmail IMAP polling |
+| `api_handlers` | REST API for dashboard (list emails, detail, update response, metrics) |
+| `save_result` | Persist pipeline execution results to DynamoDB |
+| `gmail_imap_poller` | Scheduled Gmail IMAP polling (alternative to SES) |
+| `sagemaker_inference` | PyTorch GPU inference endpoint integration |
 
 ### Terraform Modules (`terraform/modules/`)
 
-`iam`, `storage`, `lambda`, `step-functions`, `api-gateway`, `bedrock`, `ses`, `monitoring`.
+| Module | Purpose |
+|---|---|
+| `storage` | S3 buckets (emails, knowledge-base, logs, frontend), DynamoDB tables |
+| `lambda` | All 13 Lambda functions + CloudWatch logs + layers |
+| `step-functions` | Email processing workflow orchestration |
+| `api-gateway` | REST API routes, CORS, Lambda integration |
+| `iam` | Execution roles, policies, cross-service permissions |
+| `bedrock` | Model access configuration (no resources, placeholder) |
+| `ses` | Email sending identity, bounce/complaint handling |
+| `monitoring` | CloudWatch alarms, dashboards, EventBridge rules |
+| `sagemaker` | GPU inference endpoint for PyTorch model |
+
 All resources tagged `Project=InsureMailAI, ManagedBy=Terraform`. DynamoDB uses `PAY_PER_REQUEST`.
 
 ### DynamoDB Tables
 
-| Table | PK | SK |
+| Table | PK | SK/GSI | Purpose |
+|---|---|---|---|
+| `email_processing` | `email_id` (UUID) | `timestamp-index` (GSI) | Raw email metadata + parsed content |
+| `model_metrics` | `metric_key` ({model}#{task}#{email}) | — | Evaluation metrics for each model/task/email |
+| `kb_embeddings` | `doc_id` (MD5 hash) | `doc-type-index` (GSI) | Knowledge base chunks + Titan embeddings |
+| `customers` | `customer_id` | — | CRM customer/policy data for lookup |
+| `pipeline_results` | `email_id` | `action-date-index` (GSI: {action}#{date}) | Final routing decision + execution trace |
+
+## Dashboard REST API Endpoints
+
+Base: `{VITE_API_BASE_URL}/api`
+
+| Method | Path | Purpose |
 |---|---|---|
-| `email_processing` | `email_id` (UUID) | — |
-| `model_metrics` | `task_type` | `model_id#timestamp` |
-| `kb_embeddings` | `doc_id` | — |
-| `customers` | `customer_id` | — |
+| `GET` | `/emails` | List all emails (paginated, filters: status, confidence, intent) |
+| `GET` | `/emails/{email_id}` | Single email detail + full trace |
+| `POST` | `/emails/{email_id}/response` | Update/approve generated response before sending |
+| `GET` | `/metrics/model` | Model accuracy/timing metrics by task |
+| `GET` | `/metrics/rag` | Knowledge base stats (chunks, embeddings) |
+| `GET` | `/metrics/eval` | Bedrock evaluation job results |
+| `POST` | `/model/inference` | Test model on custom email (SageMaker endpoint) |
+
+## Debugging & Common Issues
+
+### Tests fail with `ModuleNotFoundError: No module named 'lambda_function'`
+Tests must clean up module cache before importing Lambda handlers:
+```python
+sys.modules.pop('lambda_function', None)
+from lambda.email_parser import lambda_function
+```
+See `tests/conftest.py` for shared fixtures.
+
+### DynamoDB Decimal types in tests
+Moto returns `Decimal` instead of `float`. Convert explicitly:
+```python
+assert int(result['confidence_score']) == 85  # not == 0.85
+```
+
+### Step Functions state machine stuck in RUNNING
+Check CloudWatch logs for specific Lambda failure. Use `aws stepfunctions describe-execution` to inspect input/output at each step.
+
+### Frontend build warnings (chunk size > 500 kB)
+Non-critical. Use dynamic imports (`React.lazy()`) if code-splitting is needed. Vite build succeeds regardless.
+
+### API Gateway CORS errors in browser
+Ensure `VITE_API_BASE_URL` is set correctly in `dashboard/frontend/.env` and matches Terraform API Gateway output. OPTIONS preflight requires CORS headers from Lambda (configured in `api-gateway` module).
 
 ## Key Conventions
 
 ### Bedrock Model IDs
 - Mistral 7B (intent, entity extraction, HyDE, rerank, response gen, CRM SQL): `mistral.mistral-7b-instruct-v0:2`
-- Llama 3.1 8B (fallback): `meta.llama3-8b-instruct-v1:0`
+- Llama 3.1 8B (fallback, response gen): `meta.llama3-8b-instruct-v1:0`
 - Titan Embeddings V2 (1024-dim): `amazon.titan-embed-text-v2:0`
+
+### Model Selection
+Dashboard allows switching between Mistral 7B and Llama 3.1 8B at runtime:
+- **Mistral 7B** (default): Optimized for intent classification + response generation, faster, lower cost
+- **Llama 3.1 8B** (fallback): Larger context, more nuanced responses, higher latency
+
+Switch in Dashboard UI → Settings or via environment variable in `claude_response` Lambda:
+```python
+MODEL_ID = os.getenv('LLM_MODEL_ID', 'mistral.mistral-7b-instruct-v0:2')
+```
 
 ### Test Patterns
 - **AWS mocking**: `@mock_aws` from moto v5.x — never `@mock_dynamodb` or `@mock_s3`.

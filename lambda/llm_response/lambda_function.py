@@ -85,8 +85,7 @@ FRAUD ASSESSMENT
 KNOWLEDGE BASE CONTEXT
 {rag_context}
 
-Output ONLY a JSON object — no other text:
-{{"response_text": "<full email response>", "reference_ids": ["<doc_id1>", ...]}}"""
+Output ONLY the email response text — no JSON, no metadata, no extra text."""
 
 _EVALUATION_PROMPT = """\
 You are an expert evaluator for a RAG system.
@@ -231,14 +230,11 @@ def generate_response(
     raw_output, input_tokens, output_tokens = _invoke_model(model_config, prompt)
     latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
-    text = _extract_json(raw_output)
-    try:
-        parsed        = json.loads(text)
-        response_text = str(parsed.get('response_text', raw_output[:3000]))
-        reference_ids = list(parsed.get('reference_ids', []))
-    except json.JSONDecodeError:
-        response_text = raw_output[:3000]
-        reference_ids = []
+    # Use raw_output directly as response_text (plain text, no JSON parsing)
+    response_text = raw_output.strip()
+
+    # Extract reference_ids from rag_documents
+    reference_ids = [doc.get('doc_id', '') for doc in rag_documents if doc.get('doc_id')]
 
     cost      = _calculate_cost(input_tokens, output_tokens, model_config)
     timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')

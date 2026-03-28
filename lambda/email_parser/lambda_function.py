@@ -1,9 +1,8 @@
 """
 Email Parser Lambda Function
 Parses raw emails from S3, extracts fields matching the emails.jsonl schema,
-and runs entity extraction (Textract + Bedrock Claude) on any attachments.
+and runs document extraction (Textract) and entity extraction (Bedrock Claude) on attachments.
 """
-import io
 import json
 import logging
 import os
@@ -615,43 +614,9 @@ def _extract_pdf_text(
     payload: bytes, filename: str, bucket: str, email_id: str
 ) -> str:
     """
-    Extract text from a PDF attachment.
-    Step 1: pypdf text-layer extraction (fast, zero cost).
-    Step 2: Textract via S3Object fallback for scanned/image-only PDFs.
+    Extract text from a PDF attachment using AWS Textract.
+    All document handling (text layers, form fields, scanned PDFs) is done by Textract.
     """
-    try:
-        import pypdf as _pypdf
-        reader     = _pypdf.PdfReader(io.BytesIO(payload))
-        pages_text = []
-        for page in reader.pages:
-            pt = page.extract_text() or ""
-            if pt.strip():
-                pages_text.append(pt.strip())
-        combined = "\n".join(pages_text).strip()
-        if combined:
-            logger.info(json.dumps({
-                "trace_id": email_id,
-                "op":       "pypdf_extract",
-                "filename": filename,
-                "chars":    len(combined),
-                "pages":    len(reader.pages),
-                "preview":  combined[:300],
-            }))
-            return combined
-        else:
-            logger.warning(json.dumps({
-                "trace_id": email_id,
-                "warning":  "pypdf_empty_text",
-                "filename": filename,
-                "pages":    len(reader.pages),
-            }))
-    except Exception as exc:
-        logger.warning(json.dumps({
-            "trace_id": email_id,
-            "warning":  "pypdf_extract_failed",
-            "filename": filename,
-            "error":    str(exc),
-        }))
 
     if len(payload) > 5 * 1024 * 1024:
         logger.warning(json.dumps({
@@ -664,47 +629,113 @@ def _extract_pdf_text(
 
     temp_key = f"tmp/textract/{email_id}/{filename}"
     try:
+        logger.info(json.dumps({
+            "trace_id": email_id,
+            "op": "textract_step1_upload",
+            "filename": filename,
+            "size_bytes": len(payload),
+            "s3_key": temp_key,
+        }))
+
         s3_client.put_object(
             Bucket=bucket, Key=temp_key, Body=payload, ContentType="application/pdf"
         )
+
+        logger.info(json.dumps({
+            "trace_id": email_id,
+            "op": "textract_step2_start_job",
+            "filename": filename,
+        }))
+
         t0   = time.monotonic()
         # Use async API — supports multi-page PDFs (detect_document_text only handles single-page)
         start_resp = textract.start_document_text_detection(
             DocumentLocation={"S3Object": {"Bucket": bucket, "Name": temp_key}}
         )
         job_id = start_resp["JobId"]
-        # Poll until complete (max 60s)
-        for _ in range(30):
+
+        logger.info(json.dumps({
+            "trace_id": email_id,
+            "op": "textract_job_started",
+            "job_id": job_id,
+            "filename": filename,
+        }))
+
+        # Poll until complete (max 300s = 150 iterations × 2s)
+        max_iterations = 150
+        for iteration in range(max_iterations):
             time.sleep(2)
             result = textract.get_document_text_detection(JobId=job_id)
-            if result["JobStatus"] in ("SUCCEEDED", "FAILED"):
+            status = result["JobStatus"]
+
+            if iteration % 10 == 0:  # Log every 10 iterations (every 20s)
+                logger.info(json.dumps({
+                    "trace_id": email_id,
+                    "op": "textract_polling",
+                    "job_id": job_id,
+                    "iteration": iteration,
+                    "status": status,
+                    "filename": filename,
+                }))
+
+            if status in ("SUCCEEDED", "FAILED"):
+                logger.info(json.dumps({
+                    "trace_id": email_id,
+                    "op": "textract_job_complete",
+                    "job_id": job_id,
+                    "status": status,
+                    "iteration": iteration,
+                    "elapsed_seconds": (iteration + 1) * 2,
+                    "filename": filename,
+                }))
                 break
+
         if result["JobStatus"] != "SUCCEEDED":
+            logger.error(json.dumps({
+                "trace_id": email_id,
+                "op": "textract_job_failed",
+                "job_id": job_id,
+                "status": result["JobStatus"],
+                "filename": filename,
+                "result": result,
+            }))
             raise RuntimeError(f"Textract job {job_id} status: {result['JobStatus']}")
-        lines      = [b["Text"] for b in result.get("Blocks", []) if b["BlockType"] == "LINE"]
+
+        blocks     = result.get("Blocks", [])
+        lines      = [b["Text"] for b in blocks if b["BlockType"] == "LINE"]
         latency_ms = int((time.monotonic() - t0) * 1000)
+
         logger.info(json.dumps({
             "trace_id":   email_id,
             "op":         "textract_pdf_async",
             "filename":   filename,
+            "job_id":     job_id,
             "lines":      len(lines),
+            "blocks":     len(blocks),
             "latency_ms": latency_ms,
+            "preview":    "\n".join(lines[:100])[:300] if lines else "NO_LINES",
         }))
         return "\n".join(lines)
     except ClientError as exc:
-        logger.warning(json.dumps({
+        error_code = exc.response.get("Error", {}).get("Code", "UNKNOWN")
+        error_msg = exc.response.get("Error", {}).get("Message", "Unknown error")
+        logger.error(json.dumps({
             "trace_id": email_id,
-            "warning":  "textract_pdf_failed",
+            "warning":  "textract_pdf_aws_error",
             "filename": filename,
-            "error":    exc.response["Error"]["Message"],
+            "error_code": error_code,
+            "error_message": error_msg,
+            "full_error": str(exc),
         }))
         return ""
     except Exception as exc:
-        logger.warning(json.dumps({
+        logger.error(json.dumps({
             "trace_id": email_id,
             "warning":  "textract_pdf_unexpected_error",
             "filename": filename,
-            "error":    str(exc),
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+            "full_traceback": __import__('traceback').format_exc(),
         }))
         return ""
     finally:
