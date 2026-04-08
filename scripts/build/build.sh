@@ -32,7 +32,7 @@ build_lambdas() {
     echo "[INFO]   Packaging $name → $zip_path" | tee -a "$LOG_FILE"
     # Install deps into a tmp layer dir if requirements.txt exists
     if [[ -f "$dir/requirements.txt" ]]; then
-      pip install -r "$dir/requirements.txt" -t "$dir/package/" -q
+      pip3 install -r "$dir/requirements.txt" -t "$dir/package/" -q
       (cd "$dir/package" && zip -r "$zip_path" . -q)
     fi
     (cd "$dir" && zip -r "$zip_path" lambda_function.py -u -q)

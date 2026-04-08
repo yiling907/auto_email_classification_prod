@@ -6,11 +6,16 @@ other available model as a judge.
 """
 import json
 import os
+import sys
 from typing import Dict, Any, Tuple
 from datetime import datetime, timezone
 from decimal import Decimal
 import boto3
 from botocore.exceptions import ClientError
+
+# Shared ReAct / CoT utilities
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../shared'))
+from reasoning_utils import extract_react_answer, log_reasoning_trace
 
 # ── AWS clients ──────────────────────────────────────────────────────────────
 bedrock_runtime = boto3.client('bedrock-runtime')
@@ -85,12 +90,14 @@ INTENT_TO_ROUTE = {
 CLASSIFICATION_FIELDS = (
     'customer_intent', 'secondary_intent', 'business_line',
     'urgency', 'sentiment', 'gold_route_team', 'gold_priority',
+    'reasoning_quality',
 )
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 _CLASSIFICATION_PROMPT = """\
+<s>[INST]
 You are an AI assistant for an Irish health insurance company.
-Classify the customer email below. Output ONLY a JSON object — no other text.
+Classify the customer email across 7 dimensions using step-by-step reasoning.
 
 EMAIL SUBJECT: {subject}
 EMAIL BODY: {body}
@@ -105,24 +112,50 @@ Valid values per field:
 - gold_priority     : normal | high | urgent
 - requires_human_review : true | false  (true when complaint, pre_authorisation, or urgent priority)
 
-{{"customer_intent": "...", "secondary_intent": "...", "business_line": "health_insurance", \
-"urgency": "...", "sentiment": "...", "gold_route_team": "...", "gold_priority": "...", \
-"requires_human_review": false}}"""
+Thought 1: What is the primary purpose of this email? What is the customer trying to achieve?
+Action 1: IDENTIFY_INTENT
+Observation 1: <your observation>
+
+Thought 2: Is there a secondary or supporting intent in the email?
+Action 2: IDENTIFY_SECONDARY_INTENT
+Observation 2: <your observation>
+
+Thought 3: What urgency level (low/medium/high) and customer sentiment (positive/neutral/frustrated/upset) does the email convey?
+Action 3: ASSESS_URGENCY_SENTIMENT
+Observation 3: <your observation>
+
+Thought 4: Based on the primary intent, which team should handle this, and what is the routing priority?
+Action 4: DETERMINE_ROUTING
+Observation 4: <your observation>
+
+Thought 5: Does this case require human review? (true if complaint, pre_authorisation, or urgent priority)
+Action 5: CHECK_HUMAN_REVIEW
+Observation 5: <your observation>
+
+FINAL_ANSWER: {{"customer_intent": "...", "secondary_intent": "...", "business_line": "health_insurance", "urgency": "...", "sentiment": "...", "gold_route_team": "...", "gold_priority": "...", "requires_human_review": false}}
+[/INST]"""
 
 _ACCURACY_PROMPT = """\
+<s>[INST]
 You are a quality-assurance reviewer for a health insurance AI system.
-An LLM classified the email below. Evaluate whether each field is correct (1) or incorrect (0).
-Consider only what can be reasonably inferred from the email text.
+An LLM classified the email below. The classification included a reasoning trace.
+Evaluate whether each field is correct (1) or incorrect (0), and whether the
+reasoning trace supports the final answer (reasoning_quality: 1) or is flawed/absent (0).
 
 EMAIL SUBJECT: {subject}
 EMAIL BODY: {body}
+
+REASONING TRACE:
+{scratchpad}
 
 CLASSIFICATION TO EVALUATE:
 {classification}
 
 Output ONLY a JSON object — no other text.
 {{"customer_intent": <0|1>, "secondary_intent": <0|1>, "business_line": <0|1>, \
-"urgency": <0|1>, "sentiment": <0|1>, "gold_route_team": <0|1>, "gold_priority": <0|1>}}"""
+"urgency": <0|1>, "sentiment": <0|1>, "gold_route_team": <0|1>, "gold_priority": <0|1>, \
+"reasoning_quality": <0|1>}}
+[/INST]"""
 
 
 # ── Lambda handler ────────────────────────────────────────────────────────────
@@ -154,18 +187,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             )
 
         # ── Step 1: classify with the active model ────────────────────────
-        classification, clf_metrics = classify_email(
+        classification, clf_metrics, scratchpad = classify_email(
             email_id, subject, email_body, active_model
         )
 
         # ── Step 2: update email table ────────────────────────────────────
         if email_id:
-            _update_email_record(email_id, classification)
+            _update_email_record(email_id, classification, scratchpad)
 
         # ── Step 3: judge accuracy with the other model ───────────────────
         judge_model = _other_model(active_model)
         accuracy = evaluate_accuracy(
-            email_id, subject, email_body, classification, judge_model
+            email_id, subject, email_body, classification, judge_model, scratchpad
         )
 
         return {
@@ -209,10 +242,12 @@ def classify_email(
     )
 
     start = datetime.now(timezone.utc)
-    raw_output, input_tokens, output_tokens = _invoke_model(model_config, prompt)
+    raw_output, input_tokens, output_tokens = _invoke_model(
+        model_config, prompt, task='classification'
+    )
     latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
-    classification = _parse_classification(raw_output)
+    classification, scratchpad = _parse_classification(raw_output, email_id)
     cost = _calculate_cost(input_tokens, output_tokens, model_config)
     timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
@@ -232,7 +267,7 @@ def classify_email(
         f"intent={classification.get('customer_intent')} "
         f"latency={latency_ms:.0f}ms cost=${cost:.6f}"
     )
-    return classification, metrics
+    return classification, metrics, scratchpad
 
 
 # ── Accuracy evaluation ───────────────────────────────────────────────────────
@@ -243,23 +278,28 @@ def evaluate_accuracy(
     body: str,
     classification: Dict[str, Any],
     judge_model_name: str,
+    scratchpad: str = '',
 ) -> Dict[str, Any]:
     """
-    Use the judge model to score each classification field as 0 (wrong) or 1 (correct).
+    Use the judge model to score each classification field as 0 (wrong) or 1 (correct),
+    plus reasoning_quality (1 if the ReAct scratchpad supports the answer, else 0).
 
     Returns:
         {judge_model, per_field: {field: 0|1}, overall_score: float}
     """
     model_config = MODELS[judge_model_name]
-    clf_summary = {f: classification.get(f, '') for f in CLASSIFICATION_FIELDS}
+    clf_summary = {f: classification.get(f, '') for f in CLASSIFICATION_FIELDS if f != 'reasoning_quality'}
     prompt = _ACCURACY_PROMPT.format(
         subject=subject,
         body=body,
+        scratchpad=scratchpad[:1000] if scratchpad else '(no reasoning trace)',
         classification=json.dumps(clf_summary, indent=2),
     )
 
     start = datetime.now(timezone.utc)
-    raw_output, input_tokens, output_tokens = _invoke_model(model_config, prompt)
+    raw_output, input_tokens, output_tokens = _invoke_model(
+        model_config, prompt, task='judge'
+    )
     latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
     per_field = _parse_accuracy(raw_output)
@@ -296,17 +336,24 @@ def evaluate_accuracy(
 def _invoke_model(
     model_config: Dict[str, Any],
     prompt: str,
+    task: str = 'classification',
 ) -> Tuple[str, int, int]:
     """
     Invoke a Bedrock model and return (output_text, input_tokens, output_tokens).
+
+    task='classification' uses 768 tokens (ReAct trace + JSON answer).
+    task='judge'          uses 256 tokens (judge outputs only a small JSON).
     """
     model_id   = model_config['id']
     model_type = model_config['type']
 
+    # Token budget: classification needs space for ReAct trace; judge only outputs JSON
+    max_tokens = 256 if task == 'judge' else 768
+
     if model_type == 'mistral':
         request_body = {
             'prompt': prompt,
-            'max_tokens': 512,
+            'max_tokens': max_tokens,
             'temperature': 0.1,
             'top_p': 0.9,
             'top_k': 50,
@@ -314,7 +361,7 @@ def _invoke_model(
     elif model_type == 'meta':
         request_body = {
             'prompt': prompt,
-            'max_gen_len': 512,
+            'max_gen_len': max_tokens,
             'temperature': 0.1,
             'top_p': 0.9,
         }
@@ -348,12 +395,28 @@ def _invoke_model(
 
 # ── Output parsers ─────────────────────────────────────────────────────────────
 
-def _parse_classification(raw: str) -> Dict[str, Any]:
+def _parse_classification(raw: str, email_id: str = '') -> Tuple[Dict[str, Any], str]:
     """
     Parse model output into a validated classification dict.
-    Falls back gracefully on malformed JSON.
+
+    Extracts the ReAct scratchpad and FINAL_ANSWER JSON using reasoning_utils.
+    Falls back to brace-depth JSON extraction when the sentinel is absent.
+
+    Returns:
+        (classification_dict, scratchpad)
     """
-    text = _strip_fences(raw)
+    scratchpad, json_str = extract_react_answer(raw)
+
+    log_reasoning_trace(
+        logger_fn              = print,
+        email_id               = email_id,
+        lambda_name            = "classify_intent_by_llm",
+        scratchpad             = scratchpad,
+        final_answer           = json_str,
+        reasoning_format_valid = bool(scratchpad),
+    )
+
+    text = json_str if json_str else _strip_fences(raw)
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
@@ -403,15 +466,18 @@ def _parse_classification(raw: str) -> Dict[str, Any]:
         'gold_route_team':      route,
         'gold_priority':        priority,
         'requires_human_review': requires_review,
-    }
+    }, scratchpad
 
 
 def _parse_accuracy(raw: str) -> Dict[str, int]:
     """
     Parse judge-model output into per-field binary scores {field: 0|1}.
+    Includes 'reasoning_quality' from the ReAct-format judge prompt.
     Defaults to 0 for any unparseable field.
     """
-    text = _strip_fences(raw)
+    # Judge output may itself contain a FINAL_ANSWER sentinel or bare JSON
+    _, json_str = extract_react_answer(raw)
+    text = json_str if json_str else _strip_fences(raw)
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
@@ -483,16 +549,21 @@ def _store_metrics(metrics: Dict[str, Any]) -> None:
         raise
 
 
-def _update_email_record(email_id: str, classification: Dict[str, Any]) -> None:
-    """Update the email record with the 7 classification label fields."""
+def _update_email_record(
+    email_id: str,
+    classification: Dict[str, Any],
+    scratchpad: str = '',
+) -> None:
+    """Update the email record with the 7 classification label fields and reasoning trace."""
     try:
         email_table.update_item(
             Key={'email_id': email_id},
             UpdateExpression=(
                 'SET customer_intent = :ci, secondary_intent = :si, '
                 'business_line = :bl, urgency = :ug, sentiment = :se, '
-                'gold_route_team = :rt, gold_priority = :gp, '
+                'route_team = :rt, gold_route_team = :rt, gold_priority = :gp, '
                 'requires_human_review = :rhr, '
+                'classification_reasoning = :cr, '
                 'classification_timestamp = :ts'
             ),
             ExpressionAttributeValues={
@@ -504,6 +575,7 @@ def _update_email_record(email_id: str, classification: Dict[str, Any]) -> None:
                 ':rt':  classification['gold_route_team'],
                 ':gp':  classification['gold_priority'],
                 ':rhr': classification['requires_human_review'],
+                ':cr':  scratchpad[:1000] if scratchpad else '',
                 ':ts':  datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             },
         )

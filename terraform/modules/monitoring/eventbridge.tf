@@ -3,8 +3,8 @@
 # Gmail IMAP Polling Schedule
 resource "aws_cloudwatch_event_rule" "gmail_imap_poll" {
   name                = "${var.project_name}-${var.environment}-gmail-imap-poll"
-  description         = "Trigger Gmail IMAP poller every 5 minutes"
-  schedule_expression = "rate(5 minutes)"
+  description         = "Trigger Gmail IMAP poller every 1 minute"
+  schedule_expression = "rate(1 minute)"
   tags                = var.tags
 }
 

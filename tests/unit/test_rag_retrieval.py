@@ -243,3 +243,76 @@ class TestEmbeddingParsing:
 
         # Corrupted doc should be skipped
         assert len(results) == 0
+
+
+# ── ReAct cross-encoder reranker tests ───────────────────────────────────────
+
+class TestCrossEncoderRerankerReAct:
+    """Tests for the ReAct-formatted cross-encoder reranker in _cross_encoder_rerank."""
+
+    def _make_bedrock_response(self, text: str) -> dict:
+        import io
+        body = json.dumps({"outputs": [{"text": text}]}).encode()
+        return {"body": io.BytesIO(body)}
+
+    def test_reranker_parses_react_final_answer(self):
+        """Reranker correctly parses score from a full ReAct trace with FINAL_ANSWER sentinel."""
+        react_output = (
+            "Thought 1: The customer is asking about outpatient claim reimbursement.\n"
+            "Action 1: IDENTIFY_QUERY_TOPIC\n"
+            "Observation 1: Topic is claim_reimbursement.\n"
+            "Thought 2: The snippet discusses out-patient claim procedures matching the query.\n"
+            "Action 2: CHECK_SNIPPET_RELEVANCE\n"
+            "Observation 2: Direct match on claim reimbursement language.\n"
+            "Thought 3: Score 9 — highly relevant.\n"
+            "Action 3: ASSIGN_SCORE\n"
+            "Observation 3: 9/10\n"
+            '  FINAL_ANSWER: {"score": 9, "reason": "Snippet directly addresses reimbursement process."}'
+        )
+        candidate = {
+            "doc_id": "doc-001",
+            "doc_type": "policy",
+            "content": "Out-patient claims must be submitted within 90 days.",
+            "metadata": {},
+            "_rrf_score": 0.1,
+            "_vec_score": 0.7,
+        }
+
+        with patch.object(
+            lambda_function.bedrock_runtime, 'invoke_model',
+            return_value=self._make_bedrock_response(react_output),
+        ):
+            results = lambda_function._cross_encoder_rerank(
+                query="How do I submit an outpatient claim?",
+                candidates=[candidate],
+            )
+
+        assert len(results) == 1
+        # rerank_score = 9/10 = 0.9; final = 0.5*0.9 + 0.3*0.7 + 0.2*min(0.1*100,1.0) = 0.45+0.21+0.02 = 0.68
+        assert results[0]["similarity_score"] > 0.5
+        assert results[0]["doc_id"] == "doc-001"
+
+    def test_reranker_falls_back_on_missing_sentinel(self):
+        """When model ignores sentinel, bare JSON score is still parsed correctly."""
+        bare_output = '{"score": 6, "reason": "Partially relevant."}'
+        candidate = {
+            "doc_id": "doc-002",
+            "doc_type": "policy",
+            "content": "Coverage for dental emergencies is available.",
+            "metadata": {},
+            "_rrf_score": 0.05,
+            "_vec_score": 0.5,
+        }
+
+        with patch.object(
+            lambda_function.bedrock_runtime, 'invoke_model',
+            return_value=self._make_bedrock_response(bare_output),
+        ):
+            results = lambda_function._cross_encoder_rerank(
+                query="Is dental covered?",
+                candidates=[candidate],
+            )
+
+        assert len(results) == 1
+        # Verify a valid numeric score was produced (not the fallback RRF path)
+        assert 0.0 <= results[0]["similarity_score"] <= 1.0

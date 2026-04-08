@@ -70,56 +70,94 @@ class TestParseClassification:
             'gold_priority': 'normal',
             'requires_human_review': False,
         })
-        result = lf._parse_classification(raw)
+        result, _ = lf._parse_classification(raw)
         assert result['customer_intent'] == 'claim_status'
         assert result['gold_route_team'] == 'claims_team'
         assert result['business_line'] == 'health_insurance'
 
+    def test_react_final_answer_parsed(self):
+        """FINAL_ANSWER: sentinel is extracted correctly."""
+        scratchpad = (
+            "Thought 1: The email asks about claim status.\n"
+            "Action 1: IDENTIFY_INTENT\n"
+            "Observation 1: Intent is claim_status.\n"
+        )
+        answer_json = json.dumps({
+            'customer_intent': 'claim_status',
+            'secondary_intent': '',
+            'business_line': 'health_insurance',
+            'urgency': 'medium',
+            'sentiment': 'neutral',
+            'gold_route_team': 'claims_team',
+            'gold_priority': 'normal',
+            'requires_human_review': False,
+        })
+        raw = scratchpad + 'FINAL_ANSWER: ' + answer_json
+        result, returned_scratchpad = lf._parse_classification(raw)
+        assert result['customer_intent'] == 'claim_status'
+        assert 'Thought 1' in returned_scratchpad
+
+    def test_fallback_on_missing_sentinel(self):
+        """When sentinel is absent, bare JSON is still parsed correctly."""
+        raw = json.dumps({'customer_intent': 'renewal_query'})
+        result, scratchpad = lf._parse_classification(raw)
+        assert result['customer_intent'] == 'renewal_query'
+        assert scratchpad == ''
+
     def test_invalid_intent_falls_back_to_other(self):
         raw = json.dumps({'customer_intent': 'nonsense_value'})
-        assert lf._parse_classification(raw)['customer_intent'] == 'other'
+        result, _ = lf._parse_classification(raw)
+        assert result['customer_intent'] == 'other'
 
     def test_invalid_urgency_falls_back_to_low(self):
         raw = json.dumps({'customer_intent': 'claim_status', 'urgency': 'critical'})
-        assert lf._parse_classification(raw)['urgency'] == 'low'
+        result, _ = lf._parse_classification(raw)
+        assert result['urgency'] == 'low'
 
     def test_invalid_sentiment_falls_back_to_neutral(self):
         raw = json.dumps({'customer_intent': 'claim_status', 'sentiment': 'angry'})
-        assert lf._parse_classification(raw)['sentiment'] == 'neutral'
+        result, _ = lf._parse_classification(raw)
+        assert result['sentiment'] == 'neutral'
 
     def test_invalid_route_team_inferred_from_intent(self):
         raw = json.dumps({'customer_intent': 'claim_status', 'gold_route_team': 'bad_team'})
-        assert lf._parse_classification(raw)['gold_route_team'] == 'claims_team'
+        result, _ = lf._parse_classification(raw)
+        assert result['gold_route_team'] == 'claims_team'
 
     def test_invalid_priority_falls_back_to_normal(self):
         raw = json.dumps({'customer_intent': 'claim_status', 'gold_priority': 'critical'})
-        assert lf._parse_classification(raw)['gold_priority'] == 'normal'
+        result, _ = lf._parse_classification(raw)
+        assert result['gold_priority'] == 'normal'
 
     def test_complaint_forces_human_review(self):
         raw = json.dumps({'customer_intent': 'complaint', 'requires_human_review': False})
-        assert lf._parse_classification(raw)['requires_human_review'] is True
+        result, _ = lf._parse_classification(raw)
+        assert result['requires_human_review'] is True
 
     def test_pre_authorisation_forces_human_review(self):
         raw = json.dumps({'customer_intent': 'pre_authorisation'})
-        assert lf._parse_classification(raw)['requires_human_review'] is True
+        result, _ = lf._parse_classification(raw)
+        assert result['requires_human_review'] is True
 
     def test_urgent_priority_forces_human_review(self):
         raw = json.dumps({'customer_intent': 'claim_status', 'gold_priority': 'urgent'})
-        assert lf._parse_classification(raw)['requires_human_review'] is True
+        result, _ = lf._parse_classification(raw)
+        assert result['requires_human_review'] is True
 
     def test_markdown_fences_stripped(self):
         raw = '```json\n{"customer_intent": "payment_issue"}\n```'
-        result = lf._parse_classification(raw)
+        result, _ = lf._parse_classification(raw)
         assert result['customer_intent'] == 'payment_issue'
 
     def test_malformed_json_returns_safe_defaults(self):
-        result = lf._parse_classification('not json at all')
+        result, _ = lf._parse_classification('not json at all')
         assert result['customer_intent'] == 'other'
         assert result['business_line'] == 'health_insurance'
 
     def test_business_line_always_health_insurance(self):
         raw = json.dumps({'customer_intent': 'renewal_query', 'business_line': 'life_insurance'})
-        assert lf._parse_classification(raw)['business_line'] == 'health_insurance'
+        result, _ = lf._parse_classification(raw)
+        assert result['business_line'] == 'health_insurance'
 
 
 # ── _parse_accuracy ───────────────────────────────────────────────────────────
@@ -146,8 +184,16 @@ class TestParseAccuracy:
         result = lf._parse_accuracy('not valid json')
         assert all(v == 0 for v in result.values())
 
+    def test_reasoning_quality_field_present(self):
+        """reasoning_quality is a new field in CLASSIFICATION_FIELDS."""
+        assert 'reasoning_quality' in lf.CLASSIFICATION_FIELDS
+        raw = json.dumps({f: 1 for f in lf.CLASSIFICATION_FIELDS})
+        result = lf._parse_accuracy(raw)
+        assert 'reasoning_quality' in result
+        assert result['reasoning_quality'] == 1
+
     def test_markdown_fences_stripped(self):
-        raw = '```json\n{"customer_intent": 1, "secondary_intent": 1, "business_line": 1, "urgency": 1, "sentiment": 1, "gold_route_team": 1, "gold_priority": 1}\n```'
+        raw = '```json\n{"customer_intent": 1, "secondary_intent": 1, "business_line": 1, "urgency": 1, "sentiment": 1, "gold_route_team": 1, "gold_priority": 1, "reasoning_quality": 1}\n```'
         result = lf._parse_accuracy(raw)
         assert result['customer_intent'] == 1
 
@@ -280,7 +326,7 @@ class TestClassifyEmail:
         with patch.object(lf.bedrock_runtime, 'invoke_model',
                           return_value=_make_mistral_response(clf_json)):
             with patch.object(lf, '_store_metrics'):
-                clf, metrics = lf.classify_email(
+                clf, metrics, scratchpad = lf.classify_email(
                     SAMPLE_EMAIL_ID, SAMPLE_SUBJECT, SAMPLE_BODY, 'mistral-7b'
                 )
         assert clf['customer_intent'] == 'claim_status'
@@ -290,13 +336,14 @@ class TestClassifyEmail:
         assert metrics['email_id'] == SAMPLE_EMAIL_ID
         assert metrics['cost_usd'] >= 0
         assert metrics['latency_ms'] >= 0
+        assert isinstance(scratchpad, str)
 
     def test_classify_email_llama_success(self, lambda_env_vars):
         clf_json = json.dumps(VALID_CLASSIFICATION)
         with patch.object(lf.bedrock_runtime, 'invoke_model',
                           return_value=_make_llama_response(clf_json)):
             with patch.object(lf, '_store_metrics'):
-                clf, metrics = lf.classify_email(
+                clf, metrics, _ = lf.classify_email(
                     SAMPLE_EMAIL_ID, SAMPLE_SUBJECT, SAMPLE_BODY, 'llama-3.1-8b'
                 )
         assert clf['customer_intent'] == 'claim_status'
@@ -356,6 +403,7 @@ class TestLambdaHandler:
 
     def test_handler_success_default_model(self, lambda_env_vars, lambda_context):
         clf_json = json.dumps(VALID_CLASSIFICATION)
+        # Judge response must include reasoning_quality
         acc_json = json.dumps({f: 1 for f in lf.CLASSIFICATION_FIELDS})
         side_effects = self._mock_both_models(clf_json, acc_json)
 
@@ -424,7 +472,12 @@ class TestLambdaHandler:
                          'email_body': SAMPLE_BODY},
                         lambda_context,
                     )
-        mock_update.assert_called_once_with(SAMPLE_EMAIL_ID, VALID_CLASSIFICATION)
+        # Called with (email_id, classification, scratchpad)
+        assert mock_update.call_count == 1
+        call_args = mock_update.call_args[0]
+        assert call_args[0] == SAMPLE_EMAIL_ID
+        assert call_args[1]['customer_intent'] == VALID_CLASSIFICATION['customer_intent']
+        assert isinstance(call_args[2], str)  # scratchpad is always a string
 
     def test_handler_stores_two_metrics_records(self, lambda_env_vars, lambda_context):
         """One for classification, one for accuracy evaluation."""

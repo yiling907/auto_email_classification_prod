@@ -6,12 +6,17 @@ import json
 import math
 import os
 import re
+import sys
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
+
+# Shared ReAct / CoT utilities
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../shared'))
+from reasoning_utils import extract_react_answer
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 bedrock_runtime = boto3.client('bedrock-runtime')
@@ -254,26 +259,40 @@ def _cross_encoder_rerank(
     Runs in parallel. Falls back to RRF score if Mistral call fails.
     """
     def score_one(doc: Dict[str, Any]) -> Dict[str, Any]:
+        snippet = doc.get('content', '')[:400]
         prompt = (
-            "Rate how relevant this insurance knowledge base snippet is to the customer query.\n"
-            "Return ONLY valid JSON: {\"score\": <integer 0-10>}\n\n"
+            "You are scoring the relevance of an insurance knowledge base snippet to a customer query.\n"
+            "Use Thought/Action/Observation to reason, then give a final score.\n\n"
             f"Query: {query}\n\n"
-            f"Snippet: {doc.get('content', '')[:400]}"
+            f"Snippet: {snippet}\n\n"
+            "Thought 1: What is the customer asking about?\n"
+            "Action 1: IDENTIFY_QUERY_TOPIC\n"
+            "Observation 1: <your observation>\n\n"
+            "Thought 2: Does the snippet directly address this topic? What specific phrases match?\n"
+            "Action 2: CHECK_SNIPPET_RELEVANCE\n"
+            "Observation 2: <your observation>\n\n"
+            "Thought 3: On a scale of 0-10, how relevant is this snippet?\n"
+            "Action 3: ASSIGN_SCORE\n"
+            "Observation 3: <your score reasoning>\n\n"
+            'FINAL_ANSWER: {"score": <integer 0-10>, "reason": "<one sentence>"}'
         )
         try:
             resp = bedrock_runtime.invoke_model(
                 modelId=MISTRAL_MODEL_ID,
                 body=json.dumps({
                     "prompt":      f"<s>[INST] {prompt} [/INST]",
-                    "max_tokens":  20,
+                    "max_tokens":  128,    # increased from 20 to accommodate ReAct trace
                     "temperature": 0.0,
                 }),
                 contentType='application/json',
                 accept='application/json',
             )
-            raw  = json.loads(resp['body'].read())['outputs'][0]['text']
-            data = json.loads(_extract_json(raw))
+            raw = json.loads(resp['body'].read())['outputs'][0]['text']
+            scratchpad, json_str = extract_react_answer(raw)
+            data = json.loads(json_str or _extract_json(raw))
             rerank_score = max(0.0, min(10.0, float(data.get('score', 5)))) / 10.0
+            if scratchpad:
+                print(f"Rerank trace [{doc.get('doc_id')}]: {scratchpad[:200]} | reason: {data.get('reason', '')}")
         except Exception as e:
             print(f"Reranker failed for {doc.get('doc_id')}: {e}")
             rerank_score = doc.get('_rrf_score', 0.0) * 5   # fallback: scale RRF

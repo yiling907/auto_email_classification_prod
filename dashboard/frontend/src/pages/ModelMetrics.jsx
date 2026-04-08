@@ -19,7 +19,7 @@ const MODEL_COLORS = {
 
 const ACCURACY_FIELDS = [
   'customer_intent', 'secondary_intent', 'business_line',
-  'urgency', 'sentiment', 'gold_route_team', 'gold_priority',
+  'urgency', 'sentiment', 'gold_route_team', 'gold_priority', 'reasoning_quality',
 ]
 
 const EVAL_DIMS = [

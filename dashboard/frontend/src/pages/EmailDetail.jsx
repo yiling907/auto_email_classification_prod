@@ -2,6 +2,39 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useParams, Link } from 'react-router-dom'
 
+function ReasoningTrace({ title, text }) {
+  const [open, setOpen] = useState(false)
+  const hasData = Boolean(text)
+  return (
+    <div style={{ marginTop: '0.75rem' }}>
+      <button
+        onClick={() => hasData && setOpen(o => !o)}
+        style={{
+          background: 'none', border: '1px solid #dee2e6', borderRadius: 4,
+          padding: '0.3rem 0.75rem', fontSize: '0.8rem',
+          color: hasData ? '#555' : '#aaa',
+          cursor: hasData ? 'pointer' : 'default',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}
+      >
+        <span style={{ fontSize: '0.7rem' }}>{open ? '▼' : '▶'}</span>
+        {title}
+        {!hasData && <span style={{ fontSize: '0.72rem', color: '#bbb', marginLeft: 4 }}>(not yet available)</span>}
+      </button>
+      {open && hasData && (
+        <pre style={{
+          marginTop: '0.4rem', padding: '0.75rem', background: '#f8f9fa',
+          borderRadius: 4, fontSize: '0.75rem', whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word', maxHeight: 320, overflowY: 'auto',
+          border: '1px solid #e9ecef', color: '#495057',
+        }}>
+          {text}
+        </pre>
+      )}
+    </div>
+  )
+}
+
 function EmailDetail({ apiUrl }) {
   const { emailId } = useParams()
   const [email, setEmail]       = useState(null)
@@ -117,10 +150,14 @@ function EmailDetail({ apiUrl }) {
         <Field label="Business Line"        value={email.business_line} />
         <Field label="Urgency"              value={email.urgency} />
         <Field label="Sentiment"            value={email.sentiment} />
-        <Field label="Route Team"           value={email.gold_route_team} />
+        <Field label="Route Team"           value={email.route_team || email.gold_route_team} />
         <Field label="Priority"             value={email.gold_priority} />
         <Field label="Requires Human Review" value={String(email.requires_human_review ?? 'N/A')} />
         <Field label="Classification Time"  value={formatDate(email.classification_timestamp)} />
+        <ReasoningTrace
+          title="Classification Reasoning (ReAct trace)"
+          text={email.classification_reasoning}
+        />
       </div>
 
       {/* ── Extracted Data ── */}
@@ -243,6 +280,10 @@ function EmailDetail({ apiUrl }) {
             </ul>
           </div>
         )}
+        <ReasoningTrace
+          title="Generation Reasoning (CoT trace)"
+          text={email.generation_reasoning}
+        />
       </div>
 
       {/* ── Storage ── */}

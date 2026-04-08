@@ -66,11 +66,16 @@ import json
 import logging
 import os
 import re
+import sys
 import time
 from typing import Any, Dict, List, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
+
+# Shared ReAct / CoT utilities
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../shared'))
+from reasoning_utils import extract_cot_answer, log_reasoning_trace, wrap_mistral
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -105,9 +110,42 @@ _EXTRACTION_PROMPT = """\
 You are an insurance document entity extractor specialised in Laya Healthcare \
 Out-patient Claim Forms (Ireland).
 
-Given text from a Laya Healthcare email and/or an attached Out-patient Claim \
-Form, extract every field listed below. Use null for any field not present in \
-the source text. Return ONLY valid JSON — no explanation, no markdown.
+Given text from a Laya Healthcare email and/or an attached Out-patient Claim Form, \
+work through each section carefully before outputting the final JSON.
+
+<reasoning>
+SECTION 1 — Member's details:
+  Read the text carefully. What membership_no, title, surname, forenames, date_of_birth, \
+telephone, and correspondence_address are present? List each found value or note "not found".
+
+SECTION 2 — Dependants:
+  Are any dependants listed? Note names and relationships, or note "none found".
+
+SECTION 3 — MRI:
+  Is there MRI-related content? Note mri_date, mri_reason_for_referral, mri_centre, \
+mri_procedure, mri_referring_gp, mri_consultant_code, or note "not present".
+
+SECTION 4 — Accidents:
+  Is there accident information? Note accident_date, accident_description, \
+expenses_recoverable, recovery flags, third_party_details, or note "not present".
+
+SECTION 5 — Emergency Dental:
+  Is there dental injury information? Note dental_injury_date, dental_injury_place, \
+dental_injury_description, treatment dates, dental_cost, or note "not present".
+
+SECTION 6 — Receipt details:
+  List all receipt rows found: treatment_type, num_receipts, total_cost per row. \
+Sum them for receipts_total_cost. If none, note "no receipts found".
+
+SECTION 7 — Payment details:
+  Is banking information present? Note account_holder_name, account_number, \
+bank_sort_code, bank_name_address, or note "not present".
+
+SECTION 8 / Meta:
+  What is the declaration_date? Assign confidence 0.0–1.0 based on how many fields \
+were actually found (0.9+ = many fields with clear values; 0.5 = some fields; \
+0.2 = very few fields or only partial data).
+</reasoning>
 
 --- SECTION 1: Member's details ---
   membership_no          : string  (laya membership number)
@@ -172,9 +210,8 @@ Email body (first 800 chars):
 
 {attachment_section}
 
-Respond ONLY with JSON matching this exact key set (nulls/empty arrays for \
-missing fields):
-{{
+After completing your <reasoning> above, output the extracted fields.
+FINAL_JSON: {{
   "membership_no":            ...,
   "title":                    ...,
   "surname":                  ...,
@@ -570,8 +607,8 @@ def _extract_via_bedrock(
     )
 
     body = json.dumps({
-        "prompt":      f"<s>[INST] {prompt} [/INST]",
-        "max_tokens":  2048,
+        "prompt":      wrap_mistral(prompt),
+        "max_tokens":  3072,   # increased from 2048 to accommodate CoT reasoning trace
         "temperature": 0.0,
     })
 
@@ -615,11 +652,28 @@ def _parse_extraction_json(
     text: str, email_id: str
 ) -> Tuple[Dict[str, Any], float]:
     """
-    Extract the first JSON object from Bedrock's output.
+    Extract structured fields from Bedrock's CoT output.
+
+    Expects the model to produce:
+        <reasoning>...</reasoning>
+        FINAL_JSON: { ... }
+
+    Falls back to brace-depth JSON extraction when FINAL_JSON: is absent.
     Returns (fields_dict, confidence). Never raises.
     """
-    match = re.search(r"\{[\s\S]*\}", text)
-    if not match:
+    # Extract CoT reasoning and FINAL_JSON sentinel
+    reasoning_text, json_str = extract_cot_answer(text)
+
+    log_reasoning_trace(
+        logger_fn              = lambda msg: logger.info(msg),
+        email_id               = email_id,
+        lambda_name            = "extract_entity",
+        scratchpad             = reasoning_text,
+        final_answer           = json_str[:500] if json_str else '',
+        reasoning_format_valid = bool(reasoning_text),
+    )
+
+    if not json_str:
         logger.warning(json.dumps({
             "trace_id": email_id,
             "warning":  "no_json_in_bedrock_output",
@@ -627,7 +681,7 @@ def _parse_extraction_json(
         return {}, 0.5
 
     try:
-        obj = json.loads(match.group())
+        obj = json.loads(json_str)
     except json.JSONDecodeError as exc:
         logger.warning(json.dumps({
             "trace_id": email_id,

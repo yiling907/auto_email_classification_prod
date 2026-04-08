@@ -525,6 +525,7 @@ def send_email_response(email_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
             'subject':          item.get('subject', ''),
             'response_text':    item.get('llm_response', ''),
             'confidence_score': float(item.get('confidence_score', 0)),
+            'reference_ids':    list(item.get('reference_ids', [])),
         }
 
         if not payload['recipient_email'] or not payload['response_text']:

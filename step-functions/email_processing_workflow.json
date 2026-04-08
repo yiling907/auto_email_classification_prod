@@ -213,7 +213,8 @@
         "recipient_email.$":  "$.parsed_email.parsed_data.sender_email",
         "subject.$":          "$.parsed_email.parsed_data.subject",
         "response_text.$":    "$.response.response_text",
-        "confidence_score.$": "$.response.confidence_score"
+        "confidence_score.$": "$.response.confidence_score",
+        "reference_ids.$":    "$.response.reference_ids"
       },
       "ResultPath": "$.email_result",
       "Next": "SaveResult",

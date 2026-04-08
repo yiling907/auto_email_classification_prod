@@ -40,6 +40,7 @@ import json
 import logging
 import os
 import re
+import sys
 import time
 from datetime import date, datetime, timezone
 from typing import Any, Dict, Optional, Tuple
@@ -47,6 +48,10 @@ from typing import Any, Dict, Optional, Tuple
 import boto3
 from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
+
+# Shared ReAct / CoT utilities
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../shared'))
+from reasoning_utils import extract_react_answer, log_reasoning_trace, wrap_mistral
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -137,7 +142,7 @@ _INTENT_REQUIRES_ACTIVE = frozenset({
 
 _QUERY_PLAN_PROMPT = """\
 You are a database query planner for an insurance company CRM system.
-Your job is to read a customer's email and extract the best identifier \
+Your job is to read a customer's email and select the best identifier \
 to look up their record in the customers table.
 
 {schema}
@@ -149,14 +154,25 @@ Email excerpt (first 400 chars):
 {email_excerpt}
 \"\"\"
 
-Rules:
-1. Choose EXACTLY ONE lookup field from: customer_id, member_id, policy_number, email
-2. The lookup_value must appear verbatim in the email or extracted entities
-3. Prefer customer_id > member_id > policy_number > email (most → least precise)
-4. If no valid identifier is present, set lookup_field and lookup_value to null
+Solve this step by step using Thought/Action/Observation:
 
-Respond with ONLY valid JSON — no explanation, no markdown, no extra keys:
-{{
+Thought 1: What identifiers are present in the extracted entities above?
+Action 1: SCAN_ENTITIES
+Observation 1: <list each identifier key found, its value, and whether it matches the schema format>
+
+Thought 2: Are there additional identifiers visible directly in the email excerpt that were NOT captured in the entities?
+Action 2: SCAN_EMAIL_EXCERPT
+Observation 2: <list any additional identifiers found in the email text>
+
+Thought 3: Which identifier should I use? Apply the preference rule: customer_id > member_id > policy_number > email (most precise → least precise). If none present, use null.
+Action 3: SELECT_BEST_IDENTIFIER
+Observation 3: <state which identifier you chose and why>
+
+Thought 4: How confident am I that this is the correct identifier to use? (1.0 = exact match to schema format; 0.7 = partial match; 0.3 = guessed from context; 0.0 = no identifier found)
+Action 4: ASSESS_CONFIDENCE
+Observation 4: <confidence reasoning>
+
+FINAL_ANSWER: {{
   "lookup_field": "<field name or null>",
   "lookup_value": "<exact value or null>",
   "confidence": <float 0.0-1.0>
@@ -223,11 +239,10 @@ def _build_query_plan(
         email_excerpt = email_body[:400].replace('"', "'"),
     )
 
-    # Mistral instruction format: <s>[INST] … [/INST]
     body = json.dumps({
-        "prompt":      f"<s>[INST] {prompt} [/INST]",
-        "max_tokens":  128,
-        "temperature": 0.0,   # deterministic — this is a structured extraction task
+        "prompt":      wrap_mistral(prompt),
+        "max_tokens":  384,    # increased from 128 to accommodate ReAct reasoning trace
+        "temperature": 0.0,    # deterministic — structured extraction task
         "top_p":       1.0,
     })
 
@@ -248,12 +263,25 @@ def _build_query_plan(
 
     latency_ms = int((time.monotonic() - t0) * 1000)
 
-    # Parse the JSON the model produced
-    plan = _parse_model_json(model_text)
+    # Extract ReAct scratchpad and FINAL_ANSWER JSON
+    scratchpad, json_str = extract_react_answer(model_text)
+    reasoning_valid = bool(scratchpad)
+
+    log_reasoning_trace(
+        logger_fn              = lambda msg: logger.info(msg),
+        email_id               = intent,   # email_id not in scope here; intent is sufficient for tracing
+        lambda_name            = "crm_validation",
+        scratchpad             = scratchpad,
+        final_answer           = json_str,
+        reasoning_format_valid = reasoning_valid,
+    )
+
+    plan = _parse_model_json(json_str or model_text)
     plan.update({
         "model_used":        TEXT2SQL_MODEL_ID,
         "latency_ms":        latency_ms,
-        "raw_model_output":  model_text[:200],   # truncated for logging safety
+        "raw_model_output":  model_text[:200],
+        "react_scratchpad":  scratchpad[:500] if scratchpad else None,
     })
     return plan
 
@@ -261,15 +289,18 @@ def _build_query_plan(
 def _parse_model_json(text: str) -> Dict[str, Any]:
     """
     Extract the first JSON object from the model's text output.
+
+    Uses reasoning_utils.extract_json_block (brace-depth aware) so nested JSON
+    objects in the ReAct FINAL_ANSWER are handled correctly.
     Returns a null plan on parse failure.
     """
-    # Find the first '{...}' block in the model output
-    match = re.search(r"\{[^{}]*\}", text, re.DOTALL)
-    if not match:
+    from reasoning_utils import extract_json_block
+    json_str = extract_json_block(text) if text else ''
+    if not json_str:
         logger.warning("no JSON object found in model output")
         return {"lookup_field": None, "lookup_value": None, "confidence": 0.0}
     try:
-        obj = json.loads(match.group())
+        obj = json.loads(json_str)
         return {
             "lookup_field": obj.get("lookup_field"),
             "lookup_value": str(obj.get("lookup_value") or "").strip() or None,

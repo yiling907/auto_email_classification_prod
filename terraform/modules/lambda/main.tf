@@ -338,9 +338,11 @@ resource "aws_lambda_function" "email_sender" {
 
   environment {
     variables = {
-      EMAIL_TABLE_NAME = var.email_table_name
-      SENDER_EMAIL     = var.sender_email
-      SENDER_NAME      = var.sender_name
+      EMAIL_TABLE_NAME        = var.email_table_name
+      SENDER_EMAIL            = var.sender_email
+      SENDER_NAME             = var.sender_name
+      KNOWLEDGE_BASE_BUCKET   = var.knowledge_base_bucket_name
+      EMBEDDINGS_TABLE_NAME   = var.embeddings_table_name
     }
   }
 
